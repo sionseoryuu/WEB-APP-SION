@@ -1,0 +1,17 @@
+{
+  "name": "LIFE OS — Personal Life & Wealth Platform",
+  "short_name": "LIFE OS",
+  "description": "Keuangan, tugas, kebiasaan, dan tujuan hidup dalam satu aplikasi.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#171412",
+  "theme_color": "#171412",
+  "lang": "id",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

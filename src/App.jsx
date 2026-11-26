@@ -1,0 +1,10267 @@
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import {
+  LayoutDashboard,
+  Wallet,
+  PieChart,
+  PiggyBank,
+  CalendarDays,
+  CheckSquare,
+  Calendar,
+  Flame,
+  Target,
+  FileText,
+  ShoppingCart,
+  BarChart3,
+  Plus,
+  Search,
+  ArrowUpRight,
+  ArrowDownRight,
+  ArrowLeftRight,
+  Eye,
+  EyeOff,
+  Check,
+  X,
+  Edit3,
+  Trash2,
+  Pin,
+  Clock,
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  Settings,
+  Download,
+  Upload,
+  RefreshCw,
+  CreditCard,
+  Landmark,
+  Banknote,
+  Tag,
+  Bell,
+  BookOpen,
+  ListTodo,
+  Kanban,
+  CheckCircle2,
+  Circle,
+  Award,
+  ShieldCheck,
+  MoreHorizontal,
+  Sparkles,
+  Repeat,
+  Play,
+  Pause,
+  RotateCcw,
+  Globe,
+  LogOut,
+  Cloud,
+  HandCoins,
+  Split,
+  ScanLine,
+  Receipt,
+  Send,
+  Copy,
+  History,
+  Camera,
+  Image as ImageIcon,
+  Loader2,
+  QrCode,
+  TrendingUp,
+  Users,
+  BrainCircuit,
+  Wand2,
+  Moon,
+  Droplets,
+  Activity,
+  Scale,
+  HeartHandshake,
+  Cake,
+  PhoneCall,
+  MessageSquare,
+} from 'lucide-react';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  ComposedChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  Cell,
+  PieChart as RePieChart,
+  Pie,
+} from 'recharts';
+import { initializeApp, getApps } from 'firebase/app';
+import {
+  getAuth,
+  signInAnonymously,
+  signInWithCustomToken,
+} from 'firebase/auth';
+import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
+
+// ============================================================================
+// 0. FIREBASE CLOUD & MULTI-ACCOUNT ISOLATION INITIALIZATION
+// ============================================================================
+
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'life-os';
+let firebaseApp = null;
+let firebaseAuth = null;
+let firebaseDb = null;
+
+try {
+  if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+    const parsedConfig = JSON.parse(__firebase_config);
+    firebaseApp = getApps().length ? getApps()[0] : initializeApp(parsedConfig);
+    firebaseAuth = getAuth(firebaseApp);
+    firebaseDb = getFirestore(firebaseApp);
+  }
+} catch (err) {
+  console.error('Firebase initialization notice:', err);
+}
+
+
+// Gemini API key: dari VITE_GEMINI_API_KEY (opsional) atau diminta sekali lalu disimpan di perangkat.
+function getGeminiKey() {
+  try {
+    const envKey = import.meta.env?.VITE_GEMINI_API_KEY;
+    if (envKey) return envKey;
+    let k = localStorage.getItem('lifeos:gemini_key') || '';
+    if (!k && typeof window !== 'undefined') {
+      k = (window.prompt('Masukkan Gemini API key untuk fitur AI (disimpan hanya di perangkat ini):') || '').trim();
+      if (k) localStorage.setItem('lifeos:gemini_key', k);
+    }
+    return k;
+  } catch {
+    return '';
+  }
+}
+
+// Persistensi lokal (offline-first)
+const STORAGE_KEY = 'lifeos:workspace:v1';
+function loadSavedWorkspace() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function deriveWorkspaceKey(email) {
+  const normalized = String(email || 'guest').trim().toLowerCase();
+  let hash = 0;
+  for (let i = 0; i < normalized.length; i += 1) {
+    hash = (hash << 5) - hash + normalized.charCodeAt(i);
+    hash |= 0;
+  }
+  return `ws_${Math.abs(hash).toString(36)}_${normalized.replace(/[^a-z0-9]/g, '_')}`;
+}
+
+function hashPasswordClient(raw) {
+  let h = 2166136261;
+  const str = String(raw || '');
+  for (let i = 0; i < str.length; i += 1) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(16);
+}
+
+// ============================================================================
+// 1. BILINGUAL DICTIONARY (BAHASA INDONESIA & ENGLISH)
+// ============================================================================
+
+const I18N = {
+  en: {
+    grp_command: 'Command',
+    grp_wealth: 'Wealth & Vault',
+    grp_time: 'Time & Execution',
+    grp_growth: 'Growth & Life',
+    grp_intel: 'Intelligence',
+    nav_dashboard: 'Dashboard',
+    nav_wallet: 'Digital Wallet',
+    nav_budgets: 'Budgets',
+    nav_savings: 'Savings Vaults',
+    nav_subscriptions: 'Bills & Subscriptions',
+    nav_debts: 'Debts & Installments',
+    nav_planner: 'Daily Planner',
+    nav_tasks: 'Tasks',
+    nav_calendar: 'Calendar',
+    nav_habits: 'Habit Tracker',
+    nav_goals: 'Goals',
+    nav_crm: 'Personal CRM',
+    nav_notes: 'Notes & Journal',
+    nav_shopping: 'Shopping Lists',
+    nav_reports: 'Reports & Analytics',
+    nav_investments: 'Investment Portfolio',
+
+    net_worth: 'Net Worth',
+    quick_entry: 'Quick Entry',
+    all_modules: 'All Modules',
+    save: 'Save',
+    cancel: 'Cancel',
+    delete: 'Delete',
+    add: 'Add',
+    edit: 'Edit',
+    search_placeholder: 'Search...',
+    actions: 'Actions',
+    date: 'Date',
+    description: 'Description',
+    category: 'Category',
+    amount: 'Amount',
+    notes: 'Notes',
+    status: 'Status',
+    priority: 'Priority',
+
+    today_banner_date: 'Thursday, November 26, 2026',
+    welcome_back: 'Welcome back',
+    welcome_subtitle:
+      'Your personal wealth vault, daily execution plan, and habit telemetry in one command center.',
+    btn_transaction: 'Transaction',
+    btn_task: 'Task',
+    btn_event: 'Event',
+    kpi_total_balance: 'Total Net Balance',
+    kpi_active_accounts: 'active wallet accounts',
+    kpi_monthly_income: 'Monthly Income',
+    kpi_inflows_label: 'November 2026 inflows',
+    kpi_monthly_expenses: 'Monthly Expenses',
+    kpi_net_savings: 'Net savings',
+    kpi_budget_util: 'Budget Utilization',
+    kpi_left: 'left',
+    chart_cashflow_title: 'Cashflow Trajectory',
+    chart_cashflow_sub: 'Income vs. Expenses derived from ledger history',
+    btn_full_analytics: 'Full Analytics',
+    todays_schedule: "Today's Schedule",
+    events_scheduled: 'events scheduled',
+    no_events_today: 'No events scheduled for today.',
+    open_time_blocker: 'Open Daily Time-Blocker',
+    recent_ledger: 'Recent Ledger Activity',
+    view_all: 'View All',
+    priority_tasks: 'Priority Tasks',
+    completed_count: 'completed',
+    daily_habit_checkin: 'Daily Habit Check-In',
+    completed_today: 'completed today',
+    active_goals_completion: 'Active Goals Completion',
+
+    wallet_title: 'Digital Wallet & Finance',
+    wallet_subtitle:
+      'Personal finance & double-entry balance tracker (does not initiate external bank transfers).',
+    custom_category: 'Custom Category',
+    add_account: 'Add Account',
+    new_transaction: 'New Transaction',
+    spending_by_cat: 'November Spending by Category',
+    excludes_transfers: 'Excludes internal account transfers so net worth remains accurate',
+    ledger_summary: 'November Ledger Summary',
+    savings_rate: 'Savings Rate',
+    all_types: 'All Types',
+    all_categories: 'All Categories',
+    all_months: 'All Months',
+    clear_account_filter: 'Clear Account Filter',
+
+    budget_title: 'Budget Architecture',
+    budget_subtitle: 'Category spending guardrails synchronized automatically with your expense ledger.',
+    set_cat_limit: 'Set Category Limit',
+    budget_alert_title: 'Budget Threshold Notification',
+    allocated_budget: 'Allocated Monthly Budget',
+    tracked_spend: 'Tracked Category Spend',
+    remaining_allowance: 'Remaining Allowance',
+    remaining: 'remaining',
+    over_by: 'Over by',
+    prev_month: 'Prev month',
+
+    savings_title: 'Savings Vaults',
+    savings_subtitle: 'Dedicated capital targets with contribution ledger history and milestone tracking.',
+    new_savings_vault: 'New Savings Vault',
+    contribute: 'Contribute',
+    history: 'History',
+    target_funded: 'Target fully funded!',
+    remaining_to_target: 'remaining to target',
+
+    subs_title: 'Recurring Bills & Subscriptions',
+    subs_subtitle: 'Track fixed monthly commitments, due dates, and pay directly into your expense ledger.',
+    add_subscription: 'Add Recurring Bill',
+    monthly_fixed_burn: 'Monthly Fixed Burn',
+    annualized_cost: 'Annualized Commitment',
+    paid_this_month: 'Paid This Month',
+    pay_and_log: 'Pay & Log',
+    paid_badge: 'Paid (Nov)',
+    due_day: 'Due day',
+
+    planner_title: 'Executive Planner',
+    planner_subtitle: 'Align daily priorities, time-blocked schedules, and weekly execution targets.',
+    mode_daily: 'Daily',
+    mode_weekly: 'Weekly',
+    mode_monthly: 'Monthly',
+    top_3_priorities: 'Top 3 Priorities',
+    high_leverage_sub: 'High-leverage focus outcomes',
+    focus_timer_title: 'Deep Work Focus Timer',
+    focus_sessions_done: 'sessions completed today',
+    daily_timeline: 'Daily Time-Block Timeline',
+    add_time_block: 'Add Time Block',
+
+    tasks_title: 'Task Command',
+    tasks_subtitle: 'Structured execution across list and Kanban workflows.',
+    view_list: 'List',
+    view_board: 'Board',
+    new_task: 'New Task',
+    todo: 'To Do',
+    in_progress: 'In Progress',
+    completed: 'Completed',
+
+    calendar_title: 'Calendar & Agenda',
+    calendar_subtitle: 'Unified view of scheduled events, reminders, and task deadlines.',
+    new_event: 'New Event',
+    daily_agenda: 'Daily Agenda',
+    task_deadlines: 'Task Deadlines',
+
+    habits_title: 'Habit Rituals & Streaks',
+    habits_subtitle: 'Track daily consistency, unbroken streaks, and 7-day completion velocity.',
+    new_habit: 'New Habit',
+    consistency_chart_title: '7-Day Consistency Rate (%)',
+    habit_ritual: 'Habit Ritual',
+    streak: 'Streak',
+
+    goals_title: 'Goals & Personal Milestones',
+    goals_subtitle: 'Short-term sprints and long-term vision backed by verifiable milestone execution.',
+    new_goal: 'New Goal',
+    milestone_progress: 'Milestone Progress',
+
+    notes_title: 'Notes & Daily Journal',
+    notes_subtitle: 'Structured knowledge vault, pinned references, and daily reflective journaling.',
+    new_journal: 'New Journal Entry',
+    new_note: 'New Note',
+    words: 'words',
+    autosaved: 'Auto-saved to workspace state',
+
+    shopping_title: 'Shopping & Provisioning',
+    shopping_subtitle: 'Organize lists by category, estimate basket costs, and sync purchased totals to your wallet.',
+    new_list: 'New List',
+    log_purchased: 'Log Purchased',
+    est_basket: 'Estimated Basket',
+    purchased_cart: 'Purchased Cart',
+    remaining_buy: 'Remaining to Buy',
+
+    reports_title: 'Intelligence & Analytics',
+    reports_subtitle: 'Cross-domain telemetry across cashflow, budget variance, savings velocity, and productivity.',
+    export_csv: 'Export Ledger CSV',
+
+    settings_title: 'Workspace Settings & Data Vault',
+    settings_sub: 'Manage language, currency, portable JSON backups, and workspace resets.',
+    profile_display: 'Language, Profile & Currency',
+    language_label: 'Interface Language',
+    display_name: 'Display Name',
+    currency_symbol: 'Currency Symbol',
+    save_preferences: 'Save Preferences',
+    data_portability: 'Data Portability & Backup',
+    export_json: 'Export JSON Snapshot',
+    import_json: 'Import JSON Snapshot',
+    workspace_reset: 'Workspace Environment Reset',
+    start_fresh: 'Start Fresh (Clear All Data)',
+    restore_demo: 'Restore Reference Dataset',
+
+    auth_badge: 'Isolated Multi-Account Database Architecture',
+    auth_title: 'Sign in to your personal LIFE OS',
+    auth_subtitle: 'Each account maintains an independent, isolated database synchronized across sessions.',
+    tab_login: 'Sign In',
+    tab_register: 'Create Account',
+    fullname_label: 'Full Name',
+    email_label: 'Email Address',
+    password_label: 'Password',
+    workspace_mode_label: 'Initial Workspace Setup',
+    seed_blank: 'Clean Slate (Empty Database)',
+    seed_demo: 'Pre-filled Executive Template',
+    btn_login: 'Access My Workspace',
+    btn_register: 'Create Account & Database',
+    btn_demo_access: 'Instant Demo Workspace',
+    logout: 'Sign Out',
+    cloud_synced: 'Cloud Vault Active',
+    cloud_syncing: 'Syncing...',
+    local_session: 'Isolated Session',
+
+    debts_title: 'Debts, Receivables & Installments',
+    debts_subtitle: 'Track installment loans and receivables with direct wallet settlement.',
+    add_debt: 'Add Debt / Receivable',
+    total_debt_owed: 'Total Remaining Debt',
+    total_receivable: 'Total Receivables',
+    monthly_installments: 'Monthly Installments',
+    debt_type_owe: 'Debt / Installment',
+    debt_type_receivable: 'Receivable (Owed to You)',
+    pay_installment: 'Pay Installment',
+    receive_payment: 'Record Repayment',
+    tenor_months: 'Tenor (Months)',
+    payday_splitter: 'Payday Splitter',
+    payday_sub: 'Automatically allocate incoming salary across multiple wallet accounts.',
+    total_payday_amount: 'Net Payday Amount',
+    execute_split: 'Execute Allocation',
+    scan_receipt: 'Scan Barcode & Receipt',
+    scan_receipt_sub: 'Use your live camera to scan QRIS/barcodes or snap a receipt for auto-extraction.',
+    mode_camera: 'Live Camera',
+    mode_upload: 'Upload Photo',
+    mode_text: 'Paste Text',
+    capture_scan: 'Snap & Extract Data',
+    scanning_ai: 'Reading image...',
+    camera_error_hint: 'Camera access unavailable or blocked in preview frame. Please allow camera permission or use Upload Photo.',
+    extract_and_review: 'Extract Receipt Data',
+    daily_briefing: 'Daily Briefing',
+    copy_briefing: 'Copy for WhatsApp / Telegram',
+    briefing_copied: 'Daily briefing copied to clipboard',
+
+    smart_cmd_placeholder:
+      'Type naturally, e.g. "Coffee 45k via QRIS and schedule project review tomorrow at 14:00"',
+    smart_cmd_btn: 'Auto-Create',
+    smart_cmd_processing: 'Parsing...',
+    split_bill: 'Split Bill',
+    split_bill_sub: 'Split shared expenses and auto-log friends’ shares as receivables.',
+    split_equal: 'Split Equally',
+    split_custom: 'Custom Amounts',
+    your_share: 'Your Own Share',
+    add_participant: 'Add Friend',
+    log_total_wallet: 'Log total paid as wallet expense',
+    execute_split_bill: 'Create Split & Receivables',
+    inv_title: 'Investment Portfolio',
+    inv_subtitle: 'Track gold, mutual funds, equities, and bonds integrated into your Total Net Worth.',
+    add_investment: 'Add Asset',
+    inv_current_value: 'Current Market Value',
+    inv_invested_capital: 'Invested Capital',
+    inv_unrealized_pnl: 'Unrealized Gain / Loss',
+    update_market_val: 'Update Value',
+    ai_advisor_title: 'AI Financial & Productivity Advisor',
+    ai_advisor_sub: 'Executive telemetry audit across cashflow, budgets, debts, tasks, and habit streaks.',
+    ai_run_audit: 'Analyze My Data',
+    ai_analyzing: 'Auditing workspace...',
+
+    // NEW: Wellness Telemetry & Personal CRM
+    wellness_title: 'Wellness, Sleep & Hydration',
+    wellness_sub: 'Daily sleep duration, hydration intake, body weight & energy telemetry',
+    sleep_hours: 'Sleep (hrs)',
+    water_glasses: 'Water (glasses)',
+    body_weight: 'Weight (kg)',
+    energy_score: 'Energy (1–10)',
+    save_wellness: 'Save Wellness Log',
+    wellness_corr_title: 'Sleep Duration vs. Energy & Productivity',
+    wellness_corr_sub: '7-day correlation between sleep hours, energy levels, and completed tasks',
+    avg_sleep: '7-Day Avg Sleep',
+    avg_energy: 'Avg Energy Score',
+    crm_title: 'Personal CRM & Relationship Vault',
+    crm_sub: 'Nurture key relationships with birthday alerts, last-contact logs, and follow-up reminders.',
+    add_contact: 'Add Contact',
+    contact_name: 'Full Name / Group',
+    relationship_cat: 'Relationship Circle',
+    birthday: 'Birthday',
+    last_contacted: 'Last Contacted',
+    followup_days: 'Follow-Up Cycle (Days)',
+    log_contact_today: 'Log Contact Today',
+    overdue_followup: 'Follow-Up Due',
+    on_track: 'On Track',
+    last_topic: 'Last Conversation Topic',
+    contact_handle: 'Phone / Handle',
+    upcoming_birthdays: 'Upcoming Birthdays',
+    due_followups: 'Due for Check-In',
+  },
+  id: {
+    grp_command: 'Pusat Kendali',
+    grp_wealth: 'Keuangan & Brankas',
+    grp_time: 'Waktu & Eksekusi',
+    grp_growth: 'Pengembangan Diri',
+    grp_intel: 'Analitik',
+    nav_dashboard: 'Dasbor Utama',
+    nav_wallet: 'Dompet Digital',
+    nav_budgets: 'Anggaran',
+    nav_savings: 'Brankas Tabungan',
+    nav_subscriptions: 'Tagihan & Langganan',
+    nav_debts: 'Utang, Piutang & Cicilan',
+    nav_planner: 'Perencana Harian',
+    nav_tasks: 'Manajemen Tugas',
+    nav_calendar: 'Kalender',
+    nav_habits: 'Pelacak Kebiasaan',
+    nav_goals: 'Target & Tujuan',
+    nav_crm: 'Personal CRM & Relasi',
+    nav_notes: 'Catatan & Jurnal',
+    nav_shopping: 'Daftar Belanja',
+    nav_reports: 'Laporan & Analitik',
+    nav_investments: 'Portofolio Investasi',
+
+    net_worth: 'Total Kekayaan',
+    quick_entry: 'Catat Cepat',
+    all_modules: 'Semua Modul',
+    save: 'Simpan',
+    cancel: 'Batal',
+    delete: 'Hapus',
+    add: 'Tambah',
+    edit: 'Ubah',
+    search_placeholder: 'Cari...',
+    actions: 'Aksi',
+    date: 'Tanggal',
+    description: 'Deskripsi',
+    category: 'Kategori',
+    amount: 'Nominal',
+    notes: 'Catatan',
+    status: 'Status',
+    priority: 'Prioritas',
+
+    today_banner_date: 'Kamis, 26 November 2026',
+    welcome_back: 'Selamat datang kembali',
+    welcome_subtitle:
+      'Brankas keuangan pribadi, rencana harian, dan progres kebiasaan Anda dalam satu pusat kendali.',
+    btn_transaction: 'Transaksi',
+    btn_task: 'Tugas',
+    btn_event: 'Agenda',
+    kpi_total_balance: 'Total Saldo Bersih',
+    kpi_active_accounts: 'akun dompet aktif',
+    kpi_monthly_income: 'Pemasukan Bulanan',
+    kpi_inflows_label: 'Arus masuk November 2026',
+    kpi_monthly_expenses: 'Pengeluaran Bulanan',
+    kpi_net_savings: 'Tabungan bersih',
+    kpi_budget_util: 'Pemakaian Anggaran',
+    kpi_left: 'tersisa',
+    chart_cashflow_title: 'Arus Kas Bulanan',
+    chart_cashflow_sub: 'Perbandingan pemasukan & pengeluaran dari buku kas',
+    btn_full_analytics: 'Analitik Lengkap',
+    todays_schedule: 'Jadwal Hari Ini',
+    events_scheduled: 'agenda terjadwal',
+    no_events_today: 'Tidak ada agenda terjadwal hari ini.',
+    open_time_blocker: 'Buka Time-Blocker Harian',
+    recent_ledger: 'Transaksi Terbaru',
+    view_all: 'Lihat Semua',
+    priority_tasks: 'Tugas Prioritas',
+    completed_count: 'selesai',
+    daily_habit_checkin: 'Check-In Kebiasaan Harian',
+    completed_today: 'selesai hari ini',
+    active_goals_completion: 'Progres Target Aktif',
+
+    wallet_title: 'Dompet Digital & Keuangan',
+    wallet_subtitle:
+      'Pencatatan keuangan pribadi & saldo akurat (tidak melakukan transfer bank eksternal secara nyata).',
+    custom_category: 'Kategori Kustom',
+    add_account: 'Tambah Akun',
+    new_transaction: 'Transaksi Baru',
+    spending_by_cat: 'Pengeluaran November per Kategori',
+    excludes_transfers: 'Tidak termasuk transfer antar akun agar total kekayaan tetap akurat',
+    ledger_summary: 'Ringkasan Kas November',
+    savings_rate: 'Rasio Tabungan',
+    all_types: 'Semua Tipe',
+    all_categories: 'Semua Kategori',
+    all_months: 'Semua Bulan',
+    clear_account_filter: 'Reset Filter Akun',
+
+    budget_title: 'Manajemen Anggaran',
+    budget_subtitle: 'Batas pengeluaran per kategori yang tersinkronisasi otomatis dengan buku kas.',
+    set_cat_limit: 'Atur Batas Kategori',
+    budget_alert_title: 'Peringatan Batas Anggaran',
+    allocated_budget: 'Total Anggaran Bulanan',
+    tracked_spend: 'Pengeluaran Terpakai',
+    remaining_allowance: 'Sisa Anggaran',
+    remaining: 'tersisa',
+    over_by: 'Melebihi batas',
+    prev_month: 'Bulan lalu',
+
+    savings_title: 'Brankas Tabungan',
+    savings_subtitle: 'Target dana khusus lengkap dengan riwayat setoran dan visualisasi progres.',
+    new_savings_vault: 'Buat Target Tabungan',
+    contribute: 'Setor Dana',
+    history: 'Riwayat',
+    target_funded: 'Target tabungan tercapai!',
+    remaining_to_target: 'lagi menuju target',
+
+    subs_title: 'Tagihan Rutin & Langganan',
+    subs_subtitle: 'Pantau tagihan bulanan tetap, tanggal jatuh tempo, dan catat pembayaran ke dompet dalam 1 klik.',
+    add_subscription: 'Tambah Tagihan Rutin',
+    monthly_fixed_burn: 'Total Tagihan Bulanan',
+    annualized_cost: 'Estimasi Biaya Tahunan',
+    paid_this_month: 'Lunas Bulan Ini',
+    pay_and_log: 'Bayar & Catat',
+    paid_badge: 'Lunas (Nov)',
+    due_day: 'Jatuh tempo tgl',
+
+    planner_title: 'Perencana Eksekutif',
+    planner_subtitle: 'Selaraskan prioritas harian, blok waktu kerja fokus, dan target mingguan.',
+    mode_daily: 'Harian',
+    mode_weekly: 'Mingguan',
+    mode_monthly: 'Bulanan',
+    top_3_priorities: '3 Prioritas Utama',
+    high_leverage_sub: 'Fokus utama paling berdampak hari ini',
+    focus_timer_title: 'Timer Fokus Deep Work',
+    focus_sessions_done: 'sesi fokus selesai hari ini',
+    daily_timeline: 'Jadwal Time-Block Harian',
+    add_time_block: 'Tambah Blok Waktu',
+
+    tasks_title: 'Manajemen Tugas',
+    tasks_subtitle: 'Kelola daftar tugas terstruktur dengan tampilan Daftar maupun Papan Kanban.',
+    view_list: 'Daftar',
+    view_board: 'Papan',
+    new_task: 'Tugas Baru',
+    todo: 'Akan Dikerjakan',
+    in_progress: 'Sedang Berjalan',
+    completed: 'Selesai',
+
+    calendar_title: 'Kalender & Agenda',
+    calendar_subtitle: 'Tampilan terpadu untuk jadwal acara, pengingat, dan tenggat tugas.',
+    new_event: 'Agenda Baru',
+    daily_agenda: 'Agenda Harian',
+    task_deadlines: 'Tenggat Tugas',
+
+    habits_title: 'Pelacak Kebiasaan & Streak',
+    habits_subtitle: 'Bangun konsistensi harian, pantau streak tanpa putus, dan grafik 7 hari terakhir.',
+    new_habit: 'Kebiasaan Baru',
+    consistency_chart_title: 'Tingkat Konsistensi 7 Hari (%)',
+    habit_ritual: 'Rutinitas Kebiasaan',
+    streak: 'Streak',
+
+    goals_title: 'Target & Pencapaian Pribadi',
+    goals_subtitle: 'Target jangka pendek & panjang yang terukur melalui daftar milestone.',
+    new_goal: 'Target Baru',
+    milestone_progress: 'Progres Milestone',
+
+    notes_title: 'Catatan & Jurnal Harian',
+    notes_subtitle: 'Brankas pengetahuan terstruktur, catatan penting tersemat, dan refleksi harian.',
+    new_journal: 'Entri Jurnal Baru',
+    new_note: 'Catatan Baru',
+    words: 'kata',
+    autosaved: 'Tersimpan otomatis ke ruang kerja',
+
+    shopping_title: 'Daftar Belanja & Kebutuhan',
+    shopping_subtitle: 'Kelompokkan belanja per kategori, hitung estimasi biaya, dan catat ke pengeluaran dompet.',
+    new_list: 'Daftar Baru',
+    log_purchased: 'Catat Belanja',
+    est_basket: 'Estimasi Total Keranjang',
+    purchased_cart: 'Sudah Dibeli',
+    remaining_buy: 'Belum Dibeli',
+
+    reports_title: 'Laporan & Analitik Terpadu',
+    reports_subtitle: 'Statistik arus kas, evaluasi anggaran, progres tabungan, dan produktivitas.',
+    export_csv: 'Ekspor CSV Buku Kas',
+
+    settings_title: 'Pengaturan Ruang Kerja & Cadangan Data',
+    settings_sub: 'Atur bahasa aplikasi, simbol mata uang, ekspor/impor JSON, atau reset data.',
+    profile_display: 'Bahasa, Profil & Mata Uang',
+    language_label: 'Bahasa Antarmuka',
+    display_name: 'Nama Pengguna',
+    currency_symbol: 'Simbol Mata Uang',
+    save_preferences: 'Simpan Pengaturan',
+    data_portability: 'Portabilitas & Cadangan Data',
+    export_json: 'Ekspor Cadangan JSON',
+    import_json: 'Impor Cadangan JSON',
+    workspace_reset: 'Reset Ruang Kerja',
+    start_fresh: 'Mulai dari Nol (Hapus Semua Data)',
+    restore_demo: 'Pulihkan Data Referensi',
+
+    auth_badge: 'Arsitektur Database Terpisah per Akun',
+    auth_title: 'Masuk ke Ruang Kerja LIFE OS Anda',
+    auth_subtitle: 'Setiap akun memiliki database terpisah yang aman dan tersinkronisasi otomatis.',
+    tab_login: 'Masuk Akun',
+    tab_register: 'Buat Akun Baru',
+    fullname_label: 'Nama Lengkap',
+    email_label: 'Alamat Email',
+    password_label: 'Kata Sandi',
+    workspace_mode_label: 'Pilihan Awal Database',
+    seed_blank: 'Mulai dari Nol (Database Kosong)',
+    seed_demo: 'Gunakan Template Data Contoh',
+    btn_login: 'Masuk ke Ruang Kerja',
+    btn_register: 'Buat Akun & Database Baru',
+    btn_demo_access: 'Akses Cepat Akun Demo',
+    logout: 'Keluar Akun',
+    cloud_synced: 'Cloud Vault Aktif',
+    cloud_syncing: 'Menyimpan...',
+    local_session: 'Sesi Terisolasi',
+
+    debts_title: 'Utang, Piutang & Cicilan',
+    debts_subtitle: 'Pantau sisa cicilan, pinjaman, dan piutang yang terhubung langsung ke saldo dompet.',
+    add_debt: 'Tambah Utang / Piutang',
+    total_debt_owed: 'Total Sisa Utang & Cicilan',
+    total_receivable: 'Total Piutang (Dana Masuk)',
+    monthly_installments: 'Komitmen Cicilan / Bulan',
+    debt_type_owe: 'Utang / Cicilan',
+    debt_type_receivable: 'Piutang (Orang Berutang)',
+    pay_installment: 'Bayar Cicilan',
+    receive_payment: 'Terima Pembayaran',
+    tenor_months: 'Tenor (Bulan)',
+    payday_splitter: 'Alokasi Gaji',
+    payday_sub: 'Bagi pemasukan gaji secara otomatis berdasarkan persentase ke beberapa akun dompet.',
+    total_payday_amount: 'Nominal Gaji / Pemasukan',
+    execute_split: 'Jalankan Alokasi Dana',
+    scan_receipt: 'Scan Barcode & Struk',
+    scan_receipt_sub: 'Buka kamera langsung untuk memindai QRIS/barcode atau foto struk belanja otomatis.',
+    mode_camera: 'Kamera Langsung',
+    mode_upload: 'Unggah Foto',
+    mode_text: 'Teks Struk',
+    capture_scan: 'Jepret & Ekstrak Data',
+    scanning_ai: 'Membaca gambar...',
+    camera_error_hint: 'Akses kamera diblokir browser/iframe atau kamera tidak ditemukan. Izinkan akses kamera atau gunakan Unggah Foto.',
+    extract_and_review: 'Ekstrak Data Struk',
+    daily_briefing: 'Ringkasan Harian',
+    copy_briefing: 'Salin untuk WhatsApp / Telegram',
+    briefing_copied: 'Ringkasan harian disalin ke clipboard',
+
+    smart_cmd_placeholder:
+      'Ketik bebas: "Beli kopi 45rb pakai QRIS dan jadwalkan evaluasi proyek besok jam 14.00"',
+    smart_cmd_btn: 'Proses Otomatis',
+    smart_cmd_processing: 'Memproses...',
+    split_bill: 'Split Bill / Patungan',
+    split_bill_sub: 'Bagi tagihan bersama dan otomatis catat bagian teman sebagai piutang.',
+    split_equal: 'Bagi Rata',
+    split_custom: 'Nominal Kustom',
+    your_share: 'Bagian Anda Sendiri',
+    add_participant: 'Tambah Teman',
+    log_total_wallet: 'Catat total pembayaran ke pengeluaran dompet',
+    execute_split_bill: 'Proses Split & Piutang',
+    inv_title: 'Portofolio Investasi',
+    inv_subtitle: 'Pantau emas, reksadana, saham, dan obligasi yang terhubung otomatis ke Total Kekayaan.',
+    add_investment: 'Tambah Aset',
+    inv_current_value: 'Nilai Pasar Terkini',
+    inv_invested_capital: 'Total Modal Awal',
+    inv_unrealized_pnl: 'Keuntungan / Rugi',
+    update_market_val: 'Update Nilai',
+    ai_advisor_title: 'Asisten Analis Keuangan & Kebiasaan (AI)',
+    ai_advisor_sub: 'Audit cerdas berdasarkan arus kas, anggaran, cicilan, tugas, dan streak kebiasaan Anda.',
+    ai_run_audit: 'Analisis Data Saya',
+    ai_analyzing: 'Menganalisis data...',
+
+    // BARU: Pelacak Kesehatan & Personal CRM
+    wellness_title: 'Kesehatan, Tidur & Hidrasi',
+    wellness_sub: 'Catat durasi tidur, asupan air minum, berat badan & skor energi harian',
+    sleep_hours: 'Tidur (jam)',
+    water_glasses: 'Air (gelas)',
+    body_weight: 'Berat (kg)',
+    energy_score: 'Energi (1–10)',
+    save_wellness: 'Simpan Log Kesehatan',
+    wellness_corr_title: 'Korelasi Durasi Tidur vs. Energi & Tugas',
+    wellness_corr_sub: 'Perbandingan 7 hari terakhir antara jam tidur, skor energi, dan penyelesaian tugas',
+    avg_sleep: 'Rata-Rata Tidur 7 Hari',
+    avg_energy: 'Rata-Rata Skor Energi',
+    crm_title: 'Personal CRM & Pengingat Relasi',
+    crm_sub: 'Jaga silaturahmi dengan pengingat ulang tahun, catatan diskusi terakhir, dan jadwal follow-up.',
+    add_contact: 'Tambah Kontak Relasi',
+    contact_name: 'Nama Lengkap / Keluarga',
+    relationship_cat: 'Lingkaran Relasi',
+    birthday: 'Tanggal Lahir',
+    last_contacted: 'Kontak Terakhir',
+    followup_days: 'Siklus Follow-Up (Hari)',
+    log_contact_today: 'Catat Silaturahmi Hari Ini',
+    overdue_followup: 'Perlu Dihubungi',
+    on_track: 'Terjaga Baik',
+    last_topic: 'Topik Pembicaraan Terakhir',
+    contact_handle: 'No. HP / Kontak',
+    upcoming_birthdays: 'Ulang Tahun Mendatang',
+    due_followups: 'Jadwal Sapa Ulang',
+  },
+};
+
+// ============================================================================
+// 2. CONSTANTS & NAVIGATION CONFIG
+// ============================================================================
+
+const _now = new Date();
+const TODAY_STR = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
+const CURRENT_MONTH = TODAY_STR.slice(0, 7);
+
+const DEFAULT_EXPENSE_CATEGORIES = [
+  'Housing & Utilities',
+  'Dining & Coffee',
+  'Groceries',
+  'Transport & Travel',
+  'Software & Subscriptions',
+  'Health & Wellness',
+  'Shopping & Lifestyle',
+  'Investments',
+];
+
+const DEFAULT_INCOME_CATEGORIES = [
+  'Primary Salary',
+  'Consulting & Advisory',
+  'Dividends & Yield',
+  'Client Retainer',
+  'Other Income',
+];
+
+const CHART_PALETTE = [
+  '#B68B61',
+  '#E4C8A6',
+  '#8C6440',
+  '#C99E74',
+  '#7A553A',
+  '#D4B48C',
+  '#9E7652',
+  '#624332',
+];
+
+const NAV_GROUPS = [
+  {
+    labelKey: 'grp_command',
+    items: [{ id: 'dashboard', labelKey: 'nav_dashboard', icon: LayoutDashboard }],
+  },
+  {
+    labelKey: 'grp_wealth',
+    items: [
+      { id: 'wallet', labelKey: 'nav_wallet', icon: Wallet },
+      { id: 'budgets', labelKey: 'nav_budgets', icon: PieChart },
+      { id: 'savings', labelKey: 'nav_savings', icon: PiggyBank },
+      { id: 'investments', labelKey: 'nav_investments', icon: TrendingUp },
+      { id: 'subscriptions', labelKey: 'nav_subscriptions', icon: Repeat },
+      { id: 'debts', labelKey: 'nav_debts', icon: HandCoins },
+    ],
+  },
+  {
+    labelKey: 'grp_time',
+    items: [
+      { id: 'planner', labelKey: 'nav_planner', icon: CalendarDays },
+      { id: 'tasks', labelKey: 'nav_tasks', icon: CheckSquare },
+      { id: 'calendar', labelKey: 'nav_calendar', icon: Calendar },
+    ],
+  },
+  {
+    labelKey: 'grp_growth',
+    items: [
+      { id: 'habits', labelKey: 'nav_habits', icon: Flame },
+      { id: 'goals', labelKey: 'nav_goals', icon: Target },
+      { id: 'crm', labelKey: 'nav_crm', icon: HeartHandshake },
+      { id: 'notes', labelKey: 'nav_notes', icon: FileText },
+      { id: 'shopping', labelKey: 'nav_shopping', icon: ShoppingCart },
+    ],
+  },
+  {
+    labelKey: 'grp_intel',
+    items: [{ id: 'reports', labelKey: 'nav_reports', icon: BarChart3 }],
+  },
+];
+
+// ============================================================================
+// 3. INITIAL APPLICATION DATA & EMPTY TEMPLATE
+// ============================================================================
+
+const createInitialState = () => ({
+  profile: {
+    name: 'Alexander Vance',
+    role: 'Executive Workspace',
+    currency: 'Rp',
+    language: 'id',
+  },
+  accounts: [
+    {
+      id: 'acc-1',
+      name: 'BCA Prioritas Utama',
+      type: 'Checking',
+      institution: 'Bank Central Asia',
+      initialBalance: 18500000,
+      lastFour: '4821',
+    },
+    {
+      id: 'acc-2',
+      name: 'Brankas Tabungan & RDPU',
+      type: 'Savings',
+      institution: 'Mandiri & Bibit',
+      initialBalance: 45000000,
+      lastFour: '9104',
+    },
+    {
+      id: 'acc-3',
+      name: 'Kartu Kredit Platinum',
+      type: 'Credit',
+      institution: 'Atelier Credit',
+      initialBalance: -1250000,
+      lastFour: '3309',
+    },
+    {
+      id: 'acc-4',
+      name: 'Dompet Tunai & QRIS',
+      type: 'Cash',
+      institution: 'Physical & E-Wallet',
+      initialBalance: 1450000,
+      lastFour: 'CASH',
+    },
+  ],
+  customExpenseCategories: [],
+  customIncomeCategories: [],
+  transactions: [
+    {
+      id: 'tx-h1',
+      type: 'income',
+      amount: 16500000,
+      date: '2026-09-28',
+      category: 'Primary Salary',
+      description: 'Gaji Bulanan & Tunjangan',
+      accountId: 'acc-1',
+      paymentMethod: 'Direct Deposit',
+      notes: 'Payroll September',
+    },
+    {
+      id: 'tx-h2',
+      type: 'expense',
+      amount: 6400000,
+      date: '2026-09-19',
+      category: 'Housing & Utilities',
+      description: 'Sewa Apartemen & Internet',
+      accountId: 'acc-1',
+      paymentMethod: 'Bank Transfer',
+      notes: '',
+    },
+    {
+      id: 'tx-h3',
+      type: 'income',
+      amount: 17200000,
+      date: '2026-10-28',
+      category: 'Primary Salary',
+      description: 'Gaji Bulanan & Bonus Proyek',
+      accountId: 'acc-1',
+      paymentMethod: 'Direct Deposit',
+      notes: '',
+    },
+    {
+      id: 'tx-h4',
+      type: 'expense',
+      amount: 7100000,
+      date: '2026-10-15',
+      category: 'Transport & Travel',
+      description: 'Tiket Perjalanan & Hotel',
+      accountId: 'acc-3',
+      paymentMethod: 'Credit Card',
+      notes: '',
+    },
+    {
+      id: 'tx-1',
+      type: 'income',
+      amount: 16500000,
+      date: '2026-11-01',
+      category: 'Primary Salary',
+      description: 'Gaji Eksekutif November',
+      accountId: 'acc-1',
+      paymentMethod: 'Direct Deposit',
+      notes: 'Transfer masuk utama',
+    },
+    {
+      id: 'tx-2',
+      type: 'expense',
+      amount: 3800000,
+      date: '2026-11-03',
+      category: 'Housing & Utilities',
+      description: 'Hunian, Listrik & Fiber Optik',
+      accountId: 'acc-1',
+      paymentMethod: 'Bank Transfer',
+      notes: 'Termasuk listrik token & internet 300Mbps',
+    },
+    {
+      id: 'tx-3',
+      type: 'transfer',
+      amount: 3500000,
+      date: '2026-11-05',
+      category: 'Vault Allocation',
+      description: 'Alokasi Dana Cadangan Bulanan',
+      accountId: 'acc-1',
+      toAccountId: 'acc-2',
+      paymentMethod: 'Internal Ledger Transfer',
+      notes: 'Auto-allocation ke brankas',
+    },
+    {
+      id: 'tx-4',
+      type: 'expense',
+      amount: 780000,
+      date: '2026-11-09',
+      category: 'Groceries',
+      description: 'Belanja Bahan Makanan & Buah Segar',
+      accountId: 'acc-3',
+      paymentMethod: 'QRIS / Card',
+      notes: 'Kebutuhan dapur mingguan',
+    },
+    {
+      id: 'tx-5',
+      type: 'income',
+      amount: 4200000,
+      date: '2026-11-14',
+      category: 'Consulting & Advisory',
+      description: 'Fee Konsultasi Arsitektur Sistem',
+      accountId: 'acc-1',
+      paymentMethod: 'Wire Settlement',
+      notes: 'Sprint Q4',
+    },
+    {
+      id: 'tx-6',
+      type: 'expense',
+      amount: 450000,
+      date: '2026-11-18',
+      category: 'Software & Subscriptions',
+      description: 'Cloud Hosting & Design Suite',
+      accountId: 'acc-3',
+      paymentMethod: 'Credit Card',
+      notes: '',
+    },
+    {
+      id: 'tx-7',
+      type: 'expense',
+      amount: 620000,
+      date: '2026-11-21',
+      category: 'Dining & Coffee',
+      description: 'Makan Malam Klien & Biji Kopi Arabika',
+      accountId: 'acc-3',
+      paymentMethod: 'Credit Card',
+      notes: '',
+    },
+    {
+      id: 'tx-8',
+      type: 'expense',
+      amount: 490000,
+      date: '2026-11-24',
+      category: 'Health & Wellness',
+      description: 'Membership Gym & Fisioterapi',
+      accountId: 'acc-1',
+      paymentMethod: 'Debit Card',
+      notes: '',
+    },
+    {
+      id: 'tx-9',
+      type: 'expense',
+      amount: 215000,
+      date: '2026-11-26',
+      category: 'Groceries',
+      description: 'Restock Kopi & Kebutuhan Harian',
+      accountId: 'acc-4',
+      paymentMethod: 'QRIS',
+      notes: '',
+    },
+  ],
+  budgets: [
+    { id: 'bud-1', category: 'Housing & Utilities', limit: 4200000, month: '2026-11' },
+    { id: 'bud-2', category: 'Dining & Coffee', limit: 1000000, month: '2026-11' },
+    { id: 'bud-3', category: 'Groceries', limit: 1500000, month: '2026-11' },
+    { id: 'bud-4', category: 'Software & Subscriptions', limit: 500000, month: '2026-11' },
+    { id: 'bud-5', category: 'Health & Wellness', limit: 750000, month: '2026-11' },
+    { id: 'bud-6', category: 'Transport & Travel', limit: 1200000, month: '2026-11' },
+  ],
+  savingsGoals: [
+    {
+      id: 'sav-1',
+      name: 'Dana Liburan Kyoto & Swiss',
+      targetAmount: 35000000,
+      targetDate: '2027-06-15',
+      linkedAccountId: 'acc-2',
+      contributions: [
+        { id: 'sc-1', amount: 12000000, date: '2026-09-15', note: 'Setoran awal' },
+        { id: 'sc-2', amount: 6500000, date: '2026-10-15', note: 'Alokasi bonus Oktober' },
+        { id: 'sc-3', amount: 3500000, date: '2026-11-05', note: 'Alokasi November' },
+      ],
+    },
+    {
+      id: 'sav-2',
+      name: 'Dana Darurat 12 Bulan',
+      targetAmount: 80000000,
+      targetDate: '2027-03-01',
+      linkedAccountId: 'acc-2',
+      contributions: [
+        { id: 'sc-4', amount: 48000000, date: '2026-08-01', note: 'Cadangan inti' },
+        { id: 'sc-5', amount: 7000000, date: '2026-11-10', note: 'Top-up rutin' },
+      ],
+    },
+    {
+      id: 'sav-3',
+      name: 'Upgrade Studio Kerja & Audio',
+      targetAmount: 15000000,
+      targetDate: '2027-01-30',
+      linkedAccountId: 'acc-1',
+      contributions: [
+        { id: 'sc-6', amount: 6500000, date: '2026-10-20', note: 'Milestone proyek' },
+        { id: 'sc-7', amount: 2500000, date: '2026-11-18', note: 'Setoran November' },
+      ],
+    },
+  ],
+  investments: [
+    {
+      id: 'inv-1',
+      name: 'Emas Batangan Antam (15 Gram)',
+      assetClass: 'Gold',
+      quantity: '15 gr',
+      investedAmount: 19500000,
+      currentValue: 23400000,
+      updatedAt: '2026-11-26',
+    },
+    {
+      id: 'inv-2',
+      name: 'Reksadana Pasar Uang & Pendapatan Tetap',
+      assetClass: 'Mutual Fund',
+      quantity: '12.450 Unit',
+      investedAmount: 20000000,
+      currentValue: 21850000,
+      updatedAt: '2026-11-26',
+    },
+    {
+      id: 'inv-3',
+      name: 'Saham Blue-Chip IDX (BBCA & BMRI)',
+      assetClass: 'Stocks',
+      quantity: '18 Lot',
+      investedAmount: 16200000,
+      currentValue: 18100000,
+      updatedAt: '2026-11-26',
+    },
+  ],
+  subscriptions: [
+    {
+      id: 'sub-1',
+      name: 'Cloud Workspace & AI Pro Suite',
+      amount: 320000,
+      billingCycle: 'Monthly',
+      dueDay: 28,
+      category: 'Software & Subscriptions',
+      accountId: 'acc-3',
+      lastPaidMonth: '2026-10',
+    },
+    {
+      id: 'sub-2',
+      name: 'Internet Fiber Gigabit & VPN',
+      amount: 485000,
+      billingCycle: 'Monthly',
+      dueDay: 5,
+      category: 'Housing & Utilities',
+      accountId: 'acc-1',
+      lastPaidMonth: '2026-11',
+    },
+    {
+      id: 'sub-3',
+      name: 'Membership Athletic Club',
+      amount: 490000,
+      billingCycle: 'Monthly',
+      dueDay: 24,
+      category: 'Health & Wellness',
+      accountId: 'acc-1',
+      lastPaidMonth: '2026-11',
+    },
+    {
+      id: 'sub-4',
+      name: 'Asuransi Kesehatan & Jiwa',
+      amount: 650000,
+      billingCycle: 'Monthly',
+      dueDay: 30,
+      category: 'Health & Wellness',
+      accountId: 'acc-3',
+      lastPaidMonth: '2026-10',
+    },
+  ],
+  debts: [
+    {
+      id: 'dbt-1',
+      title: 'Cicilan Workstation MacBook Pro 0%',
+      counterparty: 'BCA Cicilan 0%',
+      kind: 'debt',
+      totalAmount: 18000000,
+      paidAmount: 12000000,
+      monthlyAmount: 1500000,
+      tenorMonths: 12,
+      dueDate: '2026-12-05',
+      accountId: 'acc-1',
+      notes: 'Cicilan ke-8 dari 12 bulan',
+    },
+    {
+      id: 'dbt-2',
+      title: 'Reimbursement Perjalanan Klien Q4',
+      counterparty: 'PT Nusantara Digital',
+      kind: 'receivable',
+      totalAmount: 3250000,
+      paidAmount: 0,
+      monthlyAmount: 3250000,
+      tenorMonths: 1,
+      dueDate: '2026-12-01',
+      accountId: 'acc-1',
+      notes: 'Invoice #INV-209 disetujui',
+    },
+  ],
+  wellnessLogs: [
+    { date: '2026-11-20', sleepHours: 7.2, waterGlasses: 7, weightKg: 71.5, energyScore: 8 },
+    { date: '2026-11-21', sleepHours: 6.5, waterGlasses: 6, weightKg: 71.4, energyScore: 7 },
+    { date: '2026-11-22', sleepHours: 8.0, waterGlasses: 8, weightKg: 71.3, energyScore: 9 },
+    { date: '2026-11-23', sleepHours: 7.5, waterGlasses: 8, weightKg: 71.2, energyScore: 9 },
+    { date: '2026-11-24', sleepHours: 6.0, waterGlasses: 5, weightKg: 71.4, energyScore: 6 },
+    { date: '2026-11-25', sleepHours: 7.8, waterGlasses: 8, weightKg: 71.1, energyScore: 9 },
+    { date: '2026-11-26', sleepHours: 7.5, waterGlasses: 7, weightKg: 71.0, energyScore: 8 },
+  ],
+  contacts: [
+    {
+      id: 'cnt-1',
+      name: 'Hendra Wijaya',
+      category: 'Client',
+      handle: '+62 812-8800-4411',
+      birthday: '1988-12-04',
+      lastContacted: '2026-10-20',
+      followUpIntervalDays: 30,
+      lastTopic: 'Diskusi ekspansi proyek Q1 & arsitektur cloud',
+    },
+    {
+      id: 'cnt-2',
+      name: 'Dr. Ratna Kusuma',
+      category: 'Mentor',
+      handle: 'ratna.k@advisory.id',
+      birthday: '1979-05-14',
+      lastContacted: '2026-11-12',
+      followUpIntervalDays: 45,
+      lastTopic: 'Review strategi portofolio & kepemimpinan tim',
+    },
+    {
+      id: 'cnt-3',
+      name: 'Ayah & Ibu (Keluarga Inti)',
+      category: 'Family',
+      handle: 'Bandung',
+      birthday: '1962-12-15',
+      lastContacted: '2026-11-24',
+      followUpIntervalDays: 7,
+      lastTopic: 'Rencana makan malam keluarga akhir pekan',
+    },
+    {
+      id: 'cnt-4',
+      name: 'Dimas Pratama',
+      category: 'Friend',
+      handle: '@dimaspratama',
+      birthday: '1993-08-22',
+      lastContacted: '2026-09-10',
+      followUpIntervalDays: 60,
+      lastTopic: 'Lari bareng & rekomendasi buku sistem terdistribusi',
+    },
+  ],
+  tasks: [
+    {
+      id: 'tsk-1',
+      title: 'Evaluasi Portofolio Q4 & Rebalancing Aset',
+      description: 'Audit alokasi reksadana dan catatan dividen tahunan.',
+      priority: 'Urgent',
+      dueDate: '2026-11-26',
+      category: 'Finance',
+      status: 'in_progress',
+      isTopPriority: true,
+    },
+    {
+      id: 'tsk-2',
+      title: 'Finalisasi Checklist Rilis LIFE OS v2.0',
+      description: 'Verifikasi tampilan responsif desktop & mobile serta isolasi database.',
+      priority: 'High',
+      dueDate: '2026-11-26',
+      category: 'Work',
+      status: 'in_progress',
+      isTopPriority: true,
+    },
+    {
+      id: 'tsk-3',
+      title: 'Lari Sore 8km & Peregangan Mobilitas',
+      description: 'Jaga pace zona 3 di jalur taman kota.',
+      priority: 'Medium',
+      dueDate: '2026-11-26',
+      category: 'Health',
+      status: 'todo',
+      isTopPriority: true,
+    },
+    {
+      id: 'tsk-4',
+      title: 'Perpanjang Asuransi Perjalanan Internasional',
+      description: 'Konfirmasi cakupan untuk jadwal kuartal depan.',
+      priority: 'Low',
+      dueDate: '2026-11-28',
+      category: 'Personal',
+      status: 'todo',
+      isTopPriority: false,
+    },
+    {
+      id: 'tsk-5',
+      title: 'Rangkum Catatan Arsitektur Sistem Terdistribusi',
+      description: 'Buat ringkasan protokol konsensus.',
+      priority: 'Medium',
+      dueDate: '2026-11-25',
+      category: 'Learning',
+      status: 'completed',
+      isTopPriority: false,
+    },
+  ],
+  events: [
+    {
+      id: 'evt-1',
+      title: 'Blok Fokus Deep Work: Arsitektur Sistem',
+      date: '2026-11-26',
+      startTime: '09:00',
+      endTime: '11:30',
+      category: 'Work',
+      location: 'Ruang Kerja Pribadi',
+      reminder: '15 min before',
+      notes: 'Matikan notifikasi. Fokus pada pipeline data inti.',
+    },
+    {
+      id: 'evt-2',
+      title: 'Review Strategi Keuangan & Arus Kas',
+      date: '2026-11-26',
+      startTime: '15:00',
+      endTime: '16:00',
+      category: 'Finance',
+      location: 'Video Call',
+      reminder: '15 min before',
+      notes: 'Evaluasi tabungan November dan anggaran Desember.',
+    },
+    {
+      id: 'evt-3',
+      title: 'Kopi Sore & Waktu Membaca Buku',
+      date: '2026-11-26',
+      startTime: '17:30',
+      endTime: '18:30',
+      category: 'Personal',
+      location: 'Noir Roastery',
+      reminder: 'None',
+      notes: 'Selesaikan bab 7 buku arsitektur data.',
+    },
+    {
+      id: 'evt-4',
+      title: 'Perencanaan Sprint Mingguan',
+      date: '2026-11-27',
+      startTime: '10:00',
+      endTime: '11:00',
+      category: 'Work',
+      location: 'Studio A',
+      reminder: '1 hour before',
+      notes: '',
+    },
+  ],
+  habits: [
+    {
+      id: 'hab-1',
+      name: 'Kopi Pagi & Membaca Buku 30 Menit',
+      category: 'Mindset',
+      timeOfDay: 'Morning',
+      targetPerWeek: 7,
+      completedDates: [
+        '2026-11-20',
+        '2026-11-21',
+        '2026-11-22',
+        '2026-11-23',
+        '2026-11-24',
+        '2026-11-25',
+        '2026-11-26',
+      ],
+    },
+    {
+      id: 'hab-2',
+      name: 'Latihan Kekuatan atau Lari 8km',
+      category: 'Health',
+      timeOfDay: 'Evening',
+      targetPerWeek: 5,
+      completedDates: ['2026-11-20', '2026-11-22', '2026-11-23', '2026-11-25'],
+    },
+    {
+      id: 'hab-3',
+      name: 'Audit Pengeluaran Harian & Tanpa Belanja Impulsif',
+      category: 'Finance',
+      timeOfDay: 'Evening',
+      targetPerWeek: 7,
+      completedDates: [
+        '2026-11-21',
+        '2026-11-22',
+        '2026-11-23',
+        '2026-11-24',
+        '2026-11-25',
+        '2026-11-26',
+      ],
+    },
+    {
+      id: 'hab-4',
+      name: 'Blok Fokus 90 Menit Tanpa Gangguan',
+      category: 'Productivity',
+      timeOfDay: 'Morning',
+      targetPerWeek: 6,
+      completedDates: ['2026-11-20', '2026-11-21', '2026-11-23', '2026-11-24', '2026-11-25', '2026-11-26'],
+    },
+  ],
+  goals: [
+    {
+      id: 'gol-1',
+      title: 'Capai Total Kekayaan Likuid Rp 100 Juta',
+      horizon: 'Long-Term',
+      category: 'Financial',
+      deadline: '2027-04-30',
+      status: 'Active',
+      milestones: [
+        { id: 'ms-1', title: 'Bangun Dana Darurat Rp 45 Juta', completed: true },
+        { id: 'ms-2', title: 'Otomatisasi transfer brankas Rp 3,5 Juta/bln', completed: true },
+        { id: 'ms-3', title: 'Capai saldo gabungan Rp 60 Juta', completed: true },
+        { id: 'ms-4', title: 'Tembus milestone Rp 100 Juta', completed: false },
+      ],
+    },
+    {
+      id: 'gol-2',
+      title: 'Selesaikan Half-Marathon di Bawah 1 Jam 40 Menit',
+      horizon: 'Short-Term',
+      category: 'Health',
+      deadline: '2027-02-15',
+      status: 'Active',
+      milestones: [
+        { id: 'ms-5', title: 'Bangun jarak tempuh mingguan 40km', completed: true },
+        { id: 'ms-6', title: 'Time trial 10k di bawah 45 menit', completed: true },
+        { id: 'ms-7', title: 'Simulasi lari jarak 18km', completed: false },
+      ],
+    },
+  ],
+  notes: [
+    {
+      id: 'not-1',
+      title: 'Prinsip Alokasi Keuangan & Brankas Q4',
+      type: 'Note',
+      category: 'Finance',
+      pinned: true,
+      updatedAt: '2026-11-25T19:40:00',
+      content:
+        '1. Jaga dana darurat minimal 6 bulan pengeluaran tetap di Brankas Tabungan.\n2. Batasi biaya rutin tetap di bawah 35% pemasukan bulanan.\n3. Alokasikan 100% pendapatan proyek sampingan ke tabungan tujuan.',
+    },
+    {
+      id: 'not-2',
+      title: 'Refleksi Harian — 26 Nov 2026',
+      type: 'Journal',
+      category: 'Daily Journal',
+      pinned: true,
+      mood: 'Fokus & Tenang',
+      updatedAt: '2026-11-26T08:15:00',
+      content:
+        'Kejernihan Pagi:\nMemulai hari dengan kopi seduh manual dan membaca 30 menit sebelum membuka pesan.\n\nFokus Utama Hari Ini:\nMenjaga blok kerja pagi dan menyelesaikan checklist evaluasi kuartal.',
+    },
+  ],
+  shoppingLists: [
+    {
+      id: 'shp-1',
+      name: 'Belanja Dapur & Kopi Mingguan',
+      items: [
+        { id: 'si-1', name: 'Biji Kopi Arabika Single-Origin (500g)', qty: 2, estimatedPrice: 145000, category: 'Pantry', purchased: true },
+        { id: 'si-2', name: 'Fillet Salmon Segar', qty: 2, estimatedPrice: 120000, category: 'Produce', purchased: false },
+        { id: 'si-3', name: 'Alpukat Mentega & Sayuran Organik', qty: 1, estimatedPrice: 85000, category: 'Produce', purchased: false },
+        { id: 'si-4', name: 'Minyak Zaitun Extra Virgin', qty: 1, estimatedPrice: 165000, category: 'Pantry', purchased: true },
+      ],
+    },
+    {
+      id: 'shp-2',
+      name: 'Perlengkapan Meja Kerja',
+      items: [
+        { id: 'si-6', name: 'Stand Monitor Kayu Walnut', qty: 1, estimatedPrice: 650000, category: 'Electronics', purchased: false },
+        { id: 'si-7', name: 'Kabel Braided USB-C Thunderbolt (2m)', qty: 2, estimatedPrice: 185000, category: 'Electronics', purchased: true },
+      ],
+    },
+  ],
+});
+
+const createEmptyState = (lang = 'id', ownerName = '') => ({
+  profile: {
+    name: ownerName || (lang === 'id' ? 'Pemilik Ruang Kerja' : 'Workspace Owner'),
+    role: 'Personal Life OS',
+    currency: lang === 'id' ? 'Rp' : '$',
+    language: lang,
+  },
+  accounts: [
+    {
+      id: 'acc-default',
+      name: lang === 'id' ? 'Rekening Utama' : 'Primary Checking Account',
+      type: 'Checking',
+      institution: 'Main Bank',
+      initialBalance: 0,
+      lastFour: '0001',
+    },
+  ],
+  customExpenseCategories: [],
+  customIncomeCategories: [],
+  transactions: [],
+  budgets: [],
+  savingsGoals: [],
+  investments: [],
+  subscriptions: [],
+  debts: [],
+  wellnessLogs: [],
+  contacts: [],
+  tasks: [],
+  events: [],
+  habits: [],
+  goals: [],
+  notes: [],
+  shoppingLists: [
+    {
+      id: 'shp-default',
+      name: lang === 'id' ? 'Daftar Belanja Umum' : 'General Shopping List',
+      items: [],
+    },
+  ],
+});
+
+// ============================================================================
+// 4. DETERMINISTIC FINANCIAL, WELLNESS & CRM CALCULATION ENGINE
+// ============================================================================
+
+function formatMoney(amount, currency = 'Rp', masked = false) {
+  if (masked) return `${currency} ••••••`;
+  const num = Number(amount) || 0;
+  const abs = Math.abs(num);
+
+  if (currency === 'Rp') {
+    const formattedIdr = Math.round(abs).toLocaleString('id-ID');
+    return num < 0 ? `-Rp ${formattedIdr}` : `Rp ${formattedIdr}`;
+  }
+
+  const formatted = abs.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  return num < 0 ? `-${currency}${formatted}` : `${currency}${formatted}`;
+}
+
+function formatDateReadable(dateStr, lang = 'id') {
+  if (!dateStr) return '';
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  return dt.toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+function daysBetweenDates(startIso, endIso) {
+  if (!startIso || !endIso) return 0;
+  const [y1, m1, d1] = startIso.split('-').map(Number);
+  const [y2, m2, d2] = endIso.split('-').map(Number);
+  const t1 = Date.UTC(y1, m1 - 1, d1);
+  const t2 = Date.UTC(y2, m2 - 1, d2);
+  return Math.round((t2 - t1) / (1000 * 60 * 60 * 24));
+}
+
+function getLastNDays(n = 7, anchorStr = TODAY_STR, lang = 'id') {
+  const [y, m, d] = anchorStr.split('-').map(Number);
+  const anchor = new Date(y, m - 1, d);
+  const days = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const dt = new Date(anchor);
+    dt.setDate(anchor.getDate() - i);
+    const yyyy = dt.getFullYear();
+    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+    const dd = String(dt.getDate()).padStart(2, '0');
+    days.push({
+      dateStr: `${yyyy}-${mm}-${dd}`,
+      dayShort: dt.toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-US', { weekday: 'short' }),
+      dayNum: dd,
+    });
+  }
+  return days;
+}
+
+function calculateHabitStreak(completedDates = [], anchorStr = TODAY_STR) {
+  if (!completedDates.length) return 0;
+  const set = new Set(completedDates);
+  const [y, m, d] = anchorStr.split('-').map(Number);
+  let cursor = new Date(y, m - 1, d);
+
+  const toIso = (dt) =>
+    `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+
+  if (!set.has(toIso(cursor))) {
+    cursor.setDate(cursor.getDate() - 1);
+    if (!set.has(toIso(cursor))) return 0;
+  }
+
+  let streak = 0;
+  while (set.has(toIso(cursor))) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
+// ============================================================================
+// 4B. LENIS SMOOTH SCROLL, MULTI-LAYER PARALLAX & MOTION ENGINE
+// ============================================================================
+
+const MOTION_STYLES = `
+  @keyframes lifeFadeSlideUp {
+    0% {
+      opacity: 0;
+      transform: translate3d(0, 18px, 0) scale(0.985);
+    }
+    100% {
+      opacity: 1;
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+  }
+
+  @keyframes lifeFloatSlow {
+    0%, 100% {
+      transform: translate3d(0, 0px, 0) rotate(0deg);
+    }
+    50% {
+      transform: translate3d(0, -10px, 0) rotate(2deg);
+    }
+  }
+
+  @keyframes lifePulseGlow {
+    0%, 100% {
+      opacity: 0.35;
+    }
+    50% {
+      opacity: 0.65;
+    }
+  }
+
+  .life-motion-enter {
+    animation: lifeFadeSlideUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .life-float-slow {
+    animation: lifeFloatSlow 7s ease-in-out infinite;
+  }
+
+  .life-pulse-glow {
+    animation: lifePulseGlow 5s ease-in-out infinite;
+  }
+
+  .life-glass-interactive {
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+                border-color 0.25s ease,
+                background-color 0.25s ease,
+                box-shadow 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
+  }
+
+  .life-glass-interactive:hover {
+    transform: translate3d(0, -2px, 0);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(182, 139, 97, 0.22);
+  }
+`;
+
+function useLenisAndParallax() {
+  const scrollYRef = useRef(0);
+  const pointerRef = useRef({ x: 0, y: 0 });
+  const lenisInstanceRef = useRef(null);
+
+  useEffect(() => {
+    let rafId = null;
+    let lenisInstance = null;
+    let isDestroyed = false;
+
+    const updateCssVars = () => {
+      document.documentElement.style.setProperty('--life-scroll-y', `${scrollYRef.current}px`);
+      document.documentElement.style.setProperty('--life-px', `${pointerRef.current.x}`);
+      document.documentElement.style.setProperty('--life-py', `${pointerRef.current.y}`);
+    };
+
+    const handleNativeScroll = () => {
+      if (!lenisInstance) {
+        scrollYRef.current = window.scrollY || 0;
+        updateCssVars();
+      }
+    };
+
+    const handlePointerMove = (e) => {
+      const nx = (e.clientX / Math.max(1, window.innerWidth) - 0.5) * 2;
+      const ny = (e.clientY / Math.max(1, window.innerHeight) - 0.5) * 2;
+      pointerRef.current = { x: nx, y: ny };
+      updateCssVars();
+    };
+
+    window.addEventListener('scroll', handleNativeScroll, { passive: true });
+    window.addEventListener('pointermove', handlePointerMove, { passive: true });
+
+    // Dynamically initialize Lenis smooth inertial scroll engine
+    (async () => {
+      try {
+        const mod = await import('https://esm.sh/lenis@1.1.20');
+        const LenisCtor = mod?.default || mod?.Lenis;
+        if (!LenisCtor || isDestroyed) return;
+
+        lenisInstance = new LenisCtor({
+          duration: 1.15,
+          easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+          smoothWheel: true,
+          wheelMultiplier: 0.95,
+          touchMultiplier: 1.5,
+        });
+        lenisInstanceRef.current = lenisInstance;
+
+        lenisInstance.on('scroll', (ev) => {
+          scrollYRef.current = ev?.scroll ?? window.scrollY ?? 0;
+          updateCssVars();
+        });
+
+        const raf = (time) => {
+          if (isDestroyed) return;
+          lenisInstance.raf(time);
+          rafId = requestAnimationFrame(raf);
+        };
+        rafId = requestAnimationFrame(raf);
+      } catch {
+        // Native smooth scroll + CSS variable parallax remains active seamlessly
+        document.documentElement.style.scrollBehavior = 'smooth';
+      }
+    })();
+
+    return () => {
+      isDestroyed = true;
+      window.removeEventListener('scroll', handleNativeScroll);
+      window.removeEventListener('pointermove', handlePointerMove);
+      if (rafId) cancelAnimationFrame(rafId);
+      if (lenisInstance && typeof lenisInstance.destroy === 'function') {
+        lenisInstance.destroy();
+      }
+    };
+  }, []);
+
+  const scrollToTop = useCallback(() => {
+    if (lenisInstanceRef.current && typeof lenisInstanceRef.current.scrollTo === 'function') {
+      lenisInstanceRef.current.scrollTo(0, { duration: 0.75 });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, []);
+
+  return { scrollToTop };
+}
+
+const ParallaxLayer = ({ speed = -0.15, pointerFactor = 12, className = '', children }) => {
+  const layerRef = useRef(null);
+
+  useEffect(() => {
+    let raf = null;
+    const tick = () => {
+      if (layerRef.current) {
+        const sy = parseFloat(
+          getComputedStyle(document.documentElement).getPropertyValue('--life-scroll-y') || '0'
+        );
+        const px = parseFloat(
+          getComputedStyle(document.documentElement).getPropertyValue('--life-px') || '0'
+        );
+        const py = parseFloat(
+          getComputedStyle(document.documentElement).getPropertyValue('--life-py') || '0'
+        );
+        const ty = sy * speed + py * pointerFactor;
+        const tx = px * pointerFactor;
+        layerRef.current.style.transform = `translate3d(${tx.toFixed(1)}px, ${ty.toFixed(1)}px, 0)`;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [speed, pointerFactor]);
+
+  return (
+    <div ref={layerRef} className={`will-change-transform ${className}`}>
+      {children}
+    </div>
+  );
+};
+
+const MotionReveal = ({ delay = 0, className = '', children }) => {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setVisible(true);
+            observer.disconnect();
+          }
+        });
+      },
+      { threshold: 0.06 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      style={{ animationDelay: `${delay}ms` }}
+      className={`${visible ? 'life-motion-enter' : 'opacity-0 translate-y-4'} ${className}`}
+    >
+      {children}
+    </div>
+  );
+};
+
+// ============================================================================
+// 5. ERROR BOUNDARY & DARK CHOCOLATE LUXURY UI PRIMITIVES
+// ============================================================================
+
+class WorkspaceErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, errorMsg: '' };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, errorMsg: error?.message || 'Unexpected UI error' };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-[#171412] text-[#F4E9DC] flex items-center justify-center p-6">
+          <div className="max-w-md w-full rounded-2xl bg-[#241B17] border border-[#B68B61]/60 p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-[#E4C8A6]">LIFE OS Recovery</h2>
+            <p className="text-xs text-[#A99B90]">{this.state.errorMsg}</p>
+            <button
+              onClick={() => this.setState({ hasError: false, errorMsg: '' })}
+              className="px-4 py-2 rounded-xl bg-[#B68B61] text-[#171412] text-sm font-semibold"
+            >
+              Reload Workspace
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const GlassCard = ({ children, className = '', onClick }) => (
+  <div
+    onClick={onClick}
+    className={`rounded-2xl bg-[#241B17]/85 backdrop-blur-md border border-[#624332]/40 shadow-[0_12px_32px_rgba(0,0,0,0.42)] life-glass-interactive min-w-0 ${
+      onClick ? 'cursor-pointer hover:border-[#B68B61]/60 hover:bg-[#2A201B]' : ''
+    } ${className}`}
+  >
+    {children}
+  </div>
+);
+
+const Button = ({
+  children,
+  variant = 'primary',
+  size = 'md',
+  className = '',
+  onClick,
+  type = 'button',
+  disabled = false,
+}) => {
+  const variants = {
+    primary:
+      'bg-gradient-to-r from-[#B68B61] to-[#9B7048] text-[#171412] font-semibold hover:from-[#C79C72] hover:to-[#B68B61] shadow-[0_4px_16px_rgba(182,139,97,0.28)]',
+    secondary:
+      'bg-[#30231D] text-[#F4E9DC] border border-[#624332]/60 hover:border-[#B68B61]/70 hover:bg-[#3A2B24]',
+    ghost: 'text-[#A99B90] hover:text-[#F4E9DC] hover:bg-[#30231D]/70',
+    danger:
+      'bg-[#D96B52]/20 text-[#F29B87] border border-[#D96B52]/40 hover:bg-[#D96B52]/30',
+  };
+
+  const sizes = {
+    sm: 'px-3 py-1.5 text-xs rounded-xl min-h-[38px]',
+    md: 'px-4 py-2.5 text-sm rounded-xl min-h-[44px]',
+    lg: 'px-5 py-3 text-base rounded-2xl min-h-[48px]',
+  };
+
+  return (
+    <button
+      type={type}
+      disabled={disabled}
+      onClick={onClick}
+      className={`inline-flex items-center justify-center gap-2 transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-45 disabled:pointer-events-none ${variants[variant]} ${sizes[size]} ${className}`}
+    >
+      {children}
+    </button>
+  );
+};
+
+const Input = ({ label, className = '', ...props }) => (
+  <div className="space-y-1.5 min-w-0">
+    {label && (
+      <label className="block text-xs font-medium uppercase tracking-wider text-[#A99B90]">
+        {label}
+      </label>
+    )}
+    <input
+      {...props}
+      className={`w-full rounded-xl bg-[#171412]/90 border border-[#624332]/55 px-3.5 py-2.5 text-sm text-[#F4E9DC] placeholder-[#A99B90]/50 focus:outline-none focus:border-[#B68B61] transition-colors min-h-[44px] ${className}`}
+    />
+  </div>
+);
+
+const Select = ({ label, children, className = '', ...props }) => (
+  <div className="space-y-1.5 min-w-0">
+    {label && (
+      <label className="block text-xs font-medium uppercase tracking-wider text-[#A99B90]">
+        {label}
+      </label>
+    )}
+    <select
+      {...props}
+      className={`w-full rounded-xl bg-[#171412]/90 border border-[#624332]/55 px-3.5 py-2.5 text-sm text-[#F4E9DC] focus:outline-none focus:border-[#B68B61] transition-colors min-h-[44px] ${className}`}
+    >
+      {children}
+    </select>
+  </div>
+);
+
+const ProgressBar = ({ value, max = 100, tone = 'bronze', height = 'h-2' }) => {
+  const pct = max > 0 ? Math.min(100, Math.max(0, (value / max) * 100)) : 0;
+  const tones = {
+    bronze: 'bg-gradient-to-r from-[#8C6440] to-[#B68B61]',
+    champagne: 'bg-gradient-to-r from-[#B68B61] to-[#E4C8A6]',
+    danger: 'bg-gradient-to-r from-[#B84D35] to-[#D96B52]',
+    success: 'bg-gradient-to-r from-[#5B8056] to-[#87B082]',
+  };
+  return (
+    <div className={`w-full rounded-full bg-[#171412] overflow-hidden border border-[#624332]/30 ${height}`}>
+      <div
+        className={`h-full rounded-full transition-all duration-700 ease-out ${tones[tone]}`}
+        style={{ width: `${pct}%` }}
+      />
+    </div>
+  );
+};
+
+const Modal = ({ open, onClose, title, subtitle, children, maxWidth = 'max-w-lg' }) => {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75 backdrop-blur-sm">
+      <div
+        className={`w-full ${maxWidth} rounded-t-3xl sm:rounded-2xl bg-[#241B17] border border-[#624332]/70 shadow-2xl overflow-hidden max-h-[92vh] flex flex-col life-motion-enter`}
+      >
+        <div className="flex items-start justify-between p-4 sm:p-5 border-b border-[#624332]/40 bg-[#171412]/50">
+          <div className="min-w-0 pr-2">
+            <h3 className="text-base sm:text-lg font-semibold text-[#F4E9DC] truncate">{title}</h3>
+            {subtitle && <p className="text-xs text-[#A99B90] mt-0.5">{subtitle}</p>}
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl text-[#A99B90] hover:text-[#F4E9DC] hover:bg-[#30231D] shrink-0"
+            aria-label="Close modal"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="p-4 sm:p-5 overflow-y-auto space-y-4">{children}</div>
+      </div>
+    </div>
+  );
+};
+
+const ConfirmDialog = ({ open, title, message, confirmLabel = 'Delete', cancelLabel = 'Cancel', onConfirm, onCancel }) => (
+  <Modal open={open} onClose={onCancel} title={title} maxWidth="max-w-md">
+    <p className="text-sm text-[#E4C8A6]/90 leading-relaxed">{message}</p>
+    <div className="flex items-center justify-end gap-3 pt-3">
+      <Button variant="secondary" onClick={onCancel}>
+        {cancelLabel}
+      </Button>
+      <Button variant="danger" onClick={onConfirm}>
+        {confirmLabel}
+      </Button>
+    </div>
+  </Modal>
+);
+
+const EmptyState = ({ icon: Icon, title, description, actionLabel, onAction }) => (
+  <div className="flex flex-col items-center justify-center text-center py-10 px-4 rounded-2xl border border-dashed border-[#624332]/50 bg-[#171412]/40">
+    <div className="w-12 h-12 rounded-2xl bg-[#30231D] border border-[#624332]/60 flex items-center justify-center text-[#B68B61] mb-3">
+      <Icon className="w-6 h-6" />
+    </div>
+    <h4 className="text-base font-medium text-[#F4E9DC]">{title}</h4>
+    <p className="text-xs text-[#A99B90] max-w-sm mt-1">{description}</p>
+    {actionLabel && onAction && (
+      <Button size="sm" className="mt-4" onClick={onAction}>
+        <Plus className="w-4 h-4" /> {actionLabel}
+      </Button>
+    )}
+  </div>
+);
+
+// ============================================================================
+// 6. MULTI-ACCOUNT ISOLATED AUTHENTICATION PORTAL
+// ============================================================================
+
+const AuthPortalScreen = ({ lang, onToggleLang, t, onAuthenticateSuccess }) => {
+  const [mode, setMode] = useState('login');
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [seedMode, setSeedMode] = useState('blank');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
+    setErrorMsg('');
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !password.trim()) {
+      setErrorMsg(lang === 'id' ? 'Email dan kata sandi wajib diisi.' : 'Email and password are required.');
+      return;
+    }
+
+    setSubmitting(true);
+    const workspaceKey = deriveWorkspaceKey(cleanEmail);
+    const pwHash = hashPasswordClient(password);
+
+    try {
+      if (firebaseAuth && firebaseDb) {
+        if (!firebaseAuth.currentUser) {
+          if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            await signInWithCustomToken(firebaseAuth, __initial_auth_token);
+          } else {
+            await signInAnonymously(firebaseAuth);
+          }
+        }
+
+        const accountRef = doc(firebaseDb, 'artifacts', appId, 'public', 'data', 'lifeos_accounts', workspaceKey);
+        const snap = await getDoc(accountRef);
+
+        if (mode === 'register') {
+          if (snap.exists()) {
+            setErrorMsg(
+              lang === 'id'
+                ? 'Email sudah terdaftar. Silakan masuk pada tab Masuk Akun.'
+                : 'Email already registered. Please sign in instead.'
+            );
+            setSubmitting(false);
+            return;
+          }
+          const ownerName = fullName.trim() || cleanEmail.split('@')[0];
+          const initialWorkspace =
+            seedMode === 'demo'
+              ? { ...createInitialState(), profile: { ...createInitialState().profile, name: ownerName, language: lang } }
+              : createEmptyState(lang, ownerName);
+
+          await setDoc(accountRef, {
+            email: cleanEmail,
+            name: ownerName,
+            passwordHash: pwHash,
+            workspaceKey,
+            createdAt: new Date().toISOString(),
+            workspace: initialWorkspace,
+          });
+
+          onAuthenticateSuccess({
+            email: cleanEmail,
+            name: ownerName,
+            workspaceKey,
+            initialData: initialWorkspace,
+            isCloud: true,
+          });
+          setSubmitting(false);
+          return;
+        }
+
+        if (!snap.exists()) {
+          setErrorMsg(
+            lang === 'id'
+              ? 'Akun tidak ditemukan. Silakan buat akun baru terlebih dahulu.'
+              : 'Account not found. Please create an account first.'
+          );
+          setSubmitting(false);
+          return;
+        }
+
+        const accountData = snap.data();
+        if (accountData.passwordHash && accountData.passwordHash !== pwHash) {
+          setErrorMsg(lang === 'id' ? 'Kata sandi tidak sesuai.' : 'Incorrect password.');
+          setSubmitting(false);
+          return;
+        }
+
+        onAuthenticateSuccess({
+          email: cleanEmail,
+          name: accountData.name || cleanEmail.split('@')[0],
+          workspaceKey,
+          initialData: accountData.workspace || createEmptyState(lang, accountData.name),
+          isCloud: true,
+        });
+        setSubmitting(false);
+        return;
+      }
+    } catch (err) {
+      console.error('Cloud auth fallback notice:', err);
+    }
+
+    const ownerName = fullName.trim() || cleanEmail.split('@')[0];
+    const initialWorkspace =
+      mode === 'register'
+        ? seedMode === 'demo'
+          ? { ...createInitialState(), profile: { ...createInitialState().profile, name: ownerName, language: lang } }
+          : createEmptyState(lang, ownerName)
+        : { ...createInitialState(), profile: { ...createInitialState().profile, name: ownerName, language: lang } };
+
+    onAuthenticateSuccess({
+      email: cleanEmail,
+      name: ownerName,
+      workspaceKey,
+      initialData: initialWorkspace,
+      isCloud: Boolean(firebaseDb),
+    });
+    setSubmitting(false);
+  };
+
+  const handleQuickDemoAccess = () => {
+    const demoState = createInitialState();
+    demoState.profile.language = lang;
+    onAuthenticateSuccess({
+      email: 'alexander@lifeos.app',
+      name: demoState.profile.name,
+      workspaceKey: deriveWorkspaceKey('alexander@lifeos.app'),
+      initialData: demoState,
+      isCloud: Boolean(firebaseDb),
+    });
+  };
+
+  return (
+    <div className="min-h-screen bg-[#171412] text-[#F4E9DC] flex flex-col justify-between p-4 sm:p-8 relative overflow-x-hidden">
+      <style>{MOTION_STYLES}</style>
+      <ParallaxLayer speed={-0.12} pointerFactor={18} className="fixed -top-24 -left-24 pointer-events-none">
+        <div className="w-96 h-96 rounded-full bg-[#B68B61]/12 blur-3xl life-pulse-glow" />
+      </ParallaxLayer>
+      <ParallaxLayer speed={0.14} pointerFactor={-16} className="fixed -bottom-24 -right-24 pointer-events-none">
+        <div className="w-96 h-96 rounded-full bg-[#624332]/25 blur-3xl" />
+      </ParallaxLayer>
+
+      <div className="max-w-5xl w-full mx-auto flex items-center justify-between relative z-10">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#B68B61] to-[#624332] flex items-center justify-center text-[#171412] font-bold text-lg shadow-lg">
+            L
+          </div>
+          <div>
+            <span className="text-base font-bold tracking-wider text-[#F4E9DC] block">LIFE OS</span>
+            <span className="text-[10px] uppercase tracking-widest text-[#B68B61]">
+              Dark Chocolate Edition
+            </span>
+          </div>
+        </div>
+
+        <button
+          onClick={onToggleLang}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#241B17] border border-[#624332]/60 text-xs font-semibold text-[#E4C8A6] hover:border-[#B68B61]"
+        >
+          <Globe className="w-4 h-4 text-[#B68B61]" />
+          <span>{lang === 'id' ? 'Bahasa Indonesia' : 'English'}</span>
+        </button>
+      </div>
+
+      <div className="max-w-md w-full mx-auto my-8 relative z-10 life-motion-enter">
+        <GlassCard className="p-6 sm:p-8 space-y-6 border-[#B68B61]/35">
+          <div className="text-center space-y-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#171412] border border-[#624332]/60 text-[11px] text-[#E4C8A6]">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#B68B61]" />
+              <span>{t('auth_badge')}</span>
+            </div>
+            <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('auth_title')}</h1>
+            <p className="text-xs text-[#A99B90]">{t('auth_subtitle')}</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-[#171412] border border-[#624332]/50">
+            <button
+              type="button"
+              onClick={() => {
+                setMode('login');
+                setErrorMsg('');
+              }}
+              className={`py-2.5 rounded-lg text-xs font-semibold transition-all ${
+                mode === 'login' ? 'bg-[#B68B61] text-[#171412]' : 'text-[#A99B90] hover:text-[#F4E9DC]'
+              }`}
+            >
+              {t('tab_login')}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode('register');
+                setErrorMsg('');
+              }}
+              className={`py-2.5 rounded-lg text-xs font-semibold transition-all ${
+                mode === 'register' ? 'bg-[#B68B61] text-[#171412]' : 'text-[#A99B90] hover:text-[#F4E9DC]'
+              }`}
+            >
+              {t('tab_register')}
+            </button>
+          </div>
+
+          {errorMsg && (
+            <div className="p-3 rounded-xl bg-[#D96B52]/15 border border-[#D96B52]/40 text-xs text-[#F29B87] flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleAuthSubmit} className="space-y-4">
+            {mode === 'register' && (
+              <Input
+                label={t('fullname_label')}
+                placeholder="e.g. Budi Santoso"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                required
+              />
+            )}
+
+            <Input
+              label={t('email_label')}
+              type="email"
+              placeholder="nama@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+
+            <Input
+              label={t('password_label')}
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+
+            {mode === 'register' && (
+              <div className="space-y-1.5">
+                <label className="block text-xs font-medium uppercase tracking-wider text-[#A99B90]">
+                  {t('workspace_mode_label')}
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {[
+                    { id: 'blank', label: t('seed_blank') },
+                    { id: 'demo', label: t('seed_demo') },
+                  ].map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setSeedMode(opt.id)}
+                      className={`p-2.5 rounded-xl border text-left text-xs font-medium transition-all ${
+                        seedMode === opt.id
+                          ? 'bg-[#30231D] border-[#B68B61] text-[#E4C8A6]'
+                          : 'bg-[#171412]/80 border-[#624332]/45 text-[#A99B90]'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <Button type="submit" className="w-full" disabled={submitting}>
+              {mode === 'login' ? t('btn_login') : t('btn_register')}
+            </Button>
+          </form>
+
+          <div className="pt-3 border-t border-[#624332]/35">
+            <Button variant="secondary" className="w-full" onClick={handleQuickDemoAccess}>
+              <Sparkles className="w-4 h-4 text-[#B68B61]" /> {t('btn_demo_access')}
+            </Button>
+          </div>
+        </GlassCard>
+      </div>
+
+      <div className="text-center text-[11px] text-[#A99B90]/70 relative z-10">
+        LIFE OS • Private Personal Wealth & Productivity Architecture
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// 7. MODULE VIEWS
+// ============================================================================
+
+// --- MODULE A: EXECUTIVE DASHBOARD (WITH MULTI-LAYER PARALLAX HERO) ---
+const DashboardView = ({
+  data,
+  derived,
+  maskBalances,
+  t,
+  lang,
+  onNavigate,
+  onOpenTxModal,
+  onOpenTaskModal,
+  onOpenEventModal,
+  onToggleTask,
+  onToggleHabitToday,
+}) => {
+  const { currency } = data.profile;
+  const recentTransactions = [...data.transactions]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 5);
+
+  const upcomingTasks = data.tasks
+    .filter((tk) => tk.status !== 'completed')
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+    .slice(0, 4);
+
+  const todaysEvents = data.events
+    .filter((e) => e.date === TODAY_STR)
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+  const completedHabitsToday = data.habits.filter((h) =>
+    h.completedDates.includes(TODAY_STR)
+  ).length;
+
+  const dueFollowUpsCount = (data.contacts || []).filter(
+    (c) => daysBetweenDates(c.lastContacted, TODAY_STR) >= (c.followUpIntervalDays || 30)
+  ).length;
+
+  return (
+    <div className="space-y-6">
+      {/* Multi-Layer Parallax Hero Banner */}
+      <MotionReveal delay={0}>
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#30231D] via-[#241B17] to-[#171412] border border-[#B68B61]/35 p-5 sm:p-8 shadow-2xl">
+          {/* Parallax Deep Layer 1: Radial Bronze Glow */}
+          <ParallaxLayer speed={-0.14} pointerFactor={16} className="absolute -right-16 -top-16 pointer-events-none">
+            <div className="w-72 h-72 rounded-full bg-[#B68B61]/15 blur-3xl life-pulse-glow" />
+          </ParallaxLayer>
+
+          {/* Parallax Mid Layer 2: Luxury Geometric Ring Watermark */}
+          <ParallaxLayer speed={0.09} pointerFactor={-10} className="absolute right-8 -bottom-10 pointer-events-none hidden sm:block">
+            <div className="w-44 h-44 rounded-full border border-[#E4C8A6]/12 flex items-center justify-center life-float-slow">
+              <div className="w-28 h-28 rounded-full border border-[#B68B61]/18" />
+            </div>
+          </ParallaxLayer>
+
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5 relative z-10">
+            <div className="min-w-0">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#171412]/80 border border-[#624332]/60 text-xs text-[#E4C8A6] mb-3">
+                <Sparkles className="w-3.5 h-3.5 text-[#B68B61]" />
+                <span>{new Date().toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+              </div>
+              <h1 className="text-xl sm:text-3xl font-semibold tracking-tight text-[#F4E9DC] break-words">
+                {t('welcome_back')}, {data.profile.name}
+              </h1>
+              <p className="text-xs sm:text-sm text-[#A99B90] mt-1">{t('welcome_subtitle')}</p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" onClick={() => onOpenTxModal()}>
+                <Plus className="w-4 h-4" /> {t('btn_transaction')}
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => onOpenTaskModal()}>
+                <Plus className="w-4 h-4" /> {t('btn_task')}
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => onOpenEventModal()}>
+                <Plus className="w-4 h-4" /> {t('btn_event')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </MotionReveal>
+
+      {/* Staggered KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <MotionReveal delay={60}>
+          <GlassCard className="p-5 h-full" onClick={() => onNavigate('wallet')}>
+            <div className="flex items-center justify-between text-[#A99B90] text-xs uppercase tracking-wider">
+              <span>{t('kpi_total_balance')}</span>
+              <div className="p-2 rounded-xl bg-[#30231D] text-[#B68B61]">
+                <Wallet className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-3 text-xl sm:text-2xl font-semibold text-[#F4E9DC] tabular-nums truncate">
+              {formatMoney(derived.totalNetWorth, currency, maskBalances)}
+            </div>
+            <div className="mt-2 flex items-center gap-1.5 text-xs text-[#E4C8A6] truncate">
+              <span>
+                {data.accounts.length} {t('kpi_active_accounts')}
+                {(data.investments || []).length > 0
+                  ? ` • ${(data.investments || []).length} ${lang === 'id' ? 'aset investasi' : 'assets'}`
+                  : ''}
+              </span>
+            </div>
+          </GlassCard>
+        </MotionReveal>
+
+        <MotionReveal delay={120}>
+          <GlassCard className="p-5 h-full" onClick={() => onNavigate('wallet')}>
+            <div className="flex items-center justify-between text-[#A99B90] text-xs uppercase tracking-wider">
+              <span>{t('kpi_monthly_income')}</span>
+              <div className="p-2 rounded-xl bg-[#30231D] text-[#E4C8A6]">
+                <ArrowUpRight className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-3 text-xl sm:text-2xl font-semibold text-[#E4C8A6] tabular-nums truncate">
+              {formatMoney(derived.monthlyIncome, currency, maskBalances)}
+            </div>
+            <div className="mt-2 text-xs text-[#A99B90]">{t('kpi_inflows_label')}</div>
+          </GlassCard>
+        </MotionReveal>
+
+        <MotionReveal delay={180}>
+          <GlassCard className="p-5 h-full" onClick={() => onNavigate('wallet')}>
+            <div className="flex items-center justify-between text-[#A99B90] text-xs uppercase tracking-wider">
+              <span>{t('kpi_monthly_expenses')}</span>
+              <div className="p-2 rounded-xl bg-[#30231D] text-[#D96B52]">
+                <ArrowDownRight className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-3 text-xl sm:text-2xl font-semibold text-[#F4E9DC] tabular-nums truncate">
+              {formatMoney(derived.monthlyExpenses, currency, maskBalances)}
+            </div>
+            <div className="mt-2 text-xs text-[#A99B90] truncate">
+              {t('kpi_net_savings')}:{' '}
+              <span className="text-[#B68B61] font-medium tabular-nums">
+                {formatMoney(derived.monthlyIncome - derived.monthlyExpenses, currency, maskBalances)}
+              </span>
+            </div>
+          </GlassCard>
+        </MotionReveal>
+
+        <MotionReveal delay={240}>
+          <GlassCard className="p-5 h-full" onClick={() => onNavigate('budgets')}>
+            <div className="flex items-center justify-between text-[#A99B90] text-xs uppercase tracking-wider">
+              <span>{t('kpi_budget_util')}</span>
+              <div className="p-2 rounded-xl bg-[#30231D] text-[#B68B61]">
+                <PieChart className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-3 flex items-baseline justify-between gap-2">
+              <span className="text-xl sm:text-2xl font-semibold text-[#F4E9DC] tabular-nums">
+                {derived.budgetUtilizationPct.toFixed(0)}%
+              </span>
+              <span className="text-xs text-[#A99B90] tabular-nums truncate">
+                {formatMoney(derived.totalBudgetRemaining, currency, maskBalances)} {t('kpi_left')}
+              </span>
+            </div>
+            <div className="mt-3">
+              <ProgressBar
+                value={derived.totalBudgetSpent}
+                max={derived.totalBudgetLimit || 1}
+                tone={derived.budgetUtilizationPct >= 100 ? 'danger' : 'bronze'}
+              />
+            </div>
+          </GlassCard>
+        </MotionReveal>
+      </div>
+
+      {/* Charts & Today's Schedule */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <MotionReveal delay={100} className="lg:col-span-2">
+          <GlassCard className="p-5 h-full">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+              <div>
+                <h2 className="text-base font-semibold text-[#F4E9DC]">{t('chart_cashflow_title')}</h2>
+                <p className="text-xs text-[#A99B90]">{t('chart_cashflow_sub')}</p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => onNavigate('reports')}>
+                {t('btn_full_analytics')}
+              </Button>
+            </div>
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={derived.monthlySeries} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#E4C8A6" stopOpacity={0.35} />
+                      <stop offset="95%" stopColor="#E4C8A6" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#B68B61" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#B68B61" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#624332" strokeOpacity={0.25} />
+                  <XAxis dataKey="label" stroke="#A99B90" fontSize={12} tickLine={false} />
+                  <YAxis stroke="#A99B90" fontSize={11} tickLine={false} width={45} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#241B17',
+                      borderColor: '#624332',
+                      borderRadius: '12px',
+                      color: '#F4E9DC',
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="income"
+                    name={lang === 'id' ? 'Pemasukan' : 'Income'}
+                    stroke="#E4C8A6"
+                    strokeWidth={2.2}
+                    fillOpacity={1}
+                    fill="url(#incomeGrad)"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="expenses"
+                    name={lang === 'id' ? 'Pengeluaran' : 'Expenses'}
+                    stroke="#B68B61"
+                    strokeWidth={2.2}
+                    fillOpacity={1}
+                    fill="url(#expenseGrad)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </GlassCard>
+        </MotionReveal>
+
+        <MotionReveal delay={180}>
+          <GlassCard className="p-5 h-full flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-base font-semibold text-[#F4E9DC]">{t('todays_schedule')}</h2>
+                  <p className="text-xs text-[#A99B90]">
+                    {todaysEvents.length} {t('events_scheduled')}
+                  </p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => onNavigate('calendar')}>
+                  {t('nav_calendar')}
+                </Button>
+              </div>
+              {todaysEvents.length === 0 ? (
+                <p className="text-xs text-[#A99B90] py-8 text-center">{t('no_events_today')}</p>
+              ) : (
+                <div className="space-y-3">
+                  {todaysEvents.map((evt) => (
+                    <div
+                      key={evt.id}
+                      className="p-3 rounded-xl bg-[#171412]/80 border border-[#624332]/40 flex items-start gap-3"
+                    >
+                      <div className="px-2 py-1 rounded-lg bg-[#30231D] text-[#E4C8A6] text-xs font-medium tabular-nums shrink-0">
+                        {evt.startTime}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-[#F4E9DC] truncate">{evt.title}</p>
+                        <p className="text-xs text-[#A99B90] mt-0.5 truncate">
+                          {evt.startTime} – {evt.endTime} • {evt.location || evt.category}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <Button variant="secondary" size="sm" className="w-full mt-4" onClick={() => onNavigate('planner')}>
+              {t('open_time_blocker')}
+            </Button>
+          </GlassCard>
+        </MotionReveal>
+      </div>
+
+      {/* Bottom Telemetry Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <MotionReveal delay={80}>
+          <GlassCard className="p-5 h-full">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-semibold text-[#F4E9DC]">{t('recent_ledger')}</h2>
+              <Button variant="ghost" size="sm" onClick={() => onNavigate('wallet')}>
+                {t('view_all')}
+              </Button>
+            </div>
+            {recentTransactions.length === 0 ? (
+              <p className="text-xs text-[#A99B90] py-6 text-center">
+                {lang === 'id' ? 'Belum ada transaksi tercatat.' : 'No transactions logged yet.'}
+              </p>
+            ) : (
+              <div className="space-y-2.5">
+                {recentTransactions.map((tx) => {
+                  const isIncome = tx.type === 'income';
+                  const isTransfer = tx.type === 'transfer';
+                  return (
+                    <div
+                      key={tx.id}
+                      className="flex items-center justify-between p-2.5 rounded-xl bg-[#171412]/70 border border-[#624332]/30"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-xl bg-[#30231D] flex items-center justify-center text-[#B68B61] shrink-0">
+                          {isIncome ? (
+                            <ArrowUpRight className="w-4 h-4 text-[#E4C8A6]" />
+                          ) : isTransfer ? (
+                            <ArrowLeftRight className="w-4 h-4 text-[#B68B61]" />
+                          ) : (
+                            <ArrowDownRight className="w-4 h-4 text-[#D96B52]" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-[#F4E9DC] truncate">{tx.description}</p>
+                          <p className="text-[11px] text-[#A99B90] truncate">
+                            {tx.category} • {formatDateReadable(tx.date, lang)}
+                          </p>
+                        </div>
+                      </div>
+                      <span
+                        className={`text-xs sm:text-sm font-semibold tabular-nums shrink-0 ml-2 ${
+                          isIncome
+                            ? 'text-[#E4C8A6]'
+                            : isTransfer
+                            ? 'text-[#B68B61]'
+                            : 'text-[#F4E9DC]'
+                        }`}
+                      >
+                        {isIncome ? '+' : isTransfer ? '' : '-'}
+                        {formatMoney(tx.amount, currency, maskBalances)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </GlassCard>
+        </MotionReveal>
+
+        <MotionReveal delay={140}>
+          <GlassCard className="p-5 h-full">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-base font-semibold text-[#F4E9DC]">{t('priority_tasks')}</h2>
+                <p className="text-xs text-[#A99B90]">
+                  {data.tasks.filter((tk) => tk.status === 'completed').length}/{data.tasks.length}{' '}
+                  {t('completed_count')}
+                </p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => onNavigate('tasks')}>
+                {t('view_all')}
+              </Button>
+            </div>
+            {upcomingTasks.length === 0 ? (
+              <p className="text-xs text-[#A99B90] py-6 text-center">
+                {lang === 'id' ? 'Semua tugas selesai.' : 'All tasks completed.'}
+              </p>
+            ) : (
+              <div className="space-y-2.5">
+                {upcomingTasks.map((task) => (
+                  <div
+                    key={task.id}
+                    onClick={() => onToggleTask(task.id)}
+                    className="flex items-start gap-3 p-2.5 rounded-xl bg-[#171412]/70 border border-[#624332]/30 hover:border-[#B68B61]/50 cursor-pointer transition-colors"
+                  >
+                    <button
+                      type="button"
+                      className="mt-0.5 text-[#B68B61] hover:text-[#E4C8A6] shrink-0"
+                      aria-label="Toggle task completion"
+                    >
+                      <Circle className="w-4 h-4" />
+                    </button>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-[#F4E9DC] truncate">{task.title}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#30231D] text-[#E4C8A6]">
+                          {task.priority}
+                        </span>
+                        <span className="text-[11px] text-[#A99B90]">
+                          {formatDateReadable(task.dueDate, lang)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </GlassCard>
+        </MotionReveal>
+
+        <MotionReveal delay={200}>
+          <GlassCard className="p-5 h-full flex flex-col justify-between space-y-5">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h2 className="text-base font-semibold text-[#F4E9DC]">{t('daily_habit_checkin')}</h2>
+                  <p className="text-xs text-[#A99B90]">
+                    {completedHabitsToday}/{data.habits.length} {t('completed_today')}
+                  </p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => onNavigate('habits')}>
+                  {t('nav_habits')}
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {data.habits.slice(0, 4).map((habit) => {
+                  const doneToday = habit.completedDates.includes(TODAY_STR);
+                  const streak = calculateHabitStreak(habit.completedDates);
+                  return (
+                    <button
+                      key={habit.id}
+                      onClick={() => onToggleHabitToday(habit.id, TODAY_STR)}
+                      className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition-all ${
+                        doneToday
+                          ? 'bg-[#30231D]/90 border-[#B68B61]/60 text-[#F4E9DC]'
+                          : 'bg-[#171412]/70 border-[#624332]/30 text-[#A99B90] hover:text-[#F4E9DC]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${
+                            doneToday ? 'bg-[#B68B61] text-[#171412]' : 'border border-[#624332]'
+                          }`}
+                        >
+                          {doneToday && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
+                        </div>
+                        <span className="text-xs font-medium truncate">{habit.name}</span>
+                      </div>
+                      <span className="inline-flex items-center gap-1 text-[11px] text-[#E4C8A6] shrink-0 ml-2">
+                        <Flame className="w-3.5 h-3.5 text-[#B68B61]" /> {streak}d
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-[#624332]/30 space-y-3">
+              <div>
+                <div className="flex items-center justify-between text-xs mb-1.5">
+                  <span className="text-[#A99B90]">{t('active_goals_completion')}</span>
+                  <span className="text-[#E4C8A6] font-semibold tabular-nums">
+                    {derived.overallGoalPct.toFixed(0)}%
+                  </span>
+                </div>
+                <ProgressBar value={derived.overallGoalPct} max={100} tone="champagne" />
+              </div>
+
+              {dueFollowUpsCount > 0 && (
+                <button
+                  onClick={() => onNavigate('crm')}
+                  className="w-full p-2.5 rounded-xl bg-[#30231D]/80 border border-[#B68B61]/45 flex items-center justify-between text-xs text-[#E4C8A6] hover:border-[#B68B61]"
+                >
+                  <span className="flex items-center gap-2">
+                    <HeartHandshake className="w-4 h-4 text-[#B68B61]" />
+                    <span>{t('due_followups')}</span>
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-[#B68B61] text-[#171412] font-bold">
+                    {dueFollowUpsCount}
+                  </span>
+                </button>
+              )}
+            </div>
+          </GlassCard>
+        </MotionReveal>
+      </div>
+    </div>
+  );
+};
+
+// --- MODULE B: DIGITAL WALLET & FINANCE ---
+const WalletView = ({
+  data,
+  derived,
+  maskBalances,
+  t,
+  lang,
+  onOpenTxModal,
+  onDeleteTx,
+  onAddAccount,
+  onAddCustomCategory,
+  onOpenPaydayModal,
+  onOpenReceiptModal,
+  onOpenSplitBillModal,
+}) => {
+  const { currency } = data.profile;
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [accountFilter, setAccountFilter] = useState('all');
+  const [monthFilter, setMonthFilter] = useState('all');
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+
+  const [accName, setAccName] = useState('');
+  const [accType, setAccType] = useState('Checking');
+  const [accInstitution, setAccInstitution] = useState('');
+  const [accInitial, setAccInitial] = useState('0');
+  const [accLastFour, setAccLastFour] = useState('');
+
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatKind, setNewCatKind] = useState('expense');
+
+  const allCategories = useMemo(
+    () => [
+      ...new Set([
+        ...DEFAULT_EXPENSE_CATEGORIES,
+        ...DEFAULT_INCOME_CATEGORIES,
+        ...data.customExpenseCategories,
+        ...data.customIncomeCategories,
+        'Vault Allocation',
+      ]),
+    ],
+    [data.customExpenseCategories, data.customIncomeCategories]
+  );
+
+  const availableMonths = useMemo(() => {
+    const months = new Set(data.transactions.map((tx) => tx.date.slice(0, 7)));
+    months.add(CURRENT_MONTH);
+    return [...months].sort().reverse();
+  }, [data.transactions]);
+
+  const filteredTransactions = useMemo(() => {
+    return data.transactions
+      .filter((tx) => {
+        if (typeFilter !== 'all' && tx.type !== typeFilter) return false;
+        if (categoryFilter !== 'all' && tx.category !== categoryFilter) return false;
+        if (
+          accountFilter !== 'all' &&
+          tx.accountId !== accountFilter &&
+          tx.toAccountId !== accountFilter
+        ) {
+          return false;
+        }
+        if (monthFilter !== 'all' && !tx.date.startsWith(monthFilter)) return false;
+        if (search.trim()) {
+          const q = search.toLowerCase();
+          const matchDesc = tx.description.toLowerCase().includes(q);
+          const matchCat = tx.category.toLowerCase().includes(q);
+          const matchNotes = (tx.notes || '').toLowerCase().includes(q);
+          if (!matchDesc && !matchCat && !matchNotes) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [data.transactions, typeFilter, categoryFilter, accountFilter, monthFilter, search]);
+
+  const accountMap = useMemo(() => {
+    const map = {};
+    data.accounts.forEach((a) => {
+      map[a.id] = a;
+    });
+    return map;
+  }, [data.accounts]);
+
+  const handleCreateAccount = (e) => {
+    e.preventDefault();
+    if (!accName.trim()) return;
+    onAddAccount({
+      name: accName.trim(),
+      type: accType,
+      institution: accInstitution.trim() || 'Private Ledger',
+      initialBalance: parseFloat(accInitial) || 0,
+      lastFour: (accLastFour.trim() || '0000').slice(0, 4),
+    });
+    setAccName('');
+    setAccInstitution('');
+    setAccInitial('0');
+    setAccLastFour('');
+    setShowAccountModal(false);
+  };
+
+  const handleCreateCategory = (e) => {
+    e.preventDefault();
+    if (!newCatName.trim()) return;
+    onAddCustomCategory(newCatKind, newCatName.trim());
+    setNewCatName('');
+    setShowCategoryModal(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('wallet_title')}</h1>
+          <p className="text-xs text-[#A99B90] mt-1 flex items-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5 text-[#B68B61] shrink-0" />
+            <span>{t('wallet_subtitle')}</span>
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={onOpenReceiptModal}>
+            <ScanLine className="w-4 h-4 text-[#B68B61]" /> {t('scan_receipt')}
+          </Button>
+          <Button variant="secondary" size="sm" onClick={onOpenSplitBillModal}>
+            <Users className="w-4 h-4 text-[#E4C8A6]" /> {t('split_bill')}
+          </Button>
+          <Button variant="secondary" size="sm" onClick={onOpenPaydayModal}>
+            <Split className="w-4 h-4 text-[#E4C8A6]" /> {t('payday_splitter')}
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => setShowCategoryModal(true)}>
+            <Tag className="w-4 h-4" /> {t('custom_category')}
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => setShowAccountModal(true)}>
+            <CreditCard className="w-4 h-4" /> {t('add_account')}
+          </Button>
+          <Button size="sm" onClick={() => onOpenTxModal()}>
+            <Plus className="w-4 h-4" /> {t('new_transaction')}
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {data.accounts.map((acc) => {
+          const bal = derived.accountBalances[acc.id] ?? acc.initialBalance;
+          const isSelected = accountFilter === acc.id;
+          return (
+            <div
+              key={acc.id}
+              onClick={() => setAccountFilter(isSelected ? 'all' : acc.id)}
+              className={`cursor-pointer rounded-2xl p-5 life-glass-interactive border relative overflow-hidden ${
+                isSelected
+                  ? 'bg-gradient-to-br from-[#3D2C24] to-[#241B17] border-[#E4C8A6] shadow-lg'
+                  : 'bg-gradient-to-br from-[#2B201B] to-[#171412] border-[#624332]/50 hover:border-[#B68B61]/70'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#171412]/80 text-[#E4C8A6] border border-[#624332]/50">
+                  {acc.type}
+                </span>
+                {acc.type === 'Credit' ? (
+                  <CreditCard className="w-4 h-4 text-[#B68B61]" />
+                ) : acc.type === 'Cash' ? (
+                  <Banknote className="w-4 h-4 text-[#B68B61]" />
+                ) : (
+                  <Landmark className="w-4 h-4 text-[#B68B61]" />
+                )}
+              </div>
+              <div className="mt-4">
+                <p className="text-xs text-[#A99B90] truncate">{acc.institution}</p>
+                <h3 className="text-sm font-medium text-[#F4E9DC] truncate">{acc.name}</h3>
+              </div>
+              <div className="mt-4 flex items-end justify-between gap-2">
+                <span className="text-lg sm:text-xl font-semibold text-[#F4E9DC] tabular-nums truncate">
+                  {formatMoney(bal, currency, maskBalances)}
+                </span>
+                <span className="text-xs text-[#A99B90] font-mono shrink-0">•••• {acc.lastFour}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <GlassCard className="p-5 lg:col-span-2">
+          <h2 className="text-base font-semibold text-[#F4E9DC] mb-1">{t('spending_by_cat')}</h2>
+          <p className="text-xs text-[#A99B90] mb-4">{t('excludes_transfers')}</p>
+          {derived.categoryBreakdown.length === 0 ? (
+            <p className="text-xs text-[#A99B90] py-12 text-center">
+              {lang === 'id' ? 'Belum ada pengeluaran bulan ini.' : 'No expenses recorded this month.'}
+            </p>
+          ) : (
+            <div className="h-60 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={derived.categoryBreakdown}
+                  layout="vertical"
+                  margin={{ top: 0, right: 15, left: 10, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#624332" strokeOpacity={0.2} horizontal={false} />
+                  <XAxis type="number" stroke="#A99B90" fontSize={11} />
+                  <YAxis
+                    type="category"
+                    dataKey="category"
+                    stroke="#F4E9DC"
+                    fontSize={11}
+                    width={110}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#241B17',
+                      borderColor: '#624332',
+                      borderRadius: '12px',
+                      color: '#F4E9DC',
+                    }}
+                  />
+                  <Bar dataKey="amount" name={t('amount')} radius={[0, 8, 8, 0]}>
+                    {derived.categoryBreakdown.map((_, idx) => (
+                      <Cell key={idx} fill={CHART_PALETTE[idx % CHART_PALETTE.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </GlassCard>
+
+        <GlassCard className="p-5 flex flex-col justify-between space-y-4">
+          <div>
+            <h2 className="text-base font-semibold text-[#F4E9DC] mb-1">{t('ledger_summary')}</h2>
+            <p className="text-xs text-[#A99B90]">{t('chart_cashflow_sub')}</p>
+            <div className="mt-5 space-y-3">
+              <div className="flex justify-between items-center p-3 rounded-xl bg-[#171412]/80 gap-2">
+                <span className="text-xs text-[#A99B90]">{t('net_worth')}</span>
+                <span className="text-sm font-semibold text-[#E4C8A6] tabular-nums truncate">
+                  {formatMoney(derived.totalNetWorth, currency, maskBalances)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center p-3 rounded-xl bg-[#171412]/80 gap-2">
+                <span className="text-xs text-[#A99B90]">{t('kpi_monthly_income')}</span>
+                <span className="text-sm font-semibold text-[#F4E9DC] tabular-nums truncate">
+                  +{formatMoney(derived.monthlyIncome, currency, maskBalances)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center p-3 rounded-xl bg-[#171412]/80 gap-2">
+                <span className="text-xs text-[#A99B90]">{t('kpi_monthly_expenses')}</span>
+                <span className="text-sm font-semibold text-[#D96B52] tabular-nums truncate">
+                  -{formatMoney(derived.monthlyExpenses, currency, maskBalances)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center p-3 rounded-xl bg-[#30231D]/70 border border-[#B68B61]/40 gap-2">
+                <span className="text-xs text-[#E4C8A6]">{t('savings_rate')}</span>
+                <span className="text-sm font-bold text-[#E4C8A6] tabular-nums">
+                  {derived.monthlyIncome > 0
+                    ? `${Math.max(
+                        0,
+                        ((derived.monthlyIncome - derived.monthlyExpenses) / derived.monthlyIncome) * 100
+                      ).toFixed(1)}%`
+                    : '0.0%'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </GlassCard>
+      </div>
+
+      <GlassCard className="p-4 sm:p-5 space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-4 h-4 text-[#A99B90] absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('search_placeholder')}
+              className="w-full rounded-xl bg-[#171412] border border-[#624332]/55 pl-10 pr-4 py-2 text-sm text-[#F4E9DC] placeholder-[#A99B90]/50 focus:outline-none focus:border-[#B68B61]"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="rounded-xl bg-[#171412] border border-[#624332]/55 px-3 py-2 text-xs text-[#F4E9DC]"
+            >
+              <option value="all">{t('all_types')}</option>
+              <option value="income">{lang === 'id' ? 'Pemasukan' : 'Income'}</option>
+              <option value="expense">{lang === 'id' ? 'Pengeluaran' : 'Expense'}</option>
+              <option value="transfer">Transfer</option>
+            </select>
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="rounded-xl bg-[#171412] border border-[#624332]/55 px-3 py-2 text-xs text-[#F4E9DC]"
+            >
+              <option value="all">{t('all_categories')}</option>
+              {allCategories.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+            <select
+              value={monthFilter}
+              onChange={(e) => setMonthFilter(e.target.value)}
+              className="rounded-xl bg-[#171412] border border-[#624332]/55 px-3 py-2 text-xs text-[#F4E9DC]"
+            >
+              <option value="all">{t('all_months')}</option>
+              {availableMonths.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            {accountFilter !== 'all' && (
+              <Button size="sm" variant="ghost" onClick={() => setAccountFilter('all')}>
+                {t('clear_account_filter')}
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {filteredTransactions.length === 0 ? (
+          <EmptyState
+            icon={Wallet}
+            title={lang === 'id' ? 'Tidak ada transaksi cocok' : 'No matching transactions'}
+            description={
+              lang === 'id'
+                ? 'Ubah filter pencarian atau catat pemasukan, pengeluaran, maupun transfer baru.'
+                : 'Adjust your search filters or log a new income, expense, or internal transfer.'
+            }
+            actionLabel={t('new_transaction')}
+            onAction={() => onOpenTxModal()}
+          />
+        ) : (
+          <>
+            <div className="md:hidden space-y-2.5">
+              {filteredTransactions.map((tx) => {
+                const srcAcc = accountMap[tx.accountId]?.name || 'Wallet';
+                const dstAcc = tx.toAccountId ? accountMap[tx.toAccountId]?.name : null;
+                return (
+                  <div
+                    key={tx.id}
+                    className="p-3.5 rounded-xl bg-[#171412]/85 border border-[#624332]/40 space-y-2"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-[#F4E9DC] truncate">{tx.description}</p>
+                        <p className="text-[11px] text-[#A99B90]">
+                          {formatDateReadable(tx.date, lang)} • {tx.category}
+                        </p>
+                      </div>
+                      <span
+                        className={`text-sm font-semibold tabular-nums shrink-0 ${
+                          tx.type === 'income'
+                            ? 'text-[#E4C8A6]'
+                            : tx.type === 'transfer'
+                            ? 'text-[#B68B61]'
+                            : 'text-[#F4E9DC]'
+                        }`}
+                      >
+                        {tx.type === 'income' ? '+' : tx.type === 'transfer' ? '⇄ ' : '-'}
+                        {formatMoney(tx.amount, currency, maskBalances)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between pt-1.5 border-t border-[#624332]/25 text-xs text-[#A99B90]">
+                      <span className="truncate">
+                        {tx.type === 'transfer' && dstAcc ? `${srcAcc} → ${dstAcc}` : srcAcc}
+                      </span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => onOpenTxModal(tx)}
+                          className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#E4C8A6]"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => onDeleteTx(tx)}
+                          className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#D96B52]"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-[#624332]/40 text-[11px] uppercase tracking-wider text-[#A99B90]">
+                    <th className="py-3 px-3">{t('date')}</th>
+                    <th className="py-3 px-3">{t('description')}</th>
+                    <th className="py-3 px-3">{t('category')}</th>
+                    <th className="py-3 px-3">{lang === 'id' ? 'Akun / Metode' : 'Account / Method'}</th>
+                    <th className="py-3 px-3 text-right">{t('amount')}</th>
+                    <th className="py-3 px-3 text-right">{t('actions')}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#624332]/25 text-sm">
+                  {filteredTransactions.map((tx) => {
+                    const srcAcc = accountMap[tx.accountId]?.name || 'Wallet';
+                    const dstAcc = tx.toAccountId ? accountMap[tx.toAccountId]?.name : null;
+                    return (
+                      <tr key={tx.id} className="hover:bg-[#30231D]/35 transition-colors">
+                        <td className="py-3 px-3 text-xs text-[#A99B90] whitespace-nowrap">
+                          {formatDateReadable(tx.date, lang)}
+                        </td>
+                        <td className="py-3 px-3">
+                          <div className="font-medium text-[#F4E9DC]">{tx.description}</div>
+                          {tx.notes && <div className="text-xs text-[#A99B90]">{tx.notes}</div>}
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs bg-[#30231D] text-[#E4C8A6] border border-[#624332]/40">
+                            {tx.category}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-xs text-[#A99B90]">
+                          {tx.type === 'transfer' && dstAcc ? (
+                            <span>
+                              {srcAcc} → <strong className="text-[#E4C8A6]">{dstAcc}</strong>
+                            </span>
+                          ) : (
+                            <span>
+                              {srcAcc} • {tx.paymentMethod}
+                            </span>
+                          )}
+                        </td>
+                        <td
+                          className={`py-3 px-3 text-right font-semibold tabular-nums whitespace-nowrap ${
+                            tx.type === 'income'
+                              ? 'text-[#E4C8A6]'
+                              : tx.type === 'transfer'
+                              ? 'text-[#B68B61]'
+                              : 'text-[#F4E9DC]'
+                          }`}
+                        >
+                          {tx.type === 'income' ? '+' : tx.type === 'transfer' ? '⇄ ' : '-'}
+                          {formatMoney(tx.amount, currency, maskBalances)}
+                        </td>
+                        <td className="py-3 px-3 text-right whitespace-nowrap">
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              onClick={() => onOpenTxModal(tx)}
+                              className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#E4C8A6] hover:bg-[#30231D]"
+                              title={t('edit')}
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => onDeleteTx(tx)}
+                              className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#D96B52] hover:bg-[#30231D]"
+                              title={t('delete')}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </GlassCard>
+
+      <Modal open={showAccountModal} onClose={() => setShowAccountModal(false)} title={t('add_account')}>
+        <form onSubmit={handleCreateAccount} className="space-y-4">
+          <Input
+            label={lang === 'id' ? 'Nama Akun / Rekening' : 'Account Name'}
+            placeholder="e.g. BCA Prioritas / Mandiri Tabungan"
+            value={accName}
+            onChange={(e) => setAccName(e.target.value)}
+            required
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Select
+              label={lang === 'id' ? 'Tipe Akun' : 'Account Type'}
+              value={accType}
+              onChange={(e) => setAccType(e.target.value)}
+            >
+              <option value="Checking">Checking / Giro</option>
+              <option value="Savings">Savings / Tabungan</option>
+              <option value="Credit">Credit Card / Kartu Kredit</option>
+              <option value="Cash">Cash / Tunai</option>
+              <option value="Investment">Investment / Investasi</option>
+            </Select>
+            <Input
+              label={lang === 'id' ? 'Saldo Awal' : 'Opening Balance'}
+              type="number"
+              step="0.01"
+              value={accInitial}
+              onChange={(e) => setAccInitial(e.target.value)}
+              required
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label={lang === 'id' ? 'Bank / Penyedia' : 'Institution'}
+              placeholder="e.g. Bank Central Asia"
+              value={accInstitution}
+              onChange={(e) => setAccInstitution(e.target.value)}
+            />
+            <Input
+              label={lang === 'id' ? '4 Digit Terakhir' : 'Last 4 Digits'}
+              maxLength={4}
+              placeholder="4821"
+              value={accLastFour}
+              onChange={(e) => setAccLastFour(e.target.value)}
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="secondary" onClick={() => setShowAccountModal(false)}>
+              {t('cancel')}
+            </Button>
+            <Button type="submit">{t('save')}</Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal open={showCategoryModal} onClose={() => setShowCategoryModal(false)} title={t('custom_category')}>
+        <form onSubmit={handleCreateCategory} className="space-y-4">
+          <Select
+            label={lang === 'id' ? 'Jenis Kategori' : 'Category Type'}
+            value={newCatKind}
+            onChange={(e) => setNewCatKind(e.target.value)}
+          >
+            <option value="expense">{lang === 'id' ? 'Kategori Pengeluaran' : 'Expense Category'}</option>
+            <option value="income">{lang === 'id' ? 'Kategori Pemasukan' : 'Income Category'}</option>
+          </Select>
+          <Input
+            label={lang === 'id' ? 'Nama Kategori' : 'Category Name'}
+            placeholder="e.g. Kopi & Ngopi / Zakat & Sedekah"
+            value={newCatName}
+            onChange={(e) => setNewCatName(e.target.value)}
+            required
+          />
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="secondary" onClick={() => setShowCategoryModal(false)}>
+              {t('cancel')}
+            </Button>
+            <Button type="submit">{t('save')}</Button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+};
+
+// --- MODULE C: BUDGET MANAGEMENT ---
+const BudgetsView = ({ data, maskBalances, t, lang, onSaveBudget, onDeleteBudget }) => {
+  const { currency } = data.profile;
+  const [selectedMonth, setSelectedMonth] = useState(CURRENT_MONTH);
+  const [showModal, setShowModal] = useState(false);
+  const [editingBudget, setEditingBudget] = useState(null);
+  const [category, setCategory] = useState(DEFAULT_EXPENSE_CATEGORIES[0]);
+  const [limit, setLimit] = useState('500000');
+
+  const expenseCategories = useMemo(
+    () => [...new Set([...DEFAULT_EXPENSE_CATEGORIES, ...data.customExpenseCategories])],
+    [data.customExpenseCategories]
+  );
+
+  const prevMonth = useMemo(() => {
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const dt = new Date(y, m - 2, 1);
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+  }, [selectedMonth]);
+
+  const spendingByCategory = useMemo(() => {
+    const map = {};
+    data.transactions
+      .filter((tx) => tx.type === 'expense' && tx.date.startsWith(selectedMonth))
+      .forEach((tx) => {
+        map[tx.category] = (map[tx.category] || 0) + tx.amount;
+      });
+    return map;
+  }, [data.transactions, selectedMonth]);
+
+  const prevSpendingByCategory = useMemo(() => {
+    const map = {};
+    data.transactions
+      .filter((tx) => tx.type === 'expense' && tx.date.startsWith(prevMonth))
+      .forEach((tx) => {
+        map[tx.category] = (map[tx.category] || 0) + tx.amount;
+      });
+    return map;
+  }, [data.transactions, prevMonth]);
+
+  const monthBudgets = useMemo(
+    () => data.budgets.filter((b) => b.month === selectedMonth),
+    [data.budgets, selectedMonth]
+  );
+
+  const summary = useMemo(() => {
+    const totalLimit = monthBudgets.reduce((acc, b) => acc + b.limit, 0);
+    const totalSpent = monthBudgets.reduce((acc, b) => acc + (spendingByCategory[b.category] || 0), 0);
+    const alerts = monthBudgets.filter((b) => (spendingByCategory[b.category] || 0) >= b.limit * 0.85);
+    return {
+      totalLimit,
+      totalSpent,
+      remaining: totalLimit - totalSpent,
+      alerts,
+    };
+  }, [monthBudgets, spendingByCategory]);
+
+  const openModal = (bud = null) => {
+    setEditingBudget(bud);
+    setCategory(bud ? bud.category : expenseCategories[0]);
+    setLimit(bud ? String(bud.limit) : currency === 'Rp' ? '1000000' : '500');
+    setShowModal(true);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const numericLimit = parseFloat(limit);
+    if (!numericLimit || numericLimit <= 0) return;
+    onSaveBudget({
+      id: editingBudget?.id,
+      category,
+      limit: numericLimit,
+      month: selectedMonth,
+    });
+    setShowModal(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('budget_title')}</h1>
+          <p className="text-xs text-[#A99B90] mt-1">{t('budget_subtitle')}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <input
+            type="month"
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="rounded-xl bg-[#241B17] border border-[#624332]/60 px-3 py-2 text-sm text-[#F4E9DC]"
+          />
+          <Button size="sm" onClick={() => openModal()}>
+            <Plus className="w-4 h-4" /> {t('set_cat_limit')}
+          </Button>
+        </div>
+      </div>
+
+      {summary.alerts.length > 0 && (
+        <div className="p-4 rounded-2xl bg-[#D96B52]/15 border border-[#D96B52]/40 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-[#D96B52] shrink-0 mt-0.5" />
+          <div>
+            <h3 className="text-sm font-semibold text-[#F4E9DC]">{t('budget_alert_title')}</h3>
+            <p className="text-xs text-[#E4C8A6] mt-0.5">
+              {summary.alerts
+                .map(
+                  (a) =>
+                    `${a.category} (${Math.round(((spendingByCategory[a.category] || 0) / a.limit) * 100)}%)`
+                )
+                .join(', ')}
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <GlassCard className="p-5">
+          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('allocated_budget')}</span>
+          <div className="mt-2 text-xl sm:text-2xl font-semibold text-[#F4E9DC] tabular-nums">
+            {formatMoney(summary.totalLimit, currency, maskBalances)}
+          </div>
+        </GlassCard>
+        <GlassCard className="p-5">
+          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('tracked_spend')}</span>
+          <div className="mt-2 text-xl sm:text-2xl font-semibold text-[#B68B61] tabular-nums">
+            {formatMoney(summary.totalSpent, currency, maskBalances)}
+          </div>
+        </GlassCard>
+        <GlassCard className="p-5">
+          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('remaining_allowance')}</span>
+          <div
+            className={`mt-2 text-xl sm:text-2xl font-semibold tabular-nums ${
+              summary.remaining < 0 ? 'text-[#D96B52]' : 'text-[#E4C8A6]'
+            }`}
+          >
+            {formatMoney(summary.remaining, currency, maskBalances)}
+          </div>
+        </GlassCard>
+      </div>
+
+      {monthBudgets.length === 0 ? (
+        <EmptyState
+          icon={PieChart}
+          title={lang === 'id' ? `Belum ada anggaran untuk ${selectedMonth}` : `No budgets configured for ${selectedMonth}`}
+          description={
+            lang === 'id'
+              ? 'Tetapkan batas pengeluaran bulanan per kategori untuk mengontrol arus kas.'
+              : 'Establish monthly spending ceilings per category to monitor burn rate.'
+          }
+          actionLabel={t('set_cat_limit')}
+          onAction={() => openModal()}
+        />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {monthBudgets.map((b) => {
+            const spent = spendingByCategory[b.category] || 0;
+            const prevSpent = prevSpendingByCategory[b.category] || 0;
+            const pct = b.limit > 0 ? (spent / b.limit) * 100 : 0;
+            const rem = b.limit - spent;
+            const tone = pct >= 100 ? 'danger' : pct >= 80 ? 'champagne' : 'bronze';
+            return (
+              <GlassCard key={b.id} className="p-5 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h3 className="text-base font-semibold text-[#F4E9DC]">{b.category}</h3>
+                    <p className="text-xs text-[#A99B90] mt-0.5 tabular-nums">
+                      {formatMoney(spent, currency, maskBalances)} /{' '}
+                      {formatMoney(b.limit, currency, maskBalances)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => openModal(b)}
+                      className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#E4C8A6] hover:bg-[#30231D]"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => onDeleteBudget(b)}
+                      className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#D96B52] hover:bg-[#30231D]"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <ProgressBar value={spent} max={b.limit} tone={tone} height="h-2.5" />
+
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1">
+                  <span className={rem < 0 ? 'text-[#D96B52] font-medium' : 'text-[#E4C8A6]'}>
+                    {rem < 0
+                      ? `${t('over_by')} ${formatMoney(Math.abs(rem), currency, maskBalances)}`
+                      : `${formatMoney(rem, currency, maskBalances)} ${t('remaining')}`}
+                  </span>
+                  <span className="text-[#A99B90] tabular-nums">
+                    {t('prev_month')}: {formatMoney(prevSpent, currency, maskBalances)} ({pct.toFixed(0)}%)
+                  </span>
+                </div>
+              </GlassCard>
+            );
+          })}
+        </div>
+      )}
+
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={t('set_cat_limit')} subtitle={selectedMonth}>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Select label={t('category')} value={category} onChange={(e) => setCategory(e.target.value)}>
+            {expenseCategories.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </Select>
+          <Input
+            label={`${t('amount')} (${currency})`}
+            type="number"
+            step="0.01"
+            min="1"
+            value={limit}
+            onChange={(e) => setLimit(e.target.value)}
+            required
+          />
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="secondary" onClick={() => setShowModal(false)}>
+              {t('cancel')}
+            </Button>
+            <Button type="submit">{t('save')}</Button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+};
+
+// --- MODULE D: SAVINGS VAULTS & GOALS ---
+const SavingsView = ({
+  data,
+  maskBalances,
+  t,
+  lang,
+  onCreateSavingsGoal,
+  onAddContribution,
+  onDeleteSavingsGoal,
+}) => {
+  const { currency } = data.profile;
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [contribModalGoal, setContribModalGoal] = useState(null);
+  const [historyModalGoal, setHistoryModalGoal] = useState(null);
+
+  const [name, setName] = useState('');
+  const [targetAmount, setTargetAmount] = useState('');
+  const [targetDate, setTargetDate] = useState('2027-06-30');
+  const [initialSaved, setInitialSaved] = useState('0');
+
+  const [contribAmount, setContribAmount] = useState('');
+  const [contribNote, setContribNote] = useState('');
+
+  const handleCreate = (e) => {
+    e.preventDefault();
+    const target = parseFloat(targetAmount);
+    if (!name.trim() || !target || target <= 0) return;
+    onCreateSavingsGoal({
+      name: name.trim(),
+      targetAmount: target,
+      targetDate,
+      initialSaved: Math.max(0, parseFloat(initialSaved) || 0),
+    });
+    setName('');
+    setTargetAmount('');
+    setInitialSaved('0');
+    setShowCreateModal(false);
+  };
+
+  const handleContrib = (e) => {
+    e.preventDefault();
+    const amt = parseFloat(contribAmount);
+    if (!contribModalGoal || !amt || amt <= 0) return;
+    onAddContribution(
+      contribModalGoal.id,
+      amt,
+      contribNote.trim() || (lang === 'id' ? 'Setoran tabungan' : 'Savings deposit')
+    );
+    setContribAmount('');
+    setContribNote('');
+    setContribModalGoal(null);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('savings_title')}</h1>
+          <p className="text-xs text-[#A99B90] mt-1">{t('savings_subtitle')}</p>
+        </div>
+        <Button size="sm" onClick={() => setShowCreateModal(true)}>
+          <Plus className="w-4 h-4" /> {t('new_savings_vault')}
+        </Button>
+      </div>
+
+      {data.savingsGoals.length === 0 ? (
+        <EmptyState
+          icon={PiggyBank}
+          title={lang === 'id' ? 'Belum ada target tabungan' : 'No savings vaults yet'}
+          description={
+            lang === 'id'
+              ? 'Buat brankas tabungan khusus untuk dana darurat, liburan, atau pembelian besar.'
+              : 'Create dedicated capital vaults with contribution logs and target dates.'
+          }
+          actionLabel={t('new_savings_vault')}
+          onAction={() => setShowCreateModal(true)}
+        />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {data.savingsGoals.map((sg) => {
+            const saved = sg.contributions.reduce((s, c) => s + c.amount, 0);
+            const pct = sg.targetAmount > 0 ? Math.min(100, (saved / sg.targetAmount) * 100) : 0;
+            const rem = Math.max(0, sg.targetAmount - saved);
+            const funded = saved >= sg.targetAmount;
+
+            return (
+              <GlassCard key={sg.id} className="p-5 flex flex-col justify-between space-y-4">
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h3 className="text-base font-semibold text-[#F4E9DC]">{sg.name}</h3>
+                      <p className="text-xs text-[#A99B90] mt-0.5">
+                        Target: {formatDateReadable(sg.targetDate, lang)}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => onDeleteSavingsGoal(sg)}
+                      className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#D96B52]"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="pt-1">
+                    <div className="flex items-baseline justify-between text-xs mb-1.5 tabular-nums">
+                      <span className="text-base font-semibold text-[#E4C8A6]">
+                        {formatMoney(saved, currency, maskBalances)}
+                      </span>
+                      <span className="text-[#A99B90]">
+                        / {formatMoney(sg.targetAmount, currency, maskBalances)} ({pct.toFixed(0)}%)
+                      </span>
+                    </div>
+                    <ProgressBar value={saved} max={sg.targetAmount} tone={funded ? 'success' : 'champagne'} height="h-2.5" />
+                  </div>
+
+                  <p className="text-xs text-[#A99B90]">
+                    {funded
+                      ? t('target_funded')
+                      : `${formatMoney(rem, currency, maskBalances)} ${t('remaining_to_target')}`}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 pt-3 border-t border-[#624332]/35">
+                  <Button size="sm" className="flex-1" onClick={() => setContribModalGoal(sg)}>
+                    <Plus className="w-3.5 h-3.5" /> {t('contribute')}
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => setHistoryModalGoal(sg)}>
+                    <History className="w-3.5 h-3.5" /> {t('history')} ({sg.contributions.length})
+                  </Button>
+                </div>
+              </GlassCard>
+            );
+          })}
+        </div>
+      )}
+
+      <Modal open={showCreateModal} onClose={() => setShowCreateModal(false)} title={t('new_savings_vault')}>
+        <form onSubmit={handleCreate} className="space-y-4">
+          <Input
+            label={lang === 'id' ? 'Nama Target Tabungan' : 'Vault Name'}
+            placeholder="e.g. Dana Pendidikan / Rumah Impian"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label={`${lang === 'id' ? 'Target Dana' : 'Target Amount'} (${currency})`}
+              type="number"
+              step="0.01"
+              min="1"
+              value={targetAmount}
+              onChange={(e) => setTargetAmount(e.target.value)}
+              required
+            />
+            <Input
+              label={`${lang === 'id' ? 'Saldo Awal' : 'Initial Deposit'} (${currency})`}
+              type="number"
+              step="0.01"
+              min="0"
+              value={initialSaved}
+              onChange={(e) => setInitialSaved(e.target.value)}
+            />
+          </div>
+          <Input
+            label={lang === 'id' ? 'Target Tanggal Tercapai' : 'Target Date'}
+            type="date"
+            value={targetDate}
+            onChange={(e) => setTargetDate(e.target.value)}
+            required
+          />
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="secondary" onClick={() => setShowCreateModal(false)}>
+              {t('cancel')}
+            </Button>
+            <Button type="submit">{t('save')}</Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        open={Boolean(contribModalGoal)}
+        onClose={() => setContribModalGoal(null)}
+        title={`${t('contribute')} — ${contribModalGoal?.name || ''}`}
+      >
+        <form onSubmit={handleContrib} className="space-y-4">
+          <Input
+            label={`${t('amount')} (${currency})`}
+            type="number"
+            step="0.01"
+            min="1"
+            value={contribAmount}
+            onChange={(e) => setContribAmount(e.target.value)}
+            required
+          />
+          <Input
+            label={t('notes')}
+            placeholder="e.g. Setoran gaji bulanan"
+            value={contribNote}
+            onChange={(e) => setContribNote(e.target.value)}
+          />
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="secondary" onClick={() => setContribModalGoal(null)}>
+              {t('cancel')}
+            </Button>
+            <Button type="submit">{t('save')}</Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        open={Boolean(historyModalGoal)}
+        onClose={() => setHistoryModalGoal(null)}
+        title={`${t('history')} — ${historyModalGoal?.name || ''}`}
+      >
+        <div className="space-y-2.5">
+          {(historyModalGoal?.contributions || []).length === 0 ? (
+            <p className="text-xs text-[#A99B90] text-center py-6">
+              {lang === 'id' ? 'Belum ada riwayat setoran.' : 'No contributions logged yet.'}
+            </p>
+          ) : (
+            [...(historyModalGoal?.contributions || [])].reverse().map((c) => (
+              <div
+                key={c.id}
+                className="flex items-center justify-between p-3 rounded-xl bg-[#171412]/80 border border-[#624332]/40"
+              >
+                <div>
+                  <p className="text-sm font-medium text-[#F4E9DC]">{c.note}</p>
+                  <p className="text-xs text-[#A99B90]">{formatDateReadable(c.date, lang)}</p>
+                </div>
+                <span className="text-sm font-semibold text-[#E4C8A6] tabular-nums">
+                  +{formatMoney(c.amount, currency, maskBalances)}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      </Modal>
+    </div>
+  );
+};
+
+// --- MODULE: RECURRING BILLS & SUBSCRIPTIONS ---
+const SubscriptionsView = ({ data, maskBalances, t, lang, onAddSub, onPaySub, onDeleteSub }) => {
+  const { currency } = data.profile;
+  const [showModal, setShowModal] = useState(false);
+  const [name, setName] = useState('');
+  const [amount, setAmount] = useState('');
+  const [dueDay, setDueDay] = useState('15');
+  const [category, setCategory] = useState('Software & Subscriptions');
+  const [accountId, setAccountId] = useState(data.accounts[0]?.id || '');
+
+  const subs = data.subscriptions || [];
+
+  const summary = useMemo(() => {
+    const monthlyTotal = subs.reduce((s, item) => s + item.amount, 0);
+    const paidThisMonth = subs
+      .filter((item) => item.lastPaidMonth === CURRENT_MONTH)
+      .reduce((s, item) => s + item.amount, 0);
+    return {
+      monthlyTotal,
+      annualized: monthlyTotal * 12,
+      paidThisMonth,
+    };
+  }, [subs]);
+
+  const handleCreate = (e) => {
+    e.preventDefault();
+    const amt = parseFloat(amount);
+    if (!name.trim() || !amt || amt <= 0) return;
+    onAddSub({
+      name: name.trim(),
+      amount: amt,
+      billingCycle: 'Monthly',
+      dueDay: Math.min(31, Math.max(1, parseInt(dueDay, 10) || 1)),
+      category,
+      accountId: accountId || data.accounts[0]?.id,
+      lastPaidMonth: '',
+    });
+    setName('');
+    setAmount('');
+    setShowModal(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('subs_title')}</h1>
+          <p className="text-xs text-[#A99B90] mt-1">{t('subs_subtitle')}</p>
+        </div>
+        <Button size="sm" onClick={() => setShowModal(true)}>
+          <Plus className="w-4 h-4" /> {t('add_subscription')}
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <GlassCard className="p-5">
+          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('monthly_fixed_burn')}</span>
+          <div className="mt-2 text-xl sm:text-2xl font-semibold text-[#F4E9DC] tabular-nums">
+            {formatMoney(summary.monthlyTotal, currency, maskBalances)}
+          </div>
+        </GlassCard>
+        <GlassCard className="p-5">
+          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('annualized_cost')}</span>
+          <div className="mt-2 text-xl sm:text-2xl font-semibold text-[#B68B61] tabular-nums">
+            {formatMoney(summary.annualized, currency, maskBalances)}
+          </div>
+        </GlassCard>
+        <GlassCard className="p-5">
+          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('paid_this_month')}</span>
+          <div className="mt-2 text-xl sm:text-2xl font-semibold text-[#E4C8A6] tabular-nums">
+            {formatMoney(summary.paidThisMonth, currency, maskBalances)}
+          </div>
+        </GlassCard>
+      </div>
+
+      {subs.length === 0 ? (
+        <EmptyState
+          icon={Repeat}
+          title={lang === 'id' ? 'Belum ada tagihan rutin' : 'No recurring bills configured'}
+          description={
+            lang === 'id'
+              ? 'Tambahkan langganan internet, listrik, atau SaaS untuk memantau tanggal jatuh tempo bulanan.'
+              : 'Track monthly utilities, insurance, and subscriptions with 1-click ledger logging.'
+          }
+          actionLabel={t('add_subscription')}
+          onAction={() => setShowModal(true)}
+        />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {subs.map((sub) => {
+            const isPaid = sub.lastPaidMonth === CURRENT_MONTH;
+            return (
+              <GlassCard key={sub.id} className="p-5 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-semibold text-[#F4E9DC] truncate">{sub.name}</h3>
+                    {isPaid && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#5B8056]/25 text-[#87B082] border border-[#5B8056]/40 shrink-0">
+                        {t('paid_badge')}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-[#A99B90] mt-1">
+                    {sub.category} • {t('due_day')} {sub.dueDay}
+                  </p>
+                  <p className="text-sm font-semibold text-[#E4C8A6] tabular-nums mt-2">
+                    {formatMoney(sub.amount, currency, maskBalances)} / {lang === 'id' ? 'bln' : 'mo'}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {!isPaid && (
+                    <Button size="sm" onClick={() => onPaySub(sub)}>
+                      {t('pay_and_log')}
+                    </Button>
+                  )}
+                  <button
+                    onClick={() => onDeleteSub(sub)}
+                    className="p-2 rounded-xl text-[#A99B90] hover:text-[#D96B52] hover:bg-[#30231D]"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </GlassCard>
+            );
+          })}
+        </div>
+      )}
+
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={t('add_subscription')}>
+        <form onSubmit={handleCreate} className="space-y-4">
+          <Input
+            label={lang === 'id' ? 'Nama Tagihan / Langganan' : 'Bill / Subscription Name'}
+            placeholder="e.g. Listrik PLN / Netflix / Internet"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label={`${t('amount')} (${currency})`}
+              type="number"
+              step="0.01"
+              min="1"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              required
+            />
+            <Input
+              label={t('due_day')}
+              type="number"
+              min="1"
+              max="31"
+              value={dueDay}
+              onChange={(e) => setDueDay(e.target.value)}
+              required
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Select label={t('category')} value={category} onChange={(e) => setCategory(e.target.value)}>
+              {DEFAULT_EXPENSE_CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </Select>
+            <Select
+              label={lang === 'id' ? 'Akun Pembayaran' : 'Payment Account'}
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value)}
+            >
+              {data.accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="secondary" onClick={() => setShowModal(false)}>
+              {t('cancel')}
+            </Button>
+            <Button type="submit">{t('save')}</Button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+};
+
+// --- MODULE: DEBTS, RECEIVABLES & INSTALLMENTS ---
+const DebtsView = ({
+  data,
+  maskBalances,
+  t,
+  lang,
+  onAddDebt,
+  onSettleDebtInstallment,
+  onDeleteDebt,
+  onOpenSplitBillModal,
+}) => {
+  const { currency } = data.profile;
+  const [showModal, setShowModal] = useState(false);
+  const [title, setTitle] = useState('');
+  const [counterparty, setCounterparty] = useState('');
+  const [kind, setKind] = useState('debt');
+  const [totalAmount, setTotalAmount] = useState('');
+  const [paidAmount, setPaidAmount] = useState('0');
+  const [monthlyAmount, setMonthlyAmount] = useState('');
+  const [tenorMonths, setTenorMonths] = useState('6');
+  const [dueDate, setDueDate] = useState('2026-12-10');
+  const [accountId, setAccountId] = useState(data.accounts[0]?.id || '');
+
+  const debts = data.debts || [];
+
+  const summary = useMemo(() => {
+    const totalOwed = debts
+      .filter((d) => d.kind === 'debt')
+      .reduce((s, d) => s + Math.max(0, d.totalAmount - d.paidAmount), 0);
+    const totalReceivable = debts
+      .filter((d) => d.kind === 'receivable')
+      .reduce((s, d) => s + Math.max(0, d.totalAmount - d.paidAmount), 0);
+    const monthlyCommitment = debts
+      .filter((d) => d.kind === 'debt' && d.paidAmount < d.totalAmount)
+      .reduce((s, d) => s + Math.min(d.monthlyAmount, d.totalAmount - d.paidAmount), 0);
+    return { totalOwed, totalReceivable, monthlyCommitment };
+  }, [debts]);
+
+  const handleCreate = (e) => {
+    e.preventDefault();
+    const tot = parseFloat(totalAmount);
+    if (!title.trim() || !tot || tot <= 0) return;
+    const tenor = Math.max(1, parseInt(tenorMonths, 10) || 1);
+    const monthly = parseFloat(monthlyAmount) || Math.round((tot / tenor) * 100) / 100;
+
+    onAddDebt({
+      title: title.trim(),
+      counterparty: counterparty.trim() || (kind === 'debt' ? 'Lender' : 'Borrower'),
+      kind,
+      totalAmount: tot,
+      paidAmount: Math.min(tot, Math.max(0, parseFloat(paidAmount) || 0)),
+      monthlyAmount: monthly,
+      tenorMonths: tenor,
+      dueDate,
+      accountId: accountId || data.accounts[0]?.id,
+      notes: '',
+    });
+    setTitle('');
+    setCounterparty('');
+    setTotalAmount('');
+    setPaidAmount('0');
+    setMonthlyAmount('');
+    setShowModal(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('debts_title')}</h1>
+          <p className="text-xs text-[#A99B90] mt-1">{t('debts_subtitle')}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="secondary" onClick={onOpenSplitBillModal}>
+            <Users className="w-4 h-4 text-[#E4C8A6]" /> {t('split_bill')}
+          </Button>
+          <Button size="sm" onClick={() => setShowModal(true)}>
+            <Plus className="w-4 h-4" /> {t('add_debt')}
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <GlassCard className="p-5">
+          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('total_debt_owed')}</span>
+          <div className="mt-2 text-xl sm:text-2xl font-semibold text-[#D96B52] tabular-nums">
+            {formatMoney(summary.totalOwed, currency, maskBalances)}
+          </div>
+        </GlassCard>
+        <GlassCard className="p-5">
+          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('total_receivable')}</span>
+          <div className="mt-2 text-xl sm:text-2xl font-semibold text-[#E4C8A6] tabular-nums">
+            {formatMoney(summary.totalReceivable, currency, maskBalances)}
+          </div>
+        </GlassCard>
+        <GlassCard className="p-5">
+          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('monthly_installments')}</span>
+          <div className="mt-2 text-xl sm:text-2xl font-semibold text-[#B68B61] tabular-nums">
+            {formatMoney(summary.monthlyCommitment, currency, maskBalances)}
+          </div>
+        </GlassCard>
+      </div>
+
+      {debts.length === 0 ? (
+        <EmptyState
+          icon={HandCoins}
+          title={lang === 'id' ? 'Belum ada catatan utang atau piutang' : 'No debts or receivables recorded'}
+          description={
+            lang === 'id'
+              ? 'Catat cicilan kartu kredit, pinjaman, atau piutang teman agar arus kas lebih terukur.'
+              : 'Track installment loans or money owed to you and settle directly through your wallet.'
+          }
+          actionLabel={t('add_debt')}
+          onAction={() => setShowModal(true)}
+        />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {debts.map((item) => {
+            const remaining = Math.max(0, item.totalAmount - item.paidAmount);
+            const pct = item.totalAmount > 0 ? Math.min(100, (item.paidAmount / item.totalAmount) * 100) : 0;
+            const isSettled = remaining <= 0;
+            const nextStepAmount = Math.min(item.monthlyAmount, remaining);
+            const isDebt = item.kind === 'debt';
+
+            return (
+              <GlassCard key={item.id} className="p-5 flex flex-col justify-between space-y-4">
+                <div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span
+                        className={`text-[10px] uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                          isDebt
+                            ? 'bg-[#D96B52]/15 text-[#F29B87] border-[#D96B52]/40'
+                            : 'bg-[#B68B61]/20 text-[#E4C8A6] border-[#B68B61]/40'
+                        }`}
+                      >
+                        {isDebt ? t('debt_type_owe') : t('debt_type_receivable')}
+                      </span>
+                      <h3 className="text-base font-semibold text-[#F4E9DC] mt-2">{item.title}</h3>
+                      <p className="text-xs text-[#A99B90]">
+                        {item.counterparty} • Due: {formatDateReadable(item.dueDate, lang)}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => onDeleteDebt(item)}
+                      className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#D96B52]"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="mt-4 space-y-2">
+                    <div className="flex flex-wrap justify-between gap-1 text-xs tabular-nums">
+                      <span className="text-[#A99B90]">
+                        {lang === 'id' ? 'Terbayar' : 'Settled'}:{' '}
+                        <strong className="text-[#F4E9DC]">
+                          {formatMoney(item.paidAmount, currency, maskBalances)}
+                        </strong>{' '}
+                        / {formatMoney(item.totalAmount, currency, maskBalances)}
+                      </span>
+                      <span className="text-[#E4C8A6] font-semibold">{pct.toFixed(0)}%</span>
+                    </div>
+                    <ProgressBar
+                      value={item.paidAmount}
+                      max={item.totalAmount}
+                      tone={isSettled ? 'success' : isDebt ? 'danger' : 'champagne'}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[#624332]/35">
+                  <div className="text-xs text-[#A99B90] tabular-nums">
+                    {lang === 'id' ? 'Sisa' : 'Remaining'}:{' '}
+                    <strong className="text-[#F4E9DC]">
+                      {formatMoney(remaining, currency, maskBalances)}
+                    </strong>
+                  </div>
+                  {isSettled ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#87B082]">
+                      <CheckCircle2 className="w-4 h-4" /> {lang === 'id' ? 'Lunas' : 'Settled'}
+                    </span>
+                  ) : (
+                    <Button size="sm" onClick={() => onSettleDebtInstallment(item, nextStepAmount)}>
+                      <Wallet className="w-3.5 h-3.5" />
+                      {isDebt ? t('pay_installment') : t('receive_payment')} (
+                      {formatMoney(nextStepAmount, currency, maskBalances)})
+                    </Button>
+                  )}
+                </div>
+              </GlassCard>
+            );
+          })}
+        </div>
+      )}
+
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={t('add_debt')}>
+        <form onSubmit={handleCreate} className="space-y-4">
+          <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-[#171412] border border-[#624332]/50">
+            {[
+              { id: 'debt', label: t('debt_type_owe') },
+              { id: 'receivable', label: t('debt_type_receivable') },
+            ].map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setKind(opt.id)}
+                className={`py-2 rounded-lg text-xs font-semibold ${
+                  kind === opt.id ? 'bg-[#B68B61] text-[#171412]' : 'text-[#A99B90]'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          <Input
+            label={lang === 'id' ? 'Judul Utang / Piutang' : 'Title'}
+            placeholder="e.g. Cicilan Laptop / Pinjaman Budi"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+          />
+          <Input
+            label={lang === 'id' ? 'Pihak Terkait (Bank / Nama)' : 'Counterparty'}
+            placeholder="e.g. BCA PayLater / Budi Santoso"
+            value={counterparty}
+            onChange={(e) => setCounterparty(e.target.value)}
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label={`${lang === 'id' ? 'Total Nominal' : 'Total Amount'} (${currency})`}
+              type="number"
+              step="0.01"
+              min="1"
+              value={totalAmount}
+              onChange={(e) => setTotalAmount(e.target.value)}
+              required
+            />
+            <Input
+              label={`${lang === 'id' ? 'Sudah Dibayar' : 'Already Paid'} (${currency})`}
+              type="number"
+              step="0.01"
+              min="0"
+              value={paidAmount}
+              onChange={(e) => setPaidAmount(e.target.value)}
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Input
+              label={t('tenor_months')}
+              type="number"
+              min="1"
+              value={tenorMonths}
+              onChange={(e) => setTenorMonths(e.target.value)}
+            />
+            <Input
+              label={`${lang === 'id' ? 'Cicilan / Bln' : 'Monthly'} (${currency})`}
+              type="number"
+              step="0.01"
+              value={monthlyAmount}
+              onChange={(e) => setMonthlyAmount(e.target.value)}
+            />
+            <Input
+              label={t('date')}
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+            />
+          </div>
+          <Select
+            label={lang === 'id' ? 'Akun Dompet Terkait' : 'Wallet Account'}
+            value={accountId}
+            onChange={(e) => setAccountId(e.target.value)}
+          >
+            {data.accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </Select>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="secondary" onClick={() => setShowModal(false)}>
+              {t('cancel')}
+            </Button>
+            <Button type="submit">{t('save')}</Button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+};
+
+// --- MODULE: INVESTMENT PORTFOLIO ---
+const InvestmentsView = ({
+  data,
+  maskBalances,
+  t,
+  lang,
+  onAddInvestment,
+  onUpdateInvestmentValue,
+  onDeleteInvestment,
+}) => {
+  const { currency } = data.profile;
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingAsset, setEditingAsset] = useState(null);
+  const [updatedMarketVal, setUpdatedMarketVal] = useState('');
+
+  const [name, setName] = useState('');
+  const [assetClass, setAssetClass] = useState('Gold');
+  const [quantity, setQuantity] = useState('');
+  const [investedAmount, setInvestedAmount] = useState('');
+  const [currentValue, setCurrentValue] = useState('');
+
+  const holdings = data.investments || [];
+
+  const summary = useMemo(() => {
+    const totalCurrent = holdings.reduce((s, item) => s + (Number(item.currentValue) || 0), 0);
+    const totalInvested = holdings.reduce((s, item) => s + (Number(item.investedAmount) || 0), 0);
+    const pnl = totalCurrent - totalInvested;
+    const pnlPct = totalInvested > 0 ? (pnl / totalInvested) * 100 : 0;
+    return { totalCurrent, totalInvested, pnl, pnlPct };
+  }, [holdings]);
+
+  const handleCreate = (e) => {
+    e.preventDefault();
+    const invAmt = parseFloat(investedAmount) || 0;
+    const curVal = parseFloat(currentValue) || invAmt;
+    if (!name.trim() || curVal < 0) return;
+
+    onAddInvestment({
+      name: name.trim(),
+      assetClass,
+      quantity: quantity.trim() || '1 Unit',
+      investedAmount: invAmt,
+      currentValue: curVal,
+      updatedAt: TODAY_STR,
+    });
+    setName('');
+    setQuantity('');
+    setInvestedAmount('');
+    setCurrentValue('');
+    setShowAddModal(false);
+  };
+
+  const handleUpdateSubmit = (e) => {
+    e.preventDefault();
+    const val = parseFloat(updatedMarketVal);
+    if (!editingAsset || Number.isNaN(val) || val < 0) return;
+    onUpdateInvestmentValue(editingAsset.id, val);
+    setEditingAsset(null);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('inv_title')}</h1>
+          <p className="text-xs text-[#A99B90] mt-1">{t('inv_subtitle')}</p>
+        </div>
+        <Button size="sm" onClick={() => setShowAddModal(true)}>
+          <Plus className="w-4 h-4" /> {t('add_investment')}
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <GlassCard className="p-5">
+          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('inv_current_value')}</span>
+          <div className="mt-2 text-xl sm:text-2xl font-semibold text-[#E4C8A6] tabular-nums">
+            {formatMoney(summary.totalCurrent, currency, maskBalances)}
+          </div>
+        </GlassCard>
+        <GlassCard className="p-5">
+          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('inv_invested_capital')}</span>
+          <div className="mt-2 text-xl sm:text-2xl font-semibold text-[#F4E9DC] tabular-nums">
+            {formatMoney(summary.totalInvested, currency, maskBalances)}
+          </div>
+        </GlassCard>
+        <GlassCard className="p-5">
+          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('inv_unrealized_pnl')}</span>
+          <div
+            className={`mt-2 text-xl sm:text-2xl font-semibold tabular-nums ${
+              summary.pnl >= 0 ? 'text-[#87B082]' : 'text-[#D96B52]'
+            }`}
+          >
+            {summary.pnl >= 0 ? '+' : ''}
+            {formatMoney(summary.pnl, currency, maskBalances)}{' '}
+            <span className="text-xs font-normal">
+              ({summary.pnl >= 0 ? '+' : ''}
+              {summary.pnlPct.toFixed(1)}%)
+            </span>
+          </div>
+        </GlassCard>
+      </div>
+
+      {holdings.length === 0 ? (
+        <EmptyState
+          icon={TrendingUp}
+          title={lang === 'id' ? 'Belum ada aset investasi tercatat' : 'No investment assets yet'}
+          description={
+            lang === 'id'
+              ? 'Catat kepemilikan emas, reksadana, atau saham Anda agar terhitung dalam Total Kekayaan Bersih.'
+              : 'Record gold, mutual funds, or equity positions to track portfolio performance.'
+          }
+          actionLabel={t('add_investment')}
+          onAction={() => setShowAddModal(true)}
+        />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {holdings.map((asset) => {
+            const gain = asset.currentValue - asset.investedAmount;
+            const gainPct = asset.investedAmount > 0 ? (gain / asset.investedAmount) * 100 : 0;
+            return (
+              <GlassCard key={asset.id} className="p-5 flex flex-col justify-between space-y-4">
+                <div>
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-[10px] uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#30231D] text-[#E4C8A6] border border-[#624332]/50">
+                      {asset.assetClass} • {asset.quantity}
+                    </span>
+                    <button
+                      onClick={() => onDeleteInvestment(asset)}
+                      className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#D96B52]"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <h3 className="text-base font-semibold text-[#F4E9DC] mt-2">{asset.name}</h3>
+
+                  <div className="mt-4 space-y-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-[#A99B90]">{t('inv_current_value')}</span>
+                      <span className="text-sm font-semibold text-[#F4E9DC] tabular-nums">
+                        {formatMoney(asset.currentValue, currency, maskBalances)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-[#A99B90]">{t('inv_invested_capital')}</span>
+                      <span className="text-[#A99B90] tabular-nums">
+                        {formatMoney(asset.investedAmount, currency, maskBalances)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs pt-1">
+                      <span className="text-[#A99B90]">Return</span>
+                      <span
+                        className={`font-semibold tabular-nums ${
+                          gain >= 0 ? 'text-[#87B082]' : 'text-[#D96B52]'
+                        }`}
+                      >
+                        {gain >= 0 ? '+' : ''}
+                        {formatMoney(gain, currency, maskBalances)} ({gain >= 0 ? '+' : ''}
+                        {gainPct.toFixed(1)}%)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-[#624332]/35 flex items-center justify-between">
+                  <span className="text-[11px] text-[#A99B90]">
+                    {formatDateReadable(asset.updatedAt, lang)}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setEditingAsset(asset);
+                      setUpdatedMarketVal(String(asset.currentValue));
+                    }}
+                  >
+                    <Edit3 className="w-3.5 h-3.5" /> {t('update_market_val')}
+                  </Button>
+                </div>
+              </GlassCard>
+            );
+          })}
+        </div>
+      )}
+
+      <Modal open={showAddModal} onClose={() => setShowAddModal(false)} title={t('add_investment')}>
+        <form onSubmit={handleCreate} className="space-y-4">
+          <Input
+            label={lang === 'id' ? 'Nama Aset Investasi' : 'Asset Name'}
+            placeholder="e.g. Emas Antam / Reksadana RDPU / Saham BBCA"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Select
+              label={lang === 'id' ? 'Kelas Aset' : 'Asset Class'}
+              value={assetClass}
+              onChange={(e) => setAssetClass(e.target.value)}
+            >
+              <option value="Gold">Gold / Emas</option>
+              <option value="Mutual Fund">Mutual Fund / Reksadana</option>
+              <option value="Stocks">Stocks / Saham</option>
+              <option value="Bonds">Bonds / Obligasi & SBN</option>
+              <option value="Other">Other / Lainnya</option>
+            </Select>
+            <Input
+              label={lang === 'id' ? 'Jumlah / Unit / Gram' : 'Quantity / Units'}
+              placeholder="e.g. 10 gr / 5 Lot"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label={`${t('inv_invested_capital')} (${currency})`}
+              type="number"
+              step="0.01"
+              min="0"
+              value={investedAmount}
+              onChange={(e) => setInvestedAmount(e.target.value)}
+              required
+            />
+            <Input
+              label={`${t('inv_current_value')} (${currency})`}
+              type="number"
+              step="0.01"
+              min="0"
+              value={currentValue}
+              onChange={(e) => setCurrentValue(e.target.value)}
+              required
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="secondary" onClick={() => setShowAddModal(false)}>
+              {t('cancel')}
+            </Button>
+            <Button type="submit">{t('save')}</Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        open={Boolean(editingAsset)}
+        onClose={() => setEditingAsset(null)}
+        title={`${t('update_market_val')} — ${editingAsset?.name || ''}`}
+      >
+        <form onSubmit={handleUpdateSubmit} className="space-y-4">
+          <Input
+            label={`${t('inv_current_value')} (${currency})`}
+            type="number"
+            step="0.01"
+            min="0"
+            value={updatedMarketVal}
+            onChange={(e) => setUpdatedMarketVal(e.target.value)}
+            required
+          />
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="secondary" onClick={() => setEditingAsset(null)}>
+              {t('cancel')}
+            </Button>
+            <Button type="submit">{t('save')}</Button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+};
+
+// --- MODULE E: DAILY, WEEKLY & MONTHLY PLANNER (WITH FOCUS TIMER & WELLNESS TELEMETRY) ---
+const PlannerView = ({
+  data,
+  t,
+  lang,
+  onToggleTask,
+  onToggleTopPriority,
+  onOpenTaskModal,
+  onOpenEventModal,
+  onSaveWellnessLog,
+}) => {
+  const [horizon, setHorizon] = useState('daily');
+  const [selectedDate, setSelectedDate] = useState(TODAY_STR);
+
+  const [focusDuration, setFocusDuration] = useState(25);
+  const [secondsLeft, setSecondsLeft] = useState(25 * 60);
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [sessionsCompleted, setSessionsCompleted] = useState(2);
+
+  // Wellness Telemetry State synced with selectedDate
+  const existingWellness = useMemo(
+    () => (data.wellnessLogs || []).find((w) => w.date === selectedDate),
+    [data.wellnessLogs, selectedDate]
+  );
+
+  const [sleepHours, setSleepHours] = useState('7.5');
+  const [waterGlasses, setWaterGlasses] = useState(7);
+  const [weightKg, setWeightKg] = useState('71.0');
+  const [energyScore, setEnergyScore] = useState(8);
+
+  useEffect(() => {
+    if (existingWellness) {
+      setSleepHours(String(existingWellness.sleepHours ?? 7.5));
+      setWaterGlasses(existingWellness.waterGlasses ?? 7);
+      setWeightKg(String(existingWellness.weightKg ?? 71.0));
+      setEnergyScore(existingWellness.energyScore ?? 8);
+    } else {
+      setSleepHours('7.0');
+      setWaterGlasses(6);
+      setWeightKg('71.0');
+      setEnergyScore(7);
+    }
+  }, [existingWellness, selectedDate]);
+
+  useEffect(() => {
+    if (!timerRunning) return undefined;
+    const interval = setInterval(() => {
+      setSecondsLeft((prev) => {
+        if (prev <= 1) {
+          setTimerRunning(false);
+          setSessionsCompleted((s) => s + 1);
+          return focusDuration * 60;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [timerRunning, focusDuration]);
+
+  const selectPreset = (mins) => {
+    setTimerRunning(false);
+    setFocusDuration(mins);
+    setSecondsLeft(mins * 60);
+  };
+
+  const formattedClock = `${String(Math.floor(secondsLeft / 60)).padStart(2, '0')}:${String(
+    secondsLeft % 60
+  ).padStart(2, '0')}`;
+
+  const weekDays = useMemo(() => {
+    const [y, m, d] = selectedDate.split('-').map(Number);
+    const base = new Date(y, m - 1, d);
+    const dayOfWeek = base.getDay();
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const monday = new Date(base);
+    monday.setDate(base.getDate() + mondayOffset);
+    return Array.from({ length: 7 }, (_, i) => {
+      const dt = new Date(monday);
+      dt.setDate(monday.getDate() + i);
+      const iso = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(
+        dt.getDate()
+      ).padStart(2, '0')}`;
+      return {
+        dateStr: iso,
+        weekday: dt.toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-US', { weekday: 'short' }),
+        dayNum: dt.getDate(),
+      };
+    });
+  }, [selectedDate, lang]);
+
+  const dayTasks = useMemo(
+    () => data.tasks.filter((tk) => tk.dueDate === selectedDate),
+    [data.tasks, selectedDate]
+  );
+  const topPriorities = useMemo(
+    () => data.tasks.filter((tk) => tk.isTopPriority && tk.status !== 'completed').slice(0, 3),
+    [data.tasks]
+  );
+  const dayEvents = useMemo(
+    () =>
+      data.events
+        .filter((e) => e.date === selectedDate)
+        .sort((a, b) => a.startTime.localeCompare(b.startTime)),
+    [data.events, selectedDate]
+  );
+
+  const dayCompletionPct = useMemo(() => {
+    if (!dayTasks.length) return 0;
+    const done = dayTasks.filter((tk) => tk.status === 'completed').length;
+    return (done / dayTasks.length) * 100;
+  }, [dayTasks]);
+
+  const handleWellnessSubmit = (e) => {
+    e.preventDefault();
+    onSaveWellnessLog({
+      date: selectedDate,
+      sleepHours: Math.max(0, Math.min(24, parseFloat(sleepHours) || 0)),
+      waterGlasses: Math.max(0, Math.min(20, Number(waterGlasses) || 0)),
+      weightKg: Math.max(0, parseFloat(weightKg) || 0),
+      energyScore: Math.max(1, Math.min(10, Number(energyScore) || 5)),
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('planner_title')}</h1>
+          <p className="text-xs text-[#A99B90] mt-1">{t('planner_subtitle')}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex rounded-xl bg-[#241B17] p-1 border border-[#624332]/50">
+            {[
+              { id: 'daily', label: t('mode_daily') },
+              { id: 'weekly', label: t('mode_weekly') },
+              { id: 'monthly', label: t('mode_monthly') },
+            ].map((mode) => (
+              <button
+                key={mode.id}
+                onClick={() => setHorizon(mode.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  horizon === mode.id
+                    ? 'bg-[#B68B61] text-[#171412]'
+                    : 'text-[#A99B90] hover:text-[#F4E9DC]'
+                }`}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="rounded-xl bg-[#241B17] border border-[#624332]/60 px-3 py-2 text-xs text-[#F4E9DC]"
+          />
+        </div>
+      </div>
+
+      {/* 7-Day Selector Strip */}
+      <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+        {weekDays.map((wd) => {
+          const active = wd.dateStr === selectedDate;
+          const count =
+            data.tasks.filter((tk) => tk.dueDate === wd.dateStr).length +
+            data.events.filter((e) => e.date === wd.dateStr).length;
+          return (
+            <button
+              key={wd.dateStr}
+              onClick={() => setSelectedDate(wd.dateStr)}
+              className={`p-2 sm:p-3 rounded-2xl border text-center transition-all ${
+                active
+                  ? 'bg-gradient-to-b from-[#3A2B24] to-[#241B17] border-[#B68B61] text-[#F4E9DC]'
+                  : 'bg-[#241B17]/60 border-[#624332]/35 text-[#A99B90] hover:border-[#624332]'
+              }`}
+            >
+              <div className="text-[10px] sm:text-[11px] uppercase truncate">{wd.weekday}</div>
+              <div className="text-sm sm:text-lg font-semibold mt-0.5 text-[#F4E9DC]">{wd.dayNum}</div>
+              <div className="text-[10px] text-[#B68B61] mt-1">{count}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      {horizon === 'daily' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="space-y-6">
+            {/* Focus Timer Card */}
+            <GlassCard className="p-5 space-y-4 bg-gradient-to-br from-[#2C211C] to-[#171412]">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-base font-semibold text-[#F4E9DC]">{t('focus_timer_title')}</h2>
+                  <p className="text-xs text-[#A99B90]">
+                    {sessionsCompleted} {t('focus_sessions_done')}
+                  </p>
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  {[25, 50].map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => selectPreset(m)}
+                      className={`px-2 py-1 rounded-lg text-[11px] font-medium ${
+                        focusDuration === m
+                          ? 'bg-[#B68B61] text-[#171412]'
+                          : 'bg-[#171412] text-[#A99B90]'
+                      }`}
+                    >
+                      {m}m
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="text-center py-3 rounded-2xl bg-[#171412]/90 border border-[#624332]/40">
+                <div className="text-3xl sm:text-4xl font-bold tracking-wider text-[#E4C8A6] tabular-nums font-mono">
+                  {formattedClock}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => setTimerRunning((prev) => !prev)}
+                >
+                  {timerRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                  {timerRunning
+                    ? lang === 'id'
+                      ? 'Jeda'
+                      : 'Pause'
+                    : lang === 'id'
+                    ? 'Mulai Fokus'
+                    : 'Start Focus'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    setTimerRunning(false);
+                    setSecondsLeft(focusDuration * 60);
+                  }}
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </Button>
+              </div>
+            </GlassCard>
+
+            {/* NEW MODULE #4: WELLNESS, SLEEP & HYDRATION TELEMETRY WIDGET */}
+            <GlassCard className="p-5 space-y-4">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h2 className="text-base font-semibold text-[#F4E9DC] flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-[#B68B61]" />
+                    <span>{t('wellness_title')}</span>
+                  </h2>
+                  <p className="text-xs text-[#A99B90] mt-0.5">{t('wellness_sub')}</p>
+                </div>
+              </div>
+
+              <form onSubmit={handleWellnessSubmit} className="space-y-3.5">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-xl bg-[#171412]/80 border border-[#624332]/40 space-y-1">
+                    <label className="text-[11px] text-[#A99B90] flex items-center gap-1.5">
+                      <Moon className="w-3.5 h-3.5 text-[#E4C8A6]" /> {t('sleep_hours')}
+                    </label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      max="24"
+                      value={sleepHours}
+                      onChange={(e) => setSleepHours(e.target.value)}
+                      className="w-full bg-transparent text-base font-semibold text-[#F4E9DC] focus:outline-none tabular-nums"
+                    />
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-[#171412]/80 border border-[#624332]/40 space-y-1">
+                    <label className="text-[11px] text-[#A99B90] flex items-center gap-1.5">
+                      <Scale className="w-3.5 h-3.5 text-[#B68B61]" /> {t('body_weight')}
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="20"
+                      max="250"
+                      value={weightKg}
+                      onChange={(e) => setWeightKg(e.target.value)}
+                      className="w-full bg-transparent text-base font-semibold text-[#F4E9DC] focus:outline-none tabular-nums"
+                    />
+                  </div>
+                </div>
+
+                {/* Hydration Interactive Glasses */}
+                <div className="p-3 rounded-xl bg-[#171412]/80 border border-[#624332]/40 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-[#A99B90] flex items-center gap-1.5">
+                      <Droplets className="w-3.5 h-3.5 text-[#E4C8A6]" /> {t('water_glasses')}
+                    </span>
+                    <span className="font-semibold text-[#E4C8A6] tabular-nums">{waterGlasses} / 8</span>
+                  </div>
+                  <div className="grid grid-cols-8 gap-1.5">
+                    {Array.from({ length: 8 }, (_, idx) => {
+                      const filled = idx < waterGlasses;
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setWaterGlasses(idx + 1)}
+                          className={`h-7 rounded-lg flex items-center justify-center transition-all ${
+                            filled
+                              ? 'bg-[#B68B61] text-[#171412]'
+                              : 'bg-[#241B17] border border-[#624332]/45 text-[#A99B90]/50'
+                          }`}
+                          aria-label={`Water glass ${idx + 1}`}
+                        >
+                          <Droplets className="w-3.5 h-3.5" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Energy Score Selector (1 - 10) */}
+                <div className="p-3 rounded-xl bg-[#171412]/80 border border-[#624332]/40 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-[#A99B90]">{t('energy_score')}</span>
+                    <span className="font-semibold text-[#E4C8A6] tabular-nums">{energyScore} / 10</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="10"
+                    value={energyScore}
+                    onChange={(e) => setEnergyScore(Number(e.target.value))}
+                    className="w-full accent-[#B68B61] cursor-pointer"
+                  />
+                </div>
+
+                <Button type="submit" size="sm" variant="secondary" className="w-full">
+                  <Check className="w-3.5 h-3.5 text-[#B68B61]" /> {t('save_wellness')}
+                </Button>
+              </form>
+            </GlassCard>
+
+            {/* Top 3 Priorities */}
+            <GlassCard className="p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-semibold text-[#F4E9DC]">{t('top_3_priorities')}</h2>
+                  <p className="text-xs text-[#A99B90]">{t('high_leverage_sub')}</p>
+                </div>
+                <Award className="w-5 h-5 text-[#B68B61]" />
+              </div>
+              {topPriorities.length === 0 ? (
+                <p className="text-xs text-[#A99B90]">
+                  {lang === 'id'
+                    ? 'Sematkan hingga 3 tugas prioritas utama di bawah.'
+                    : 'Pin up to 3 tasks as Top Priority below.'}
+                </p>
+              ) : (
+                <div className="space-y-2.5">
+                  {topPriorities.map((tp, idx) => (
+                    <div
+                      key={tp.id}
+                      className="p-3 rounded-xl bg-gradient-to-r from-[#30231D] to-[#241B17] border border-[#B68B61]/45 flex items-center gap-3"
+                    >
+                      <span className="w-6 h-6 rounded-lg bg-[#B68B61] text-[#171412] text-xs font-bold flex items-center justify-center shrink-0">
+                        {idx + 1}
+                      </span>
+                      <span className="text-sm font-medium text-[#F4E9DC] flex-1 truncate">{tp.title}</span>
+                      <button
+                        onClick={() => onToggleTask(tp.id)}
+                        className="p-1.5 rounded-lg bg-[#171412]/70 text-[#E4C8A6] hover:bg-[#B68B61] hover:text-[#171412] shrink-0"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </GlassCard>
+          </div>
+
+          {/* Right 2 Columns: Timeline + Daily Tasks */}
+          <div className="lg:col-span-2 space-y-6">
+            <GlassCard className="p-5 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-base font-semibold text-[#F4E9DC]">{t('daily_timeline')}</h2>
+                  <p className="text-xs text-[#A99B90]">{formatDateReadable(selectedDate, lang)}</p>
+                </div>
+                <Button size="sm" onClick={() => onOpenEventModal(null, selectedDate)}>
+                  <Plus className="w-4 h-4" /> {t('add_time_block')}
+                </Button>
+              </div>
+
+              {dayEvents.length === 0 ? (
+                <EmptyState
+                  icon={Clock}
+                  title={lang === 'id' ? 'Jadwal masih kosong' : 'Open schedule block'}
+                  description={
+                    lang === 'id'
+                      ? 'Tambahkan sesi kerja fokus, rapat, atau rutinitas pribadi untuk menata hari Anda.'
+                      : 'Add deep work sessions, meetings, or personal rituals to structure your day.'
+                  }
+                  actionLabel={t('add_time_block')}
+                  onAction={() => onOpenEventModal(null, selectedDate)}
+                />
+              ) : (
+                <div className="space-y-3">
+                  {dayEvents.map((ev) => (
+                    <div
+                      key={ev.id}
+                      onClick={() => onOpenEventModal(ev)}
+                      className="cursor-pointer p-4 rounded-2xl bg-[#171412]/80 border border-[#624332]/45 hover:border-[#B68B61]/70 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    >
+                      <div className="flex items-start gap-3 sm:gap-4 min-w-0">
+                        <div className="px-3 py-1.5 rounded-xl bg-[#30231D] border border-[#624332]/50 text-xs font-semibold text-[#E4C8A6] tabular-nums shrink-0">
+                          {ev.startTime} – {ev.endTime}
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="text-sm font-semibold text-[#F4E9DC]">{ev.title}</h3>
+                          {ev.notes && <p className="text-xs text-[#A99B90] mt-1">{ev.notes}</p>}
+                        </div>
+                      </div>
+                      <span className="text-xs px-2.5 py-1 rounded-lg bg-[#241B17] border border-[#624332]/40 text-[#B68B61] self-start sm:self-center shrink-0">
+                        {ev.location || ev.category}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </GlassCard>
+
+            <GlassCard className="p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-semibold text-[#F4E9DC]">
+                    {t('nav_tasks')} — {formatDateReadable(selectedDate, lang)}
+                  </h2>
+                  <p className="text-xs text-[#A99B90]">
+                    {dayCompletionPct.toFixed(0)}% {t('completed_count')}
+                  </p>
+                </div>
+                <Button size="sm" variant="secondary" onClick={() => onOpenTaskModal(null, selectedDate)}>
+                  <Plus className="w-3.5 h-3.5" /> {t('btn_task')}
+                </Button>
+              </div>
+              <ProgressBar value={dayCompletionPct} max={100} />
+              {dayTasks.length === 0 ? (
+                <p className="text-xs text-[#A99B90] py-4 text-center">
+                  {lang === 'id' ? 'Tidak ada tugas jatuh tempo tanggal ini.' : 'No tasks due on this date.'}
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {dayTasks.map((tk) => (
+                    <div
+                      key={tk.id}
+                      className="flex items-center justify-between p-2.5 rounded-xl bg-[#171412]/75 border border-[#624332]/35"
+                    >
+                      <button
+                        onClick={() => onToggleTask(tk.id)}
+                        className="flex items-center gap-2.5 text-left min-w-0 flex-1"
+                      >
+                        {tk.status === 'completed' ? (
+                          <CheckCircle2 className="w-4 h-4 text-[#B68B61] shrink-0" />
+                        ) : (
+                          <Circle className="w-4 h-4 text-[#A99B90] shrink-0" />
+                        )}
+                        <span
+                          className={`text-sm truncate ${
+                            tk.status === 'completed' ? 'line-through text-[#A99B90]' : 'text-[#F4E9DC]'
+                          }`}
+                        >
+                          {tk.title}
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => onToggleTopPriority(tk.id)}
+                        className={`p-1.5 rounded-lg ml-2 shrink-0 ${
+                          tk.isTopPriority ? 'text-[#B68B61]' : 'text-[#A99B90]/40 hover:text-[#A99B90]'
+                        }`}
+                      >
+                        <Pin className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </GlassCard>
+          </div>
+        </div>
+      )}
+
+      {horizon === 'weekly' && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {weekDays.map((wd) => {
+            const wTasks = data.tasks.filter((tk) => tk.dueDate === wd.dateStr);
+            const wEvents = data.events.filter((e) => e.date === wd.dateStr);
+            return (
+              <GlassCard key={wd.dateStr} className="p-4 space-y-3">
+                <div className="flex items-center justify-between border-b border-[#624332]/30 pb-2">
+                  <span className="text-sm font-semibold text-[#F4E9DC]">
+                    {wd.weekday} {wd.dayNum}
+                  </span>
+                  <span className="text-xs text-[#B68B61]">{wEvents.length + wTasks.length}</span>
+                </div>
+                <div className="space-y-2 min-h-[110px]">
+                  {wEvents.map((e) => (
+                    <div key={e.id} className="p-2 rounded-lg bg-[#30231D]/80 text-xs text-[#E4C8A6]">
+                      <span className="font-semibold">{e.startTime}</span> {e.title}
+                    </div>
+                  ))}
+                  {wTasks.map((tk) => (
+                    <div
+                      key={tk.id}
+                      onClick={() => onToggleTask(tk.id)}
+                      className="cursor-pointer p-2 rounded-lg bg-[#171412]/80 text-xs text-[#F4E9DC] flex items-center gap-2"
+                    >
+                      {tk.status === 'completed' ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-[#B68B61] shrink-0" />
+                      ) : (
+                        <Circle className="w-3.5 h-3.5 text-[#A99B90] shrink-0" />
+                      )}
+                      <span className={tk.status === 'completed' ? 'line-through text-[#A99B90]' : ''}>
+                        {tk.title}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </GlassCard>
+            );
+          })}
+        </div>
+      )}
+
+      {horizon === 'monthly' && (
+        <GlassCard className="p-5 sm:p-6 space-y-4">
+          <h2 className="text-lg font-semibold text-[#F4E9DC]">
+            {t('mode_monthly')} ({selectedDate.slice(0, 7)})
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2.5">
+              <h3 className="text-xs uppercase tracking-wider text-[#B68B61] font-semibold">
+                {t('task_deadlines')}
+              </h3>
+              {data.tasks
+                .filter((tk) => tk.dueDate.startsWith(selectedDate.slice(0, 7)))
+                .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+                .map((tk) => (
+                  <div
+                    key={tk.id}
+                    className="p-3 rounded-xl bg-[#171412]/80 border border-[#624332]/40 flex items-center justify-between gap-2"
+                  >
+                    <span className="text-sm text-[#F4E9DC] truncate">{tk.title}</span>
+                    <span className="text-xs text-[#A99B90] shrink-0">{formatDateReadable(tk.dueDate, lang)}</span>
+                  </div>
+                ))}
+            </div>
+            <div className="space-y-2.5">
+              <h3 className="text-xs uppercase tracking-wider text-[#E4C8A6] font-semibold">
+                {t('daily_agenda')}
+              </h3>
+              {data.events
+                .filter((e) => e.date.startsWith(selectedDate.slice(0, 7)))
+                .sort((a, b) => a.date.localeCompare(b.date))
+                .map((e) => (
+                  <div
+                    key={e.id}
+                    className="p-3 rounded-xl bg-[#171412]/80 border border-[#624332]/40 flex items-center justify-between gap-2"
+                  >
+                    <span className="text-sm text-[#F4E9DC] truncate">{e.title}</span>
+                    <span className="text-xs text-[#B68B61] shrink-0">
+                      {formatDateReadable(e.date, lang)} • {e.startTime}
+                    </span>
+                  </div>
+                ))}
+            </div>
+          </div>
+        </GlassCard>
+      )}
+    </div>
+  );
+};
+
+// --- MODULE F: TASK MANAGEMENT ---
+const TasksView = ({ data, t, lang, onOpenTaskModal, onToggleTask, onUpdateTaskStatus, onDeleteTask }) => {
+  const [viewMode, setViewMode] = useState('list');
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+
+  const filteredTasks = useMemo(() => {
+    return data.tasks.filter((tk) => {
+      if (statusFilter !== 'all' && tk.status !== statusFilter) return false;
+      if (priorityFilter !== 'all' && tk.priority !== priorityFilter) return false;
+      if (categoryFilter !== 'all' && tk.category !== categoryFilter) return false;
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        if (
+          !tk.title.toLowerCase().includes(q) &&
+          !(tk.description || '').toLowerCase().includes(q)
+        ) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [data.tasks, statusFilter, priorityFilter, categoryFilter, search]);
+
+  const statusColumns = [
+    { key: 'todo', label: t('todo') },
+    { key: 'in_progress', label: t('in_progress') },
+    { key: 'completed', label: t('completed') },
+  ];
+
+  const priorityTone = {
+    Urgent: 'bg-[#D96B52]/20 text-[#F29B87] border-[#D96B52]/40',
+    High: 'bg-[#B68B61]/25 text-[#E4C8A6] border-[#B68B61]/50',
+    Medium: 'bg-[#30231D] text-[#E4C8A6] border-[#624332]/50',
+    Low: 'bg-[#171412] text-[#A99B90] border-[#624332]/40',
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('tasks_title')}</h1>
+          <p className="text-xs text-[#A99B90] mt-1">{t('tasks_subtitle')}</p>
+        </div>
+        <div className="flex items-center gap-2.5">
+          <div className="inline-flex rounded-xl bg-[#241B17] p-1 border border-[#624332]/50">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium ${
+                viewMode === 'list' ? 'bg-[#B68B61] text-[#171412]' : 'text-[#A99B90]'
+              }`}
+            >
+              <ListTodo className="w-3.5 h-3.5" /> {t('view_list')}
+            </button>
+            <button
+              onClick={() => setViewMode('board')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium ${
+                viewMode === 'board' ? 'bg-[#B68B61] text-[#171412]' : 'text-[#A99B90]'
+              }`}
+            >
+              <Kanban className="w-3.5 h-3.5" /> {t('view_board')}
+            </button>
+          </div>
+          <Button size="sm" onClick={() => onOpenTaskModal()}>
+            <Plus className="w-4 h-4" /> {t('new_task')}
+          </Button>
+        </div>
+      </div>
+
+      <GlassCard className="p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Search className="w-4 h-4 text-[#A99B90] absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t('search_placeholder')}
+            className="w-full rounded-xl bg-[#171412] border border-[#624332]/55 pl-10 pr-4 py-2 text-sm text-[#F4E9DC]"
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="rounded-xl bg-[#171412] border border-[#624332]/55 px-3 py-2 text-xs text-[#F4E9DC]"
+          >
+            <option value="all">{t('status')}: All</option>
+            <option value="todo">{t('todo')}</option>
+            <option value="in_progress">{t('in_progress')}</option>
+            <option value="completed">{t('completed')}</option>
+          </select>
+          <select
+            value={priorityFilter}
+            onChange={(e) => setPriorityFilter(e.target.value)}
+            className="rounded-xl bg-[#171412] border border-[#624332]/55 px-3 py-2 text-xs text-[#F4E9DC]"
+          >
+            <option value="all">{t('priority')}: All</option>
+            <option value="Urgent">Urgent</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+          </select>
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="rounded-xl bg-[#171412] border border-[#624332]/55 px-3 py-2 text-xs text-[#F4E9DC]"
+          >
+            <option value="all">{t('all_categories')}</option>
+            <option value="Work">Work</option>
+            <option value="Finance">Finance</option>
+            <option value="Health">Health</option>
+            <option value="Personal">Personal</option>
+            <option value="Learning">Learning</option>
+          </select>
+        </div>
+      </GlassCard>
+
+      {filteredTasks.length === 0 ? (
+        <EmptyState
+          icon={CheckSquare}
+          title={lang === 'id' ? 'Tidak ada tugas ditemukan' : 'No tasks match your filter'}
+          description={
+            lang === 'id'
+              ? 'Buat tugas baru atau bersihkan filter pencarian aktif.'
+              : 'Create a new action item or clear your active filters.'
+          }
+          actionLabel={t('new_task')}
+          onAction={() => onOpenTaskModal()}
+        />
+      ) : viewMode === 'list' ? (
+        <div className="space-y-2.5">
+          {filteredTasks.map((task) => (
+            <GlassCard
+              key={task.id}
+              className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+            >
+              <div className="flex items-start gap-3 min-w-0">
+                <button
+                  onClick={() => onToggleTask(task.id)}
+                  className="mt-0.5 text-[#B68B61] hover:text-[#E4C8A6] shrink-0"
+                >
+                  {task.status === 'completed' ? (
+                    <CheckCircle2 className="w-5 h-5" />
+                  ) : (
+                    <Circle className="w-5 h-5" />
+                  )}
+                </button>
+                <div className="min-w-0">
+                  <p
+                    className={`text-sm font-medium ${
+                      task.status === 'completed' ? 'line-through text-[#A99B90]' : 'text-[#F4E9DC]'
+                    }`}
+                  >
+                    {task.title}
+                  </p>
+                  {task.description && (
+                    <p className="text-xs text-[#A99B90] mt-0.5">{task.description}</p>
+                  )}
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
+                    <span
+                      className={`text-[11px] px-2 py-0.5 rounded-md border ${
+                        priorityTone[task.priority] || priorityTone.Medium
+                      }`}
+                    >
+                      {task.priority}
+                    </span>
+                    <span className="text-[11px] px-2 py-0.5 rounded-md bg-[#171412] text-[#A99B90]">
+                      {task.category}
+                    </span>
+                    <span className="text-[11px] text-[#A99B90]">
+                      {formatDateReadable(task.dueDate, lang)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                <select
+                  value={task.status}
+                  onChange={(e) => onUpdateTaskStatus(task.id, e.target.value)}
+                  className="rounded-xl bg-[#171412] border border-[#624332]/55 px-2.5 py-1.5 text-xs text-[#E4C8A6]"
+                >
+                  <option value="todo">{t('todo')}</option>
+                  <option value="in_progress">{t('in_progress')}</option>
+                  <option value="completed">{t('completed')}</option>
+                </select>
+                <button
+                  onClick={() => onOpenTaskModal(task)}
+                  className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#E4C8A6] hover:bg-[#30231D]"
+                >
+                  <Edit3 className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => onDeleteTask(task)}
+                  className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#D96B52] hover:bg-[#30231D]"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </GlassCard>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          {statusColumns.map((col) => {
+            const colTasks = filteredTasks.filter((tk) => tk.status === col.key);
+            return (
+              <GlassCard key={col.key} className="p-4 space-y-3">
+                <div className="flex items-center justify-between border-b border-[#624332]/35 pb-2.5">
+                  <h3 className="text-sm font-semibold text-[#F4E9DC]">{col.label}</h3>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-[#30231D] text-[#E4C8A6]">
+                    {colTasks.length}
+                  </span>
+                </div>
+                <div className="space-y-2.5">
+                  {colTasks.map((task) => (
+                    <div
+                      key={task.id}
+                      className="p-3.5 rounded-xl bg-[#171412]/85 border border-[#624332]/45 space-y-2.5"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm font-medium text-[#F4E9DC]">{task.title}</p>
+                        <button
+                          onClick={() => onOpenTaskModal(task)}
+                          className="text-[#A99B90] hover:text-[#E4C8A6] shrink-0"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className={`px-2 py-0.5 rounded border ${priorityTone[task.priority]}`}>
+                          {task.priority}
+                        </span>
+                        <span className="text-[#A99B90]">{formatDateReadable(task.dueDate, lang)}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {statusColumns
+                          .filter((s) => s.key !== task.status)
+                          .map((target) => (
+                            <button
+                              key={target.key}
+                              onClick={() => onUpdateTaskStatus(task.id, target.key)}
+                              className="text-[10px] px-2 py-1 rounded-lg bg-[#241B17] hover:bg-[#30231D] text-[#E4C8A6] border border-[#624332]/40"
+                            >
+                              → {target.label}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </GlassCard>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- MODULE G: CALENDAR ---
+const CalendarView = ({ data, t, lang, onOpenEventModal, onDeleteEvent }) => {
+  const [cursorMonth, setCursorMonth] = useState('2026-11');
+  const [selectedDay, setSelectedDay] = useState(TODAY_STR);
+
+  const calendarCells = useMemo(() => {
+    const [y, m] = cursorMonth.split('-').map(Number);
+    const firstDay = new Date(y, m - 1, 1);
+    const startWeekday = firstDay.getDay();
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const cells = [];
+
+    for (let i = 0; i < startWeekday; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) {
+      const iso = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      cells.push({ day: d, dateStr: iso });
+    }
+    return cells;
+  }, [cursorMonth]);
+
+  const shiftMonth = (delta) => {
+    const [y, m] = cursorMonth.split('-').map(Number);
+    const dt = new Date(y, m - 1 + delta, 1);
+    setCursorMonth(`${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`);
+  };
+
+  const monthLabel = useMemo(() => {
+    const [y, m] = cursorMonth.split('-').map(Number);
+    return new Date(y, m - 1, 1).toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-US', {
+      month: 'long',
+      year: 'numeric',
+    });
+  }, [cursorMonth, lang]);
+
+  const selectedEvents = data.events
+    .filter((e) => e.date === selectedDay)
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+  const selectedDeadlines = data.tasks.filter((tk) => tk.dueDate === selectedDay);
+
+  const selectedBirthdays = (data.contacts || []).filter(
+    (c) => c.birthday && c.birthday.slice(5) === selectedDay.slice(5)
+  );
+
+  const weekdays =
+    lang === 'id'
+      ? ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab']
+      : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('calendar_title')}</h1>
+          <p className="text-xs text-[#A99B90] mt-1">{t('calendar_subtitle')}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={() => shiftMonth(-1)}>
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+          <span className="px-2 text-sm font-semibold text-[#F4E9DC] min-w-[130px] text-center">
+            {monthLabel}
+          </span>
+          <Button variant="secondary" size="sm" onClick={() => shiftMonth(1)}>
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+          <Button size="sm" onClick={() => onOpenEventModal(null, selectedDay)}>
+            <Plus className="w-4 h-4" /> {t('new_event')}
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <GlassCard className="p-3 sm:p-5 lg:col-span-2">
+          <div className="grid grid-cols-7 gap-1 text-center text-[10px] sm:text-[11px] uppercase tracking-wider text-[#A99B90] mb-2">
+            {weekdays.map((d) => (
+              <div key={d} className="py-1">
+                {d}
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+            {calendarCells.map((cell, idx) => {
+              if (!cell)
+                return <div key={`empty-${idx}`} className="h-14 sm:h-24 rounded-xl bg-[#171412]/30" />;
+              const dayEvents = data.events.filter((e) => e.date === cell.dateStr);
+              const dayTasks = data.tasks.filter((tk) => tk.dueDate === cell.dateStr);
+              const dayBdays = (data.contacts || []).filter(
+                (c) => c.birthday && c.birthday.slice(5) === cell.dateStr.slice(5)
+              );
+              const isSelected = cell.dateStr === selectedDay;
+              const isToday = cell.dateStr === TODAY_STR;
+
+              return (
+                <button
+                  key={cell.dateStr}
+                  onClick={() => setSelectedDay(cell.dateStr)}
+                  className={`h-14 sm:h-24 p-1.5 sm:p-2 rounded-xl border text-left flex flex-col justify-between transition-all ${
+                    isSelected
+                      ? 'bg-[#30231D] border-[#B68B61]'
+                      : 'bg-[#171412]/70 border-[#624332]/30 hover:border-[#624332]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span
+                      className={`text-xs font-semibold w-6 h-6 rounded-full flex items-center justify-center ${
+                        isToday ? 'bg-[#B68B61] text-[#171412]' : 'text-[#F4E9DC]'
+                      }`}
+                    >
+                      {cell.day}
+                    </span>
+                    {dayBdays.length > 0 && <Cake className="w-3 h-3 text-[#E4C8A6]" />}
+                  </div>
+                  <div className="flex sm:hidden gap-1">
+                    {dayEvents.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-[#E4C8A6]" />}
+                    {dayTasks.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-[#B68B61]" />}
+                  </div>
+                  <div className="hidden sm:block space-y-1 w-full overflow-hidden">
+                    {dayEvents.slice(0, 1).map((ev) => (
+                      <div
+                        key={ev.id}
+                        className="text-[10px] truncate px-1.5 py-0.5 rounded bg-[#B68B61]/25 text-[#E4C8A6]"
+                      >
+                        {ev.startTime} {ev.title}
+                      </div>
+                    ))}
+                    {dayTasks.length > 0 && (
+                      <div className="text-[10px] truncate px-1.5 py-0.5 rounded bg-[#624332]/40 text-[#F4E9DC]">
+                        {dayTasks.length} {lang === 'id' ? 'tugas' : 'due'}
+                      </div>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </GlassCard>
+
+        <GlassCard className="p-5 space-y-5">
+          <div className="flex items-center justify-between border-b border-[#624332]/35 pb-3">
+            <div>
+              <h2 className="text-base font-semibold text-[#F4E9DC]">{t('daily_agenda')}</h2>
+              <p className="text-xs text-[#B68B61]">{formatDateReadable(selectedDay, lang)}</p>
+            </div>
+            <Button size="sm" variant="secondary" onClick={() => onOpenEventModal(null, selectedDay)}>
+              <Plus className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+
+          {selectedBirthdays.length > 0 && (
+            <div className="p-3 rounded-xl bg-[#30231D]/80 border border-[#B68B61]/50 space-y-1">
+              <div className="text-[11px] uppercase tracking-wider text-[#E4C8A6] font-semibold flex items-center gap-1.5">
+                <Cake className="w-3.5 h-3.5 text-[#B68B61]" /> {t('birthday')}
+              </div>
+              {selectedBirthdays.map((b) => (
+                <p key={b.id} className="text-xs text-[#F4E9DC]">
+                  {b.name} ({b.category})
+                </p>
+              ))}
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <h3 className="text-xs uppercase tracking-wider text-[#A99B90]">{t('daily_agenda')}</h3>
+            {selectedEvents.length === 0 ? (
+              <p className="text-xs text-[#A99B90]/70">{t('no_events_today')}</p>
+            ) : (
+              selectedEvents.map((ev) => (
+                <div
+                  key={ev.id}
+                  className="p-3 rounded-xl bg-[#171412]/85 border border-[#624332]/45 space-y-1.5"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-sm font-medium text-[#F4E9DC]">{ev.title}</span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => onOpenEventModal(ev)}
+                        className="p-1 text-[#A99B90] hover:text-[#E4C8A6]"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => onDeleteEvent(ev)}
+                        className="p-1 text-[#A99B90] hover:text-[#D96B52]"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-[#E4C8A6] tabular-nums">
+                    {ev.startTime} – {ev.endTime} • {ev.location || ev.category}
+                  </p>
+                  {ev.reminder && ev.reminder !== 'None' && (
+                    <p className="text-[11px] text-[#A99B90] flex items-center gap-1">
+                      <Bell className="w-3 h-3 text-[#B68B61]" /> {ev.reminder}
+                    </p>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="space-y-2.5 pt-2 border-t border-[#624332]/30">
+            <h3 className="text-xs uppercase tracking-wider text-[#A99B90]">{t('task_deadlines')}</h3>
+            {selectedDeadlines.length === 0 ? (
+              <p className="text-xs text-[#A99B90]/70">
+                {lang === 'id' ? 'Tidak ada tenggat tugas.' : 'No task deadlines on this day.'}
+              </p>
+            ) : (
+              selectedDeadlines.map((tk) => (
+                <div
+                  key={tk.id}
+                  className="p-2.5 rounded-xl bg-[#30231D]/60 border border-[#624332]/40 flex items-center justify-between text-xs gap-2"
+                >
+                  <span className="text-[#F4E9DC] truncate">{tk.title}</span>
+                  <span className="text-[#B68B61] shrink-0">{tk.priority}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </GlassCard>
+      </div>
+    </div>
+  );
+};
+
+// --- MODULE H: HABIT TRACKER ---
+const HabitsView = ({ data, t, lang, onToggleHabitDate, onCreateHabit, onDeleteHabit }) => {
+  const [showModal, setShowModal] = useState(false);
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState('Mindset');
+  const [timeOfDay, setTimeOfDay] = useState('Morning');
+
+  const last7Days = useMemo(() => getLastNDays(7, TODAY_STR, lang), [lang]);
+
+  const weeklyChartData = useMemo(() => {
+    return last7Days.map((day) => {
+      const completed = data.habits.filter((h) => h.completedDates.includes(day.dateStr)).length;
+      const pct = data.habits.length > 0 ? Math.round((completed / data.habits.length) * 100) : 0;
+      return {
+        day: `${day.dayShort} ${day.dayNum}`,
+        consistency: pct,
+      };
+    });
+  }, [data.habits, last7Days]);
+
+  const handleCreate = (e) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    onCreateHabit({ name: name.trim(), category, timeOfDay, targetPerWeek: 7 });
+    setName('');
+    setShowModal(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('habits_title')}</h1>
+          <p className="text-xs text-[#A99B90] mt-1">{t('habits_subtitle')}</p>
+        </div>
+        <Button size="sm" onClick={() => setShowModal(true)}>
+          <Plus className="w-4 h-4" /> {t('new_habit')}
+        </Button>
+      </div>
+
+      <GlassCard className="p-5">
+        <h2 className="text-base font-semibold text-[#F4E9DC] mb-4">{t('consistency_chart_title')}</h2>
+        <div className="h-52 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={weeklyChartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#624332" strokeOpacity={0.25} vertical={false} />
+              <XAxis dataKey="day" stroke="#A99B90" fontSize={11} />
+              <YAxis stroke="#A99B90" fontSize={11} domain={[0, 100]} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#241B17',
+                  borderColor: '#624332',
+                  borderRadius: '12px',
+                  color: '#F4E9DC',
+                }}
+              />
+              <Bar dataKey="consistency" name="%" fill="#B68B61" radius={[8, 8, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </GlassCard>
+
+      {data.habits.length === 0 ? (
+        <EmptyState
+          icon={Flame}
+          title={lang === 'id' ? 'Belum ada kebiasaan dilacak' : 'No habits tracked yet'}
+          description={
+            lang === 'id'
+              ? 'Buat rutinitas harian untuk membangun konsistensi dan streak jangka panjang.'
+              : 'Define daily rituals to measure consistency streaks and build compounding momentum.'
+          }
+          actionLabel={t('new_habit')}
+          onAction={() => setShowModal(true)}
+        />
+      ) : (
+        <GlassCard className="p-4 sm:p-5 overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[600px]">
+            <thead>
+              <tr className="border-b border-[#624332]/40 text-[11px] uppercase tracking-wider text-[#A99B90]">
+                <th className="py-3 px-2">{t('habit_ritual')}</th>
+                {last7Days.map((d) => (
+                  <th key={d.dateStr} className="py-3 px-2 text-center">
+                    <div>{d.dayShort}</div>
+                    <div className="text-[#F4E9DC] font-semibold">{d.dayNum}</div>
+                  </th>
+                ))}
+                <th className="py-3 px-2 text-center">{t('streak')}</th>
+                <th className="py-3 px-2 text-right">{t('actions')}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#624332]/25">
+              {data.habits.map((habit) => {
+                const streak = calculateHabitStreak(habit.completedDates);
+                return (
+                  <tr key={habit.id} className="hover:bg-[#30231D]/30">
+                    <td className="py-3.5 px-2">
+                      <div className="text-sm font-medium text-[#F4E9DC]">{habit.name}</div>
+                      <div className="text-xs text-[#A99B90]">
+                        {habit.category} • {habit.timeOfDay}
+                      </div>
+                    </td>
+                    {last7Days.map((d) => {
+                      const checked = habit.completedDates.includes(d.dateStr);
+                      return (
+                        <td key={d.dateStr} className="py-3.5 px-2 text-center">
+                          <button
+                            onClick={() => onToggleHabitDate(habit.id, d.dateStr)}
+                            className={`w-9 h-9 rounded-xl inline-flex items-center justify-center transition-all ${
+                              checked
+                                ? 'bg-gradient-to-br from-[#B68B61] to-[#8C6440] text-[#171412] shadow'
+                                : 'bg-[#171412] border border-[#624332]/50 text-[#A99B90] hover:border-[#B68B61]'
+                            }`}
+                          >
+                            {checked && <Check className="w-4 h-4 stroke-[2.5]" />}
+                          </button>
+                        </td>
+                      );
+                    })}
+                    <td className="py-3.5 px-2 text-center">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#30231D] text-xs font-semibold text-[#E4C8A6]">
+                        <Flame className="w-3.5 h-3.5 text-[#B68B61]" /> {streak}d
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-2 text-right">
+                      <button
+                        onClick={() => onDeleteHabit(habit)}
+                        className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#D96B52]"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </GlassCard>
+      )}
+
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={t('new_habit')}>
+        <form onSubmit={handleCreate} className="space-y-4">
+          <Input
+            label={t('habit_ritual')}
+            placeholder="e.g. Baca Buku 30 Menit / Olahraga Pagi"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Select label={t('category')} value={category} onChange={(e) => setCategory(e.target.value)}>
+              <option value="Mindset">Mindset</option>
+              <option value="Health">Health</option>
+              <option value="Finance">Finance</option>
+              <option value="Productivity">Productivity</option>
+            </Select>
+            <Select
+              label={lang === 'id' ? 'Waktu Pelaksanaan' : 'Time of Day'}
+              value={timeOfDay}
+              onChange={(e) => setTimeOfDay(e.target.value)}
+            >
+              <option value="Morning">Morning / Pagi</option>
+              <option value="Afternoon">Afternoon / Siang</option>
+              <option value="Evening">Evening / Malam</option>
+              <option value="Anytime">Anytime / Kapan Saja</option>
+            </Select>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="secondary" onClick={() => setShowModal(false)}>
+              {t('cancel')}
+            </Button>
+            <Button type="submit">{t('save')}</Button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+};
+
+// --- MODULE I: GOALS & MILESTONES ---
+const GoalsView = ({ data, t, lang, onCreateGoal, onToggleMilestone, onAddMilestone, onDeleteGoal }) => {
+  const [horizonFilter, setHorizonFilter] = useState('all');
+  const [showModal, setShowModal] = useState(false);
+  const [newMilestoneInputs, setNewMilestoneInputs] = useState({});
+
+  const [title, setTitle] = useState('');
+  const [horizon, setHorizon] = useState('Short-Term');
+  const [category, setCategory] = useState('Career');
+  const [deadline, setDeadline] = useState('2027-03-31');
+  const [firstMilestone, setFirstMilestone] = useState('');
+
+  const filteredGoals = data.goals.filter((g) =>
+    horizonFilter === 'all' ? true : g.horizon === horizonFilter
+  );
+
+  const handleCreate = (e) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+    onCreateGoal({
+      title: title.trim(),
+      horizon,
+      category,
+      deadline,
+      milestones: firstMilestone.trim()
+        ? [{ id: `ms-${Date.now()}`, title: firstMilestone.trim(), completed: false }]
+        : [],
+    });
+    setTitle('');
+    setFirstMilestone('');
+    setShowModal(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('goals_title')}</h1>
+          <p className="text-xs text-[#A99B90] mt-1">{t('goals_subtitle')}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex rounded-xl bg-[#241B17] p-1 border border-[#624332]/50">
+            {['all', 'Short-Term', 'Long-Term'].map((h) => (
+              <button
+                key={h}
+                onClick={() => setHorizonFilter(h)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize ${
+                  horizonFilter === h ? 'bg-[#B68B61] text-[#171412]' : 'text-[#A99B90]'
+                }`}
+              >
+                {h === 'all' ? (lang === 'id' ? 'Semua' : 'All') : h}
+              </button>
+            ))}
+          </div>
+          <Button size="sm" onClick={() => setShowModal(true)}>
+            <Plus className="w-4 h-4" /> {t('new_goal')}
+          </Button>
+        </div>
+      </div>
+
+      {filteredGoals.length === 0 ? (
+        <EmptyState
+          icon={Target}
+          title={lang === 'id' ? 'Belum ada target pada kategori ini' : 'No goals in this horizon'}
+          description={
+            lang === 'id'
+              ? 'Tetapkan target terukur beserta langkah milestone untuk memantau pertumbuhan pribadi.'
+              : 'Define measurable milestones and target dates to track personal growth.'
+          }
+          actionLabel={t('new_goal')}
+          onAction={() => setShowModal(true)}
+        />
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {filteredGoals.map((goal) => {
+            const totalMs = goal.milestones.length;
+            const doneMs = goal.milestones.filter((m) => m.completed).length;
+            const pct = totalMs > 0 ? Math.round((doneMs / totalMs) * 100) : 0;
+
+            return (
+              <GlassCard key={goal.id} className="p-5 space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-[#30231D] text-[#E4C8A6]">
+                        {goal.horizon}
+                      </span>
+                      <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-[#171412] text-[#A99B90]">
+                        {goal.category}
+                      </span>
+                    </div>
+                    <h3 className="text-base font-semibold text-[#F4E9DC]">{goal.title}</h3>
+                    <p className="text-xs text-[#A99B90] mt-0.5">
+                      Deadline: {formatDateReadable(goal.deadline, lang)}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => onDeleteGoal(goal)}
+                    className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#D96B52] shrink-0"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-[#A99B90]">
+                      {t('milestone_progress')} ({doneMs}/{totalMs})
+                    </span>
+                    <span className="text-[#E4C8A6] font-semibold tabular-nums">{pct}%</span>
+                  </div>
+                  <ProgressBar value={pct} max={100} tone={pct === 100 ? 'success' : 'bronze'} />
+                </div>
+
+                <div className="space-y-2 pt-1">
+                  {goal.milestones.map((ms) => (
+                    <button
+                      key={ms.id}
+                      onClick={() => onToggleMilestone(goal.id, ms.id)}
+                      className="w-full flex items-center gap-2.5 p-2.5 rounded-xl bg-[#171412]/75 border border-[#624332]/35 hover:border-[#B68B61]/50 text-left"
+                    >
+                      {ms.completed ? (
+                        <CheckCircle2 className="w-4 h-4 text-[#B68B61] shrink-0" />
+                      ) : (
+                        <Circle className="w-4 h-4 text-[#A99B90] shrink-0" />
+                      )}
+                      <span
+                        className={`text-xs ${
+                          ms.completed ? 'line-through text-[#A99B90]' : 'text-[#F4E9DC]'
+                        }`}
+                      >
+                        {ms.title}
+                      </span>
+                    </button>
+                  ))}
+
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const val = (newMilestoneInputs[goal.id] || '').trim();
+                      if (!val) return;
+                      onAddMilestone(goal.id, val);
+                      setNewMilestoneInputs((prev) => ({ ...prev, [goal.id]: '' }));
+                    }}
+                    className="flex gap-2 pt-1"
+                  >
+                    <input
+                      value={newMilestoneInputs[goal.id] || ''}
+                      onChange={(e) =>
+                        setNewMilestoneInputs((prev) => ({ ...prev, [goal.id]: e.target.value }))
+                      }
+                      placeholder={lang === 'id' ? 'Tambah langkah milestone...' : 'Add next milestone...'}
+                      className="flex-1 min-w-0 rounded-xl bg-[#171412] border border-[#624332]/45 px-3 py-1.5 text-xs text-[#F4E9DC]"
+                    />
+                    <Button type="submit" size="sm" variant="secondary">
+                      {t('add')}
+                    </Button>
+                  </form>
+                </div>
+              </GlassCard>
+            );
+          })}
+        </div>
+      )}
+
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={t('new_goal')}>
+        <form onSubmit={handleCreate} className="space-y-4">
+          <Input
+            label={lang === 'id' ? 'Nama Target' : 'Goal Objective'}
+            placeholder="e.g. Capai Dana Darurat 100 Juta"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Select
+              label={lang === 'id' ? 'Jangka Waktu' : 'Time Horizon'}
+              value={horizon}
+              onChange={(e) => setHorizon(e.target.value)}
+            >
+              <option value="Short-Term">Short-Term</option>
+              <option value="Long-Term">Long-Term</option>
+            </Select>
+            <Select label={t('category')} value={category} onChange={(e) => setCategory(e.target.value)}>
+              <option value="Career">Career</option>
+              <option value="Financial">Financial</option>
+              <option value="Health">Health</option>
+              <option value="Personal">Personal</option>
+            </Select>
+          </div>
+          <Input
+            label="Deadline"
+            type="date"
+            value={deadline}
+            onChange={(e) => setDeadline(e.target.value)}
+            required
+          />
+          <Input
+            label={lang === 'id' ? 'Milestone Pertama (Opsional)' : 'Initial Milestone (Optional)'}
+            placeholder="e.g. Selesaikan tahap 1"
+            value={firstMilestone}
+            onChange={(e) => setFirstMilestone(e.target.value)}
+          />
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="secondary" onClick={() => setShowModal(false)}>
+              {t('cancel')}
+            </Button>
+            <Button type="submit">{t('save')}</Button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+};
+
+// --- MODULE #6: PERSONAL CRM & RELATIONSHIP VAULT ---
+const PersonalCrmView = ({ data, t, lang, onAddContact, onLogContactToday, onDeleteContact }) => {
+  const [search, setSearch] = useState('');
+  const [catFilter, setCatFilter] = useState('all');
+  const [showModal, setShowModal] = useState(false);
+
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState('Client');
+  const [handle, setHandle] = useState('');
+  const [birthday, setBirthday] = useState('1990-06-15');
+  const [lastContacted, setLastContacted] = useState(TODAY_STR);
+  const [followUpIntervalDays, setFollowUpIntervalDays] = useState('30');
+  const [lastTopic, setLastTopic] = useState('');
+
+  const contacts = data.contacts || [];
+
+  const filteredContacts = useMemo(() => {
+    return contacts
+      .filter((c) => {
+        if (catFilter !== 'all' && c.category !== catFilter) return false;
+        if (search.trim()) {
+          const q = search.toLowerCase();
+          if (
+            !c.name.toLowerCase().includes(q) &&
+            !(c.lastTopic || '').toLowerCase().includes(q) &&
+            !(c.handle || '').toLowerCase().includes(q)
+          ) {
+            return false;
+          }
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const aOverdue = daysBetweenDates(a.lastContacted, TODAY_STR) - (a.followUpIntervalDays || 30);
+        const bOverdue = daysBetweenDates(b.lastContacted, TODAY_STR) - (b.followUpIntervalDays || 30);
+        return bOverdue - aOverdue;
+      });
+  }, [contacts, catFilter, search]);
+
+  const metrics = useMemo(() => {
+    const overdueCount = contacts.filter(
+      (c) => daysBetweenDates(c.lastContacted, TODAY_STR) >= (c.followUpIntervalDays || 30)
+    ).length;
+    const decBirthdays = contacts.filter((c) => c.birthday && c.birthday.slice(5, 7) === '12').length;
+    return { total: contacts.length, overdueCount, decBirthdays };
+  }, [contacts]);
+
+  const handleCreate = (e) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    onAddContact({
+      name: name.trim(),
+      category,
+      handle: handle.trim(),
+      birthday,
+      lastContacted,
+      followUpIntervalDays: Math.max(1, parseInt(followUpIntervalDays, 10) || 30),
+      lastTopic: lastTopic.trim(),
+    });
+    setName('');
+    setHandle('');
+    setLastTopic('');
+    setShowModal(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('crm_title')}</h1>
+          <p className="text-xs text-[#A99B90] mt-1">{t('crm_sub')}</p>
+        </div>
+        <Button size="sm" onClick={() => setShowModal(true)}>
+          <Plus className="w-4 h-4" /> {t('add_contact')}
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <GlassCard className="p-5">
+          <span className="text-xs uppercase tracking-wider text-[#A99B90]">
+            {lang === 'id' ? 'Total Relasi Terdaftar' : 'Total Contacts'}
+          </span>
+          <div className="mt-2 text-xl sm:text-2xl font-semibold text-[#F4E9DC] tabular-nums">
+            {metrics.total}
+          </div>
+        </GlassCard>
+        <GlassCard className="p-5">
+          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('due_followups')}</span>
+          <div
+            className={`mt-2 text-xl sm:text-2xl font-semibold tabular-nums ${
+              metrics.overdueCount > 0 ? 'text-[#D96B52]' : 'text-[#87B082]'
+            }`}
+          >
+            {metrics.overdueCount}
+          </div>
+        </GlassCard>
+        <GlassCard className="p-5">
+          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('upcoming_birthdays')}</span>
+          <div className="mt-2 text-xl sm:text-2xl font-semibold text-[#E4C8A6] tabular-nums">
+            {metrics.decBirthdays}
+          </div>
+        </GlassCard>
+      </div>
+
+      <GlassCard className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Search className="w-4 h-4 text-[#A99B90] absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t('search_placeholder')}
+            className="w-full rounded-xl bg-[#171412] border border-[#624332]/55 pl-10 pr-4 py-2 text-sm text-[#F4E9DC]"
+          />
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {['all', 'Family', 'Client', 'Mentor', 'Friend'].map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setCatFilter(cat)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
+                catFilter === cat ? 'bg-[#B68B61] text-[#171412]' : 'bg-[#171412] text-[#A99B90]'
+              }`}
+            >
+              {cat === 'all' ? (lang === 'id' ? 'Semua' : 'All') : cat}
+            </button>
+          ))}
+        </div>
+      </GlassCard>
+
+      {filteredContacts.length === 0 ? (
+        <EmptyState
+          icon={HeartHandshake}
+          title={lang === 'id' ? 'Belum ada kontak relasi' : 'No contacts in this circle'}
+          description={
+            lang === 'id'
+              ? 'Tambahkan keluarga, klien penting, mentor, atau sahabat untuk menjaga komunikasi berkala.'
+              : 'Add family, clients, mentors, or friends to schedule periodic check-ins.'
+          }
+          actionLabel={t('add_contact')}
+          onAction={() => setShowModal(true)}
+        />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {filteredContacts.map((contact) => {
+            const elapsed = daysBetweenDates(contact.lastContacted, TODAY_STR);
+            const interval = contact.followUpIntervalDays || 30;
+            const isDue = elapsed >= interval;
+            const remainingDays = Math.max(0, interval - elapsed);
+
+            return (
+              <GlassCard key={contact.id} className="p-5 flex flex-col justify-between space-y-4">
+                <div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[10px] uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#30231D] text-[#E4C8A6] border border-[#624332]/50">
+                          {contact.category}
+                        </span>
+                        <span
+                          className={`text-[10px] uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                            isDue
+                              ? 'bg-[#D96B52]/20 text-[#F29B87] border-[#D96B52]/40'
+                              : 'bg-[#5B8056]/20 text-[#87B082] border-[#5B8056]/40'
+                          }`}
+                        >
+                          {isDue
+                            ? `${t('overdue_followup')} (${elapsed}d)`
+                            : `${t('on_track')} • ${remainingDays}d`}
+                        </span>
+                      </div>
+                      <h3 className="text-base font-semibold text-[#F4E9DC] mt-2">{contact.name}</h3>
+                      <p className="text-xs text-[#A99B90] mt-0.5">
+                        {contact.handle || '—'} • {t('birthday')}: {contact.birthday?.slice(5) || '—'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => onDeleteContact(contact)}
+                      className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#D96B52]"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {contact.lastTopic && (
+                    <div className="mt-3 p-3 rounded-xl bg-[#171412]/80 border border-[#624332]/35 text-xs text-[#E4C8A6] flex items-start gap-2">
+                      <MessageSquare className="w-3.5 h-3.5 text-[#B68B61] shrink-0 mt-0.5" />
+                      <span>{contact.lastTopic}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[#624332]/35">
+                  <span className="text-[11px] text-[#A99B90]">
+                    {t('last_contacted')}: {formatDateReadable(contact.lastContacted, lang)}
+                  </span>
+                  <Button size="sm" variant="secondary" onClick={() => onLogContactToday(contact.id)}>
+                    <PhoneCall className="w-3.5 h-3.5 text-[#B68B61]" /> {t('log_contact_today')}
+                  </Button>
+                </div>
+              </GlassCard>
+            );
+          })}
+        </div>
+      )}
+
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={t('add_contact')}>
+        <form onSubmit={handleCreate} className="space-y-4">
+          <Input
+            label={t('contact_name')}
+            placeholder="e.g. Budi Santoso / Klien PT Maju"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Select
+              label={t('relationship_cat')}
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              <option value="Family">Family / Keluarga</option>
+              <option value="Client">Client / Klien</option>
+              <option value="Mentor">Mentor</option>
+              <option value="Friend">Friend / Teman</option>
+            </Select>
+            <Input
+              label={t('contact_handle')}
+              placeholder="+62 812... / @username"
+              value={handle}
+              onChange={(e) => setHandle(e.target.value)}
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Input
+              label={t('birthday')}
+              type="date"
+              value={birthday}
+              onChange={(e) => setBirthday(e.target.value)}
+            />
+            <Input
+              label={t('last_contacted')}
+              type="date"
+              value={lastContacted}
+              onChange={(e) => setLastContacted(e.target.value)}
+            />
+            <Input
+              label={t('followup_days')}
+              type="number"
+              min="1"
+              value={followUpIntervalDays}
+              onChange={(e) => setFollowUpIntervalDays(e.target.value)}
+            />
+          </div>
+          <Input
+            label={t('last_topic')}
+            placeholder="e.g. Pembahasan kerjasama Q1"
+            value={lastTopic}
+            onChange={(e) => setLastTopic(e.target.value)}
+          />
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="secondary" onClick={() => setShowModal(false)}>
+              {t('cancel')}
+            </Button>
+            <Button type="submit">{t('save')}</Button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+};
+
+// --- MODULE J: NOTES & JOURNALING ---
+const NotesView = ({ data, t, lang, onSaveNote, onDeleteNote, onTogglePinNote }) => {
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [selectedNoteId, setSelectedNoteId] = useState(data.notes[0]?.id || null);
+
+  const filteredNotes = useMemo(() => {
+    return data.notes
+      .filter((n) => {
+        if (typeFilter !== 'all' && n.type !== typeFilter) return false;
+        if (search.trim()) {
+          const q = search.toLowerCase();
+          if (
+            !n.title.toLowerCase().includes(q) &&
+            !n.content.toLowerCase().includes(q) &&
+            !n.category.toLowerCase().includes(q)
+          ) {
+            return false;
+          }
+        }
+        return true;
+      })
+      .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt));
+  }, [data.notes, typeFilter, search]);
+
+  const activeNote = useMemo(
+    () => data.notes.find((n) => n.id === selectedNoteId) || filteredNotes[0] || null,
+    [data.notes, selectedNoteId, filteredNotes]
+  );
+
+  const handleCreateEntry = (type = 'Note') => {
+    const isJournal = type === 'Journal';
+    const created = onSaveNote({
+      title: isJournal
+        ? `${lang === 'id' ? 'Jurnal Harian' : 'Daily Journal'} — ${formatDateReadable(TODAY_STR, lang)}`
+        : lang === 'id'
+        ? 'Catatan Baru'
+        : 'Untitled Executive Note',
+      type,
+      category: isJournal ? 'Daily Journal' : 'General',
+      pinned: false,
+      mood: isJournal ? (lang === 'id' ? 'Fokus & Tenang' : 'Focused') : '',
+      content: isJournal
+        ? lang === 'id'
+          ? 'Hal yang Disyukuri:\n- \n\nFokus Utama Hari Ini:\n- \n\nRefleksi Malam:\n'
+          : 'Gratitude & Wins:\n- \n\nKey Priorities:\n- \n\nEvening Reflection:\n'
+        : '',
+    });
+    if (created?.id) setSelectedNoteId(created.id);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('notes_title')}</h1>
+          <p className="text-xs text-[#A99B90] mt-1">{t('notes_subtitle')}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="secondary" onClick={() => handleCreateEntry('Journal')}>
+            <BookOpen className="w-4 h-4" /> {t('new_journal')}
+          </Button>
+          <Button size="sm" onClick={() => handleCreateEntry('Note')}>
+            <Plus className="w-4 h-4" /> {t('new_note')}
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <GlassCard className="p-4 space-y-3">
+          <div className="relative">
+            <Search className="w-4 h-4 text-[#A99B90] absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('search_placeholder')}
+              className="w-full rounded-xl bg-[#171412] border border-[#624332]/55 pl-9 pr-3 py-2 text-xs text-[#F4E9DC]"
+            />
+          </div>
+          <div className="flex gap-1.5">
+            {['all', 'Note', 'Journal'].map((tp) => (
+              <button
+                key={tp}
+                onClick={() => setTypeFilter(tp)}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-medium ${
+                  typeFilter === tp ? 'bg-[#B68B61] text-[#171412]' : 'bg-[#171412] text-[#A99B90]'
+                }`}
+              >
+                {tp === 'all' ? (lang === 'id' ? 'Semua' : 'All') : tp === 'Note' ? 'Notes' : 'Jurnal'}
+              </button>
+            ))}
+          </div>
+
+          <div className="space-y-2 max-h-[360px] lg:max-h-[480px] overflow-y-auto pr-1">
+            {filteredNotes.length === 0 ? (
+              <p className="text-xs text-[#A99B90] text-center py-8">
+                {lang === 'id' ? 'Belum ada catatan.' : 'No notes found.'}
+              </p>
+            ) : (
+              filteredNotes.map((note) => {
+                const isSelected = activeNote?.id === note.id;
+                return (
+                  <div
+                    key={note.id}
+                    onClick={() => setSelectedNoteId(note.id)}
+                    className={`cursor-pointer p-3 rounded-xl border transition-all ${
+                      isSelected
+                        ? 'bg-[#30231D] border-[#B68B61]'
+                        : 'bg-[#171412]/70 border-[#624332]/35 hover:border-[#624332]'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="text-sm font-medium text-[#F4E9DC] truncate">{note.title}</h3>
+                      {note.pinned && <Pin className="w-3.5 h-3.5 text-[#B68B61] shrink-0" />}
+                    </div>
+                    <p className="text-xs text-[#A99B90] line-clamp-2 mt-1">{note.content || '...'}</p>
+                    <div className="flex items-center justify-between text-[10px] text-[#E4C8A6] mt-2">
+                      <span>{note.type} • {note.category}</span>
+                      <span>{note.updatedAt.slice(0, 10)}</span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </GlassCard>
+
+        <GlassCard className="p-4 sm:p-5 lg:col-span-2 flex flex-col justify-between min-h-[420px]">
+          {!activeNote ? (
+            <EmptyState
+              icon={FileText}
+              title={lang === 'id' ? 'Pilih atau buat catatan' : 'Select or create a note'}
+              description={
+                lang === 'id'
+                  ? 'Simpan ide strategis, ringkasan rapat, atau refleksi jurnal harian.'
+                  : 'Capture strategic insights, meeting notes, or daily journal reflections.'
+              }
+              actionLabel={t('new_note')}
+              onAction={() => handleCreateEntry('Note')}
+            />
+          ) : (
+            <div className="space-y-4 flex-1 flex flex-col">
+              <div className="flex items-center justify-between gap-2 border-b border-[#624332]/40 pb-3">
+                <input
+                  value={activeNote.title}
+                  onChange={(e) => onSaveNote({ ...activeNote, title: e.target.value })}
+                  className="bg-transparent text-base sm:text-lg font-semibold text-[#F4E9DC] focus:outline-none flex-1 min-w-0"
+                />
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => onTogglePinNote(activeNote.id)}
+                    className={`p-2 rounded-xl border transition-colors ${
+                      activeNote.pinned
+                        ? 'bg-[#30231D] border-[#B68B61] text-[#B68B61]'
+                        : 'bg-[#171412] border-[#624332]/50 text-[#A99B90]'
+                    }`}
+                  >
+                    <Pin className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => onDeleteNote(activeNote)}
+                    className="p-2 rounded-xl bg-[#171412] border border-[#624332]/50 text-[#A99B90] hover:text-[#D96B52]"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={activeNote.type}
+                  onChange={(e) => onSaveNote({ ...activeNote, type: e.target.value })}
+                  className="rounded-xl bg-[#171412] border border-[#624332]/50 px-3 py-1.5 text-xs text-[#E4C8A6]"
+                >
+                  <option value="Note">Note</option>
+                  <option value="Journal">Daily Journal</option>
+                </select>
+                <input
+                  value={activeNote.category}
+                  onChange={(e) => onSaveNote({ ...activeNote, category: e.target.value })}
+                  className="rounded-xl bg-[#171412] border border-[#624332]/50 px-3 py-1.5 text-xs text-[#F4E9DC]"
+                />
+                {activeNote.type === 'Journal' && (
+                  <input
+                    value={activeNote.mood || ''}
+                    onChange={(e) => onSaveNote({ ...activeNote, mood: e.target.value })}
+                    placeholder="Mood..."
+                    className="rounded-xl bg-[#171412] border border-[#624332]/50 px-3 py-1.5 text-xs text-[#E4C8A6]"
+                  />
+                )}
+              </div>
+
+              <textarea
+                value={activeNote.content}
+                onChange={(e) => onSaveNote({ ...activeNote, content: e.target.value })}
+                className="w-full flex-1 min-h-[240px] rounded-xl bg-[#171412]/70 border border-[#624332]/40 p-4 text-sm text-[#F4E9DC] leading-relaxed focus:outline-none focus:border-[#B68B61] resize-none"
+              />
+
+              <div className="flex items-center justify-between text-[11px] text-[#A99B90]">
+                <span>
+                  {activeNote.content.trim()
+                    ? `${activeNote.content.trim().split(/\s+/).length} ${t('words')}`
+                    : `0 ${t('words')}`}
+                </span>
+                <span>{t('autosaved')}</span>
+              </div>
+            </div>
+          )}
+        </GlassCard>
+      </div>
+    </div>
+  );
+};
+
+// --- MODULE K: SHOPPING LIST ---
+const ShoppingView = ({
+  data,
+  maskBalances,
+  t,
+  lang,
+  onCreateShoppingList,
+  onAddShoppingItem,
+  onToggleShoppingItem,
+  onDeleteShoppingItem,
+  onLogShoppingAsExpense,
+}) => {
+  const { currency } = data.profile;
+  const [selectedListId, setSelectedListId] = useState(data.shoppingLists[0]?.id || null);
+  const [showNewListModal, setShowNewListModal] = useState(false);
+  const [newListName, setNewListName] = useState('');
+
+  const [itemName, setItemName] = useState('');
+  const [itemQty, setItemQty] = useState('1');
+  const [itemPrice, setItemPrice] = useState('');
+  const [itemCategory, setItemCategory] = useState('Pantry');
+
+  const activeList =
+    data.shoppingLists.find((l) => l.id === selectedListId) || data.shoppingLists[0] || null;
+
+  const totals = useMemo(() => {
+    if (!activeList) return { estimated: 0, purchased: 0, remaining: 0 };
+    const estimated = activeList.items.reduce((s, i) => s + i.qty * i.estimatedPrice, 0);
+    const purchased = activeList.items
+      .filter((i) => i.purchased)
+      .reduce((s, i) => s + i.qty * i.estimatedPrice, 0);
+    return {
+      estimated,
+      purchased,
+      remaining: estimated - purchased,
+    };
+  }, [activeList]);
+
+  const handleAddItem = (e) => {
+    e.preventDefault();
+    if (!activeList || !itemName.trim()) return;
+    onAddShoppingItem(activeList.id, {
+      name: itemName.trim(),
+      qty: Math.max(1, parseInt(itemQty, 10) || 1),
+      estimatedPrice: Math.max(0, parseFloat(itemPrice) || 0),
+      category: itemCategory,
+      purchased: false,
+    });
+    setItemName('');
+    setItemQty('1');
+    setItemPrice('');
+  };
+
+  const handleCreateList = (e) => {
+    e.preventDefault();
+    if (!newListName.trim()) return;
+    const created = onCreateShoppingList(newListName.trim());
+    if (created?.id) setSelectedListId(created.id);
+    setNewListName('');
+    setShowNewListModal(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('shopping_title')}</h1>
+          <p className="text-xs text-[#A99B90] mt-1">{t('shopping_subtitle')}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="secondary" onClick={() => setShowNewListModal(true)}>
+            <Plus className="w-4 h-4" /> {t('new_list')}
+          </Button>
+          {activeList && totals.purchased > 0 && (
+            <Button
+              size="sm"
+              onClick={() => onLogShoppingAsExpense(activeList.name, totals.purchased)}
+            >
+              <Wallet className="w-4 h-4" /> {t('log_purchased')} (
+              {formatMoney(totals.purchased, currency, maskBalances)})
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {data.shoppingLists.map((list) => (
+          <button
+            key={list.id}
+            onClick={() => setSelectedListId(list.id)}
+            className={`px-4 py-2 rounded-xl text-xs font-medium border transition-all ${
+              activeList?.id === list.id
+                ? 'bg-[#B68B61] text-[#171412] border-[#B68B61]'
+                : 'bg-[#241B17] text-[#F4E9DC] border-[#624332]/50 hover:border-[#B68B61]/60'
+            }`}
+          >
+            {list.name} ({list.items.length})
+          </button>
+        ))}
+      </div>
+
+      {activeList && (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <GlassCard className="p-4">
+              <span className="text-xs text-[#A99B90] uppercase tracking-wider">{t('est_basket')}</span>
+              <div className="mt-1.5 text-xl font-semibold text-[#F4E9DC] tabular-nums">
+                {formatMoney(totals.estimated, currency, maskBalances)}
+              </div>
+            </GlassCard>
+            <GlassCard className="p-4">
+              <span className="text-xs text-[#A99B90] uppercase tracking-wider">{t('purchased_cart')}</span>
+              <div className="mt-1.5 text-xl font-semibold text-[#E4C8A6] tabular-nums">
+                {formatMoney(totals.purchased, currency, maskBalances)}
+              </div>
+            </GlassCard>
+            <GlassCard className="p-4">
+              <span className="text-xs text-[#A99B90] uppercase tracking-wider">{t('remaining_buy')}</span>
+              <div className="mt-1.5 text-xl font-semibold text-[#B68B61] tabular-nums">
+                {formatMoney(totals.remaining, currency, maskBalances)}
+              </div>
+            </GlassCard>
+          </div>
+
+          <GlassCard className="p-4">
+            <form onSubmit={handleAddItem} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+              <div className="sm:col-span-5">
+                <Input
+                  label={lang === 'id' ? 'Nama Barang' : 'Item Name'}
+                  placeholder="e.g. Kopi Arabika / Beras Organik"
+                  value={itemName}
+                  onChange={(e) => setItemName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <Input
+                  label="Qty"
+                  type="number"
+                  min="1"
+                  value={itemQty}
+                  onChange={(e) => setItemQty(e.target.value)}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <Input
+                  label={`${lang === 'id' ? 'Harga Satuan' : 'Est. Unit'} (${currency})`}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0"
+                  value={itemPrice}
+                  onChange={(e) => setItemPrice(e.target.value)}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <Select
+                  label={t('category')}
+                  value={itemCategory}
+                  onChange={(e) => setItemCategory(e.target.value)}
+                >
+                  <option value="Pantry">Pantry</option>
+                  <option value="Produce">Produce</option>
+                  <option value="Household">Household</option>
+                  <option value="Electronics">Electronics</option>
+                  <option value="Personal">Personal</option>
+                </Select>
+              </div>
+              <div className="sm:col-span-1">
+                <Button type="submit" className="w-full" aria-label={t('add')}>
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+            </form>
+          </GlassCard>
+
+          {activeList.items.length === 0 ? (
+            <EmptyState
+              icon={ShoppingCart}
+              title={lang === 'id' ? 'Daftar belanja masih kosong' : 'This shopping list is empty'}
+              description={
+                lang === 'id'
+                  ? 'Tambahkan barang belanjaan beserta estimasi harganya di formulir atas.'
+                  : 'Add items and estimated unit costs using the bar above.'
+              }
+            />
+          ) : (
+            <GlassCard className="p-4 sm:p-5 space-y-2.5">
+              {activeList.items.map((item) => {
+                const lineTotal = item.qty * item.estimatedPrice;
+                return (
+                  <div
+                    key={item.id}
+                    className={`flex items-center justify-between gap-3 p-3 rounded-xl border transition-all ${
+                      item.purchased
+                        ? 'bg-[#171412]/50 border-[#624332]/25 opacity-70'
+                        : 'bg-[#171412]/85 border-[#624332]/45'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => onToggleShoppingItem(activeList.id, item.id)}
+                      className="flex items-center gap-3 text-left min-w-0 flex-1"
+                    >
+                      {item.purchased ? (
+                        <CheckCircle2 className="w-5 h-5 text-[#B68B61] shrink-0" />
+                      ) : (
+                        <Circle className="w-5 h-5 text-[#A99B90] shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <p
+                          className={`text-sm font-medium truncate ${
+                            item.purchased ? 'line-through text-[#A99B90]' : 'text-[#F4E9DC]'
+                          }`}
+                        >
+                          {item.name}
+                        </p>
+                        <p className="text-xs text-[#A99B90]">
+                          {item.qty}x • {item.category}
+                        </p>
+                      </div>
+                    </button>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="text-xs sm:text-sm font-semibold text-[#E4C8A6] tabular-nums">
+                        {formatMoney(lineTotal, currency, maskBalances)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => onDeleteShoppingItem(activeList.id, item.id)}
+                        className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#D96B52]"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </GlassCard>
+          )}
+        </>
+      )}
+
+      <Modal open={showNewListModal} onClose={() => setShowNewListModal(false)} title={t('new_list')}>
+        <form onSubmit={handleCreateList} className="space-y-4">
+          <Input
+            label={lang === 'id' ? 'Nama Daftar Belanja' : 'List Name'}
+            placeholder="e.g. Belanja Bulanan / Perlengkapan Rumah"
+            value={newListName}
+            onChange={(e) => setNewListName(e.target.value)}
+            required
+          />
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="secondary" onClick={() => setShowNewListModal(false)}>
+              {t('cancel')}
+            </Button>
+            <Button type="submit">{t('save')}</Button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+};
+
+// --- MODULE L: REPORTS & ANALYTICS (WITH AI ADVISOR & WELLNESS CORRELATION CHART) ---
+const ReportsView = ({ data, derived, maskBalances, t, lang, onExportCsv }) => {
+  const { currency } = data.profile;
+  const [aiInsights, setAiInsights] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const wellnessCorrelationData = useMemo(() => {
+    const last7 = getLastNDays(7, TODAY_STR, lang);
+    const logMap = {};
+    (data.wellnessLogs || []).forEach((w) => {
+      logMap[w.date] = w;
+    });
+
+    return last7.map((d) => {
+      const log = logMap[d.dateStr] || { sleepHours: 0, energyScore: 0, waterGlasses: 0 };
+      const habitsDone = data.habits.filter((h) => h.completedDates.includes(d.dateStr)).length;
+      return {
+        day: `${d.dayShort} ${d.dayNum}`,
+        sleep: log.sleepHours,
+        energy: log.energyScore,
+        habits: habitsDone,
+      };
+    });
+  }, [data.wellnessLogs, data.habits, lang]);
+
+  const wellnessAverages = useMemo(() => {
+    const logs = data.wellnessLogs || [];
+    if (!logs.length) return { avgSleep: '0.0', avgEnergy: '0.0' };
+    const avgSleep = (logs.reduce((s, l) => s + (l.sleepHours || 0), 0) / logs.length).toFixed(1);
+    const avgEnergy = (logs.reduce((s, l) => s + (l.energyScore || 0), 0) / logs.length).toFixed(1);
+    return { avgSleep, avgEnergy };
+  }, [data.wellnessLogs]);
+
+  const runAiAdvisorAudit = async () => {
+    setAiLoading(true);
+    const savingsRate =
+      derived.monthlyIncome > 0
+        ? Math.max(0, ((derived.monthlyIncome - derived.monthlyExpenses) / derived.monthlyIncome) * 100)
+        : 0;
+    const completedTasksCount = data.tasks.filter((tk) => tk.status === 'completed').length;
+    const taskRate = data.tasks.length > 0 ? Math.round((completedTasksCount / data.tasks.length) * 100) : 0;
+    const avgStreak =
+      data.habits.length > 0
+        ? (
+            data.habits.reduce((s, h) => s + calculateHabitStreak(h.completedDates), 0) /
+            data.habits.length
+          ).toFixed(1)
+        : '0';
+
+    const buildFallbackInsights = () => {
+      const topCat = derived.categoryBreakdown[0];
+      if (lang === 'id') {
+        return {
+          summary: `Rasio tabungan bulanan Anda berada di ${savingsRate.toFixed(1)}% dengan rata-rata tidur ${wellnessAverages.avgSleep} jam/malam dan skor energi ${wellnessAverages.avgEnergy}/10.`,
+          recommendations: [
+            topCat
+              ? `Pos pengeluaran terbesar adalah "${topCat.category}" (${formatMoney(topCat.amount, currency)}). Audit pos rutin ini untuk meningkatkan rasio tabungan.`
+              : 'Catat pengeluaran harian secara konsisten untuk memetakan pola konsumsi utama Anda.',
+            `Rata-rata tidur ${wellnessAverages.avgSleep} jam berbanding lurus dengan skor energi (${wellnessAverages.avgEnergy}/10). Pertahankan durasi tidur minimal 7,5 jam di hari kerja padat.`,
+            `Pertahankan momentum streak kebiasaan (${avgStreak} hari) serta tingkat penyelesaian tugas (${taskRate}%).`,
+          ],
+        };
+      }
+      return {
+        summary: `Your monthly savings rate is ${savingsRate.toFixed(1)}% with ${wellnessAverages.avgSleep} hrs average sleep and a ${wellnessAverages.avgEnergy}/10 energy score.`,
+        recommendations: [
+          topCat
+            ? `Your largest spending category is "${topCat.category}" (${formatMoney(topCat.amount, currency)}). Auditing items here can lift your savings rate.`
+            : 'Log daily expenses consistently to surface your primary spending drivers.',
+          `Your ${wellnessAverages.avgSleep}h average sleep strongly supports your ${wellnessAverages.avgEnergy}/10 energy score. Protect 7.5+ hours before high-leverage workdays.`,
+          `Sustain your ${avgStreak}-day habit streak and ${taskRate}% task execution velocity.`,
+        ],
+      };
+    };
+
+    try {
+      const apiKey = getGeminiKey();
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+      const telemetrySummary = {
+        language: lang,
+        currency,
+        totalNetWorth: derived.totalNetWorth,
+        monthlyIncome: derived.monthlyIncome,
+        monthlyExpenses: derived.monthlyExpenses,
+        savingsRatePct: Number(savingsRate.toFixed(1)),
+        budgetUtilizationPct: Number(derived.budgetUtilizationPct.toFixed(1)),
+        topExpenseCategories: derived.categoryBreakdown.slice(0, 3),
+        taskCompletionPct: taskRate,
+        averageHabitStreakDays: Number(avgStreak),
+        averageSleepHours: Number(wellnessAverages.avgSleep),
+        averageEnergyScore: Number(wellnessAverages.avgEnergy),
+      };
+
+      const prompt = `Act as a Senior Wealth & Executive Productivity Advisor. Analyze this user telemetry JSON and respond in ${
+        lang === 'id' ? 'Bahasa Indonesia' : 'English'
+      }. Return ONLY valid JSON with keys: "summary" (1 concise executive sentence) and "recommendations" (array of 3 specific, actionable bullet strings). Telemetry: ${JSON.stringify(
+        telemetrySummary
+      )}`;
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: 'application/json' },
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const textOut = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (textOut) {
+          const parsed = JSON.parse(textOut);
+          if (parsed.summary && Array.isArray(parsed.recommendations)) {
+            setAiInsights(parsed);
+            setAiLoading(false);
+            return;
+          }
+        }
+      }
+      setAiInsights(buildFallbackInsights());
+    } catch {
+      setAiInsights(buildFallbackInsights());
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const budgetComparisonData = useMemo(() => {
+    const spendMap = {};
+    data.transactions
+      .filter((tx) => tx.type === 'expense' && tx.date.startsWith(CURRENT_MONTH))
+      .forEach((tx) => {
+        spendMap[tx.category] = (spendMap[tx.category] || 0) + tx.amount;
+      });
+    return data.budgets
+      .filter((b) => b.month === CURRENT_MONTH)
+      .map((b) => ({
+        category: b.category.split(' ')[0],
+        Planned: b.limit,
+        Actual: spendMap[b.category] || 0,
+      }));
+  }, [data.budgets, data.transactions]);
+
+  const totalSavingsVaults = useMemo(
+    () =>
+      data.savingsGoals.reduce(
+        (sum, sg) => sum + sg.contributions.reduce((s, c) => s + c.amount, 0),
+        0
+      ),
+    [data.savingsGoals]
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('reports_title')}</h1>
+          <p className="text-xs text-[#A99B90] mt-1">{t('reports_subtitle')}</p>
+        </div>
+        <Button size="sm" variant="secondary" onClick={onExportCsv}>
+          <Download className="w-4 h-4" /> {t('export_csv')}
+        </Button>
+      </div>
+
+      {/* AI FINANCIAL & PRODUCTIVITY ADVISOR CARD */}
+      <GlassCard className="p-5 sm:p-6 bg-gradient-to-br from-[#30231D]/90 via-[#241B17] to-[#171412] border-[#B68B61]/45 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#B68B61]/20 border border-[#B68B61]/50 flex items-center justify-center text-[#E4C8A6] shrink-0">
+              <BrainCircuit className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-[#F4E9DC]">{t('ai_advisor_title')}</h2>
+              <p className="text-xs text-[#A99B90] mt-0.5">{t('ai_advisor_sub')}</p>
+            </div>
+          </div>
+          <Button size="sm" onClick={runAiAdvisorAudit} disabled={aiLoading}>
+            {aiLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" /> {t('ai_analyzing')}
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" /> {t('ai_run_audit')}
+              </>
+            )}
+          </Button>
+        </div>
+
+        {aiInsights && (
+          <div className="pt-3 border-t border-[#624332]/40 space-y-3">
+            <p className="text-xs sm:text-sm font-medium text-[#E4C8A6] leading-relaxed">
+              {aiInsights.summary}
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {aiInsights.recommendations.map((rec, idx) => (
+                <div
+                  key={idx}
+                  className="p-3.5 rounded-xl bg-[#171412]/80 border border-[#624332]/45 text-xs text-[#F4E9DC] leading-relaxed flex items-start gap-2.5"
+                >
+                  <span className="w-5 h-5 rounded-md bg-[#B68B61] text-[#171412] font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">
+                    {idx + 1}
+                  </span>
+                  <span>{rec}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </GlassCard>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <GlassCard className="p-4">
+          <span className="text-xs text-[#A99B90] uppercase">{t('nav_savings')}</span>
+          <div className="mt-1.5 text-xl font-semibold text-[#E4C8A6] tabular-nums">
+            {formatMoney(totalSavingsVaults, currency, maskBalances)}
+          </div>
+        </GlassCard>
+        <GlassCard className="p-4">
+          <span className="text-xs text-[#A99B90] uppercase">{t('avg_sleep')}</span>
+          <div className="mt-1.5 text-xl font-semibold text-[#F4E9DC] tabular-nums">
+            {wellnessAverages.avgSleep}h
+          </div>
+        </GlassCard>
+        <GlassCard className="p-4">
+          <span className="text-xs text-[#A99B90] uppercase">{t('avg_energy')}</span>
+          <div className="mt-1.5 text-xl font-semibold text-[#B68B61] tabular-nums">
+            {wellnessAverages.avgEnergy} / 10
+          </div>
+        </GlassCard>
+        <GlassCard className="p-4">
+          <span className="text-xs text-[#A99B90] uppercase">{t('active_goals_completion')}</span>
+          <div className="mt-1.5 text-xl font-semibold text-[#E4C8A6] tabular-nums">
+            {derived.overallGoalPct.toFixed(0)}%
+          </div>
+        </GlassCard>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Sleep Duration vs Energy & Habits Correlation Chart */}
+        <GlassCard className="p-5">
+          <h2 className="text-base font-semibold text-[#F4E9DC] mb-1">{t('wellness_corr_title')}</h2>
+          <p className="text-xs text-[#A99B90] mb-4">{t('wellness_corr_sub')}</p>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={wellnessCorrelationData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#624332" strokeOpacity={0.25} vertical={false} />
+                <XAxis dataKey="day" stroke="#A99B90" fontSize={11} />
+                <YAxis stroke="#A99B90" fontSize={11} domain={[0, 10]} width={35} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#241B17',
+                    borderColor: '#624332',
+                    borderRadius: '12px',
+                    color: '#F4E9DC',
+                  }}
+                />
+                <Bar
+                  dataKey="sleep"
+                  name={t('sleep_hours')}
+                  fill="#B68B61"
+                  radius={[6, 6, 0, 0]}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="energy"
+                  name={t('energy_score')}
+                  stroke="#E4C8A6"
+                  strokeWidth={2.5}
+                  dot={{ r: 4, fill: '#E4C8A6' }}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </GlassCard>
+
+        <GlassCard className="p-5">
+          <h2 className="text-base font-semibold text-[#F4E9DC] mb-4">{t('chart_cashflow_title')}</h2>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={derived.monthlySeries}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#624332" strokeOpacity={0.25} vertical={false} />
+                <XAxis dataKey="label" stroke="#A99B90" fontSize={11} />
+                <YAxis stroke="#A99B90" fontSize={11} width={45} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#241B17',
+                    borderColor: '#624332',
+                    borderRadius: '12px',
+                    color: '#F4E9DC',
+                  }}
+                />
+                <Bar dataKey="income" name={lang === 'id' ? 'Pemasukan' : 'Income'} fill="#E4C8A6" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="expenses" name={lang === 'id' ? 'Pengeluaran' : 'Expenses'} fill="#B68B61" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </GlassCard>
+
+        <GlassCard className="p-5">
+          <h2 className="text-base font-semibold text-[#F4E9DC] mb-4">
+            {t('nav_budgets')} ({CURRENT_MONTH})
+          </h2>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={budgetComparisonData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#624332" strokeOpacity={0.25} vertical={false} />
+                <XAxis dataKey="category" stroke="#A99B90" fontSize={11} />
+                <YAxis stroke="#A99B90" fontSize={11} width={45} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#241B17',
+                    borderColor: '#624332',
+                    borderRadius: '12px',
+                    color: '#F4E9DC',
+                  }}
+                />
+                <Bar dataKey="Planned" fill="#624332" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="Actual" fill="#B68B61" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </GlassCard>
+
+        <GlassCard className="p-5">
+          <h2 className="text-base font-semibold text-[#F4E9DC] mb-4">{t('spending_by_cat')}</h2>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <RePieChart>
+                <Pie
+                  data={derived.categoryBreakdown}
+                  dataKey="amount"
+                  nameKey="category"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={55}
+                  outerRadius={88}
+                  paddingAngle={3}
+                >
+                  {derived.categoryBreakdown.map((_, idx) => (
+                    <Cell key={idx} fill={CHART_PALETTE[idx % CHART_PALETTE.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#241B17',
+                    borderColor: '#624332',
+                    borderRadius: '12px',
+                    color: '#F4E9DC',
+                  }}
+                />
+              </RePieChart>
+            </ResponsiveContainer>
+          </div>
+        </GlassCard>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// 8. GLOBAL CRUD MODALS, SMART TOOLS & SYSTEM SETTINGS
+// ============================================================================
+
+const SmartCommandBar = ({ t, lang, data, onExecuteBatch }) => {
+  const [command, setCommand] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const parseCommandLocally = (text) => {
+    const actions = { transactions: [], tasks: [], events: [] };
+    const clauses = text
+      .split(/\b(?:dan|and|lalu|serta|then|,|;)\b/i)
+      .map((c) => c.trim())
+      .filter(Boolean);
+
+    const isTomorrow = /\b(?:besok|tomorrow)\b/i.test(text);
+    const targetDate = isTomorrow ? '2026-11-27' : TODAY_STR;
+
+    clauses.forEach((clause) => {
+      const amtMatch = clause.match(/(\d+(?:[.,]\d+)?)\s*(rb|ribu|k|jt|juta|m)?\b/i);
+      const timeMatch = clause.match(/\b(?:jam|at|pukul)?\s*(\d{1,2})[:.](\d{2})\b/i);
+      const isSchedule = /\b(?:jadwalkan|jadwal|meeting|rapat|acara|schedule|event|call)\b/i.test(clause);
+      const isTask = /\b(?:tugas|ingatkan|todo|bayar|selesaikan|kerjakan|remind|task)\b/i.test(clause);
+      const isIncome = /\b(?:gaji|pemasukan|terima|bonus|income|salary|masuk)\b/i.test(clause);
+
+      if (amtMatch && !isSchedule && !timeMatch) {
+        let num = parseFloat(amtMatch[1].replace(',', '.'));
+        const unit = (amtMatch[2] || '').toLowerCase();
+        if (unit === 'rb' || unit === 'ribu' || unit === 'k') num *= 1000;
+        else if (unit === 'jt' || unit === 'juta' || unit === 'm') num *= 1000000;
+
+        if (num > 0) {
+          const cleanDesc = clause
+            .replace(amtMatch[0], '')
+            .replace(/\b(?:beli|bayar|pakai|via|dengan|untuk|rp|idr)\b/gi, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+          let category = isIncome ? 'Other Income' : 'Shopping & Lifestyle';
+          if (/kopi|coffee|makan|lunch|dinner|cafe/i.test(clause)) category = 'Dining & Coffee';
+          else if (/belanja|groceries|supermarket|indomaret|alfamart/i.test(clause)) category = 'Groceries';
+          else if (/bensin|grab|gojek|tol|tiket|travel/i.test(clause)) category = 'Transport & Travel';
+          else if (/gaji|salary/i.test(clause)) category = 'Primary Salary';
+
+          actions.transactions.push({
+            type: isIncome ? 'income' : 'expense',
+            amount: Math.round(num),
+            date: targetDate,
+            category,
+            description: cleanDesc || (isIncome ? 'Pemasukan Cepat' : 'Transaksi Cepat'),
+            accountId: data.accounts[0]?.id || '',
+            paymentMethod: /qris/i.test(clause) ? 'QRIS' : 'Quick Command',
+            notes: text,
+          });
+          return;
+        }
+      }
+
+      if (isSchedule || timeMatch) {
+        const hh = timeMatch ? String(Math.min(23, parseInt(timeMatch[1], 10))).padStart(2, '0') : '10';
+        const mm = timeMatch ? timeMatch[2] : '00';
+        const endHh = String(Math.min(23, parseInt(hh, 10) + 1)).padStart(2, '0');
+        const cleanTitle = clause
+          .replace(timeMatch ? timeMatch[0] : '', '')
+          .replace(/\b(?:jadwalkan|jadwal|besok|tomorrow|hari ini|today|jam|pukul|at)\b/gi, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        actions.events.push({
+          title: cleanTitle || (lang === 'id' ? 'Agenda Terjadwal' : 'Scheduled Event'),
+          date: targetDate,
+          startTime: `${hh}:${mm}`,
+          endTime: `${endHh}:${mm}`,
+          category: 'Work',
+          location: '',
+          reminder: '15 min before',
+          notes: '',
+        });
+        return;
+      }
+
+      if (isTask || clause.length > 2) {
+        const cleanTask = clause
+          .replace(/\b(?:tugas|ingatkan|todo|besok|tomorrow)\b/gi, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        if (cleanTask) {
+          actions.tasks.push({
+            title: cleanTask,
+            description: '',
+            priority: 'Medium',
+            dueDate: targetDate,
+            category: 'Personal',
+            status: 'todo',
+            isTopPriority: false,
+          });
+        }
+      }
+    });
+
+    return actions;
+  };
+
+  const handleRunCommand = async (e) => {
+    e.preventDefault();
+    const raw = command.trim();
+    if (!raw) return;
+    setBusy(true);
+
+    try {
+      const apiKey = getGeminiKey();
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+      const prompt = `Parse this personal life management command into structured actions. Today is ${TODAY_STR} (tomorrow is 2026-11-27). Return ONLY valid JSON with keys: "transactions" (array of {type:"expense"|"income", amount:number, date:"YYYY-MM-DD", category:string, description:string}), "tasks" (array of {title:string, priority:"Medium"|"High", dueDate:"YYYY-MM-DD", category:string}), and "events" (array of {title:string, date:"YYYY-MM-DD", startTime:"HH:MM", endTime:"HH:MM", category:string}). Command: "${raw}"`;
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: 'application/json' },
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const textOut = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (textOut) {
+          const parsed = JSON.parse(textOut);
+          const normalized = {
+            transactions: (parsed.transactions || []).map((tx) => ({
+              type: tx.type === 'income' ? 'income' : 'expense',
+              amount: Number(tx.amount) || 0,
+              date: tx.date || TODAY_STR,
+              category:
+                tx.category ||
+                (tx.type === 'income' ? 'Other Income' : 'Shopping & Lifestyle'),
+              description: tx.description || raw,
+              accountId: data.accounts[0]?.id || '',
+              paymentMethod: 'Smart Command',
+              notes: raw,
+            })),
+            tasks: (parsed.tasks || []).map((tk) => ({
+              title: tk.title || raw,
+              description: '',
+              priority: tk.priority || 'Medium',
+              dueDate: tk.dueDate || TODAY_STR,
+              category: tk.category || 'Personal',
+              status: 'todo',
+              isTopPriority: false,
+            })),
+            events: (parsed.events || []).map((ev) => ({
+              title: ev.title || raw,
+              date: ev.date || TODAY_STR,
+              startTime: ev.startTime || '10:00',
+              endTime: ev.endTime || '11:00',
+              category: ev.category || 'Work',
+              location: '',
+              reminder: '15 min before',
+              notes: '',
+            })),
+          };
+          if (
+            normalized.transactions.length ||
+            normalized.tasks.length ||
+            normalized.events.length
+          ) {
+            onExecuteBatch(normalized);
+            setCommand('');
+            setBusy(false);
+            return;
+          }
+        }
+      }
+    } catch {
+      // Fallback to deterministic local parser
+    }
+
+    const fallbackActions = parseCommandLocally(raw);
+    onExecuteBatch(fallbackActions);
+    setCommand('');
+    setBusy(false);
+  };
+
+  return (
+    <form
+      onSubmit={handleRunCommand}
+      className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-2 rounded-2xl bg-[#241B17]/90 border border-[#624332]/55 shadow-lg"
+    >
+      <div className="flex items-center gap-2.5 flex-1 px-2 min-w-0">
+        <Wand2 className="w-4 h-4 text-[#B68B61] shrink-0" />
+        <input
+          value={command}
+          onChange={(e) => setCommand(e.target.value)}
+          placeholder={t('smart_cmd_placeholder')}
+          className="w-full bg-transparent text-xs sm:text-sm text-[#F4E9DC] placeholder-[#A99B90]/65 focus:outline-none py-1.5"
+        />
+      </div>
+      <Button type="submit" size="sm" disabled={busy || !command.trim()} className="shrink-0">
+        {busy ? (
+          <>
+            <Loader2 className="w-3.5 h-3.5 animate-spin" /> {t('smart_cmd_processing')}
+          </>
+        ) : (
+          <>
+            <Sparkles className="w-3.5 h-3.5" /> {t('smart_cmd_btn')}
+          </>
+        )}
+      </Button>
+    </form>
+  );
+};
+
+const SplitBillModal = ({ open, onClose, data, t, lang, onExecuteSplitBill }) => {
+  const { currency } = data.profile;
+  const [title, setTitle] = useState('');
+  const [totalAmount, setTotalAmount] = useState('');
+  const [splitMode, setSplitMode] = useState('equal');
+  const [accountId, setAccountId] = useState(data.accounts[0]?.id || '');
+  const [logTotalExpense, setLogTotalExpense] = useState(true);
+  const [friends, setFriends] = useState([
+    { id: 'fr-1', name: 'Raka', customAmount: '' },
+    { id: 'fr-2', name: 'Nadia', customAmount: '' },
+  ]);
+
+  const numericTotal = parseFloat(totalAmount) || 0;
+  const headcount = friends.length + 1;
+  const equalShare = headcount > 0 ? Math.round((numericTotal / headcount) * 100) / 100 : 0;
+
+  const computedFriends = friends.map((f) => ({
+    ...f,
+    owedAmount:
+      splitMode === 'equal' ? equalShare : Math.max(0, parseFloat(f.customAmount) || 0),
+  }));
+
+  const friendsSum = computedFriends.reduce((s, f) => s + f.owedAmount, 0);
+  const yourOwnShare = Math.max(0, numericTotal - friendsSum);
+
+  const handleAddFriend = () => {
+    setFriends((prev) => [...prev, { id: `fr-${Date.now()}`, name: '', customAmount: '' }]);
+  };
+
+  const handleRemoveFriend = (id) => {
+    if (friends.length <= 1) return;
+    setFriends((prev) => prev.filter((f) => f.id !== id));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!title.trim() || numericTotal <= 0) return;
+    const validParticipants = computedFriends.filter((f) => f.name.trim() && f.owedAmount > 0);
+    if (validParticipants.length === 0) return;
+
+    onExecuteSplitBill({
+      title: title.trim(),
+      totalAmount: numericTotal,
+      accountId: accountId || data.accounts[0]?.id,
+      logTotalExpense,
+      participants: validParticipants.map((p) => ({
+        name: p.name.trim(),
+        amount: p.owedAmount,
+      })),
+    });
+
+    setTitle('');
+    setTotalAmount('');
+    onClose();
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title={t('split_bill')} subtitle={t('split_bill_sub')}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Input
+          label={lang === 'id' ? 'Judul Patungan / Makan Bersama' : 'Bill Description'}
+          placeholder="e.g. Makan Malam Klien & Tim"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          required
+        />
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Input
+            label={`${lang === 'id' ? 'Total Tagihan' : 'Total Bill'} (${currency})`}
+            type="number"
+            step="0.01"
+            min="1"
+            value={totalAmount}
+            onChange={(e) => setTotalAmount(e.target.value)}
+            required
+          />
+          <Select
+            label={lang === 'id' ? 'Dibayar dari Akun' : 'Paid From Account'}
+            value={accountId}
+            onChange={(e) => setAccountId(e.target.value)}
+          >
+            {data.accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-[#171412] border border-[#624332]/50">
+          {[
+            { id: 'equal', label: t('split_equal') },
+            { id: 'custom', label: t('split_custom') },
+          ].map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => setSplitMode(m.id)}
+              className={`py-2 rounded-lg text-xs font-semibold ${
+                splitMode === m.id ? 'bg-[#B68B61] text-[#171412]' : 'text-[#A99B90]'
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs uppercase tracking-wider text-[#A99B90]">
+              {lang === 'id' ? 'Daftar Peserta Patungan' : 'Participants'}
+            </span>
+            <button
+              type="button"
+              onClick={handleAddFriend}
+              className="text-xs font-semibold text-[#E4C8A6] hover:text-[#B68B61] inline-flex items-center gap-1"
+            >
+              <Plus className="w-3.5 h-3.5" /> {t('add_participant')}
+            </button>
+          </div>
+
+          {computedFriends.map((f) => (
+            <div key={f.id} className="flex items-center gap-2">
+              <input
+                value={f.name}
+                onChange={(e) =>
+                  setFriends((prev) =>
+                    prev.map((item) => (item.id === f.id ? { ...item, name: e.target.value } : item))
+                  )
+                }
+                placeholder={lang === 'id' ? 'Nama teman...' : 'Friend name...'}
+                className="flex-1 min-w-0 rounded-xl bg-[#171412] border border-[#624332]/55 px-3 py-2 text-xs text-[#F4E9DC]"
+                required
+              />
+              {splitMode === 'equal' ? (
+                <span className="px-3 py-2 rounded-xl bg-[#30231D] text-xs font-semibold text-[#E4C8A6] tabular-nums shrink-0">
+                  {formatMoney(f.owedAmount, currency)}
+                </span>
+              ) : (
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0"
+                  value={f.customAmount}
+                  onChange={(e) =>
+                    setFriends((prev) =>
+                      prev.map((item) =>
+                        item.id === f.id ? { ...item, customAmount: e.target.value } : item
+                      )
+                    )
+                  }
+                  className="w-28 rounded-xl bg-[#171412] border border-[#624332]/55 px-3 py-2 text-xs text-[#F4E9DC] text-right"
+                  required
+                />
+              )}
+              {friends.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => handleRemoveFriend(f.id)}
+                  className="p-2 text-[#A99B90] hover:text-[#D96B52]"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="p-3 rounded-xl bg-[#171412]/80 border border-[#624332]/40 flex items-center justify-between text-xs">
+          <span className="text-[#A99B90]">{t('your_share')}</span>
+          <span className="font-semibold text-[#F4E9DC] tabular-nums">
+            {formatMoney(yourOwnShare, currency)}
+          </span>
+        </div>
+
+        <label className="flex items-center gap-2.5 text-xs text-[#E4C8A6] cursor-pointer">
+          <input
+            type="checkbox"
+            checked={logTotalExpense}
+            onChange={(e) => setLogTotalExpense(e.target.checked)}
+            className="rounded accent-[#B68B61]"
+          />
+          {t('log_total_wallet')}
+        </label>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="secondary" onClick={onClose}>
+            {t('cancel')}
+          </Button>
+          <Button type="submit">{t('execute_split_bill')}</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+const PaydaySplitterModal = ({ open, onClose, data, t, lang, onExecuteSplit }) => {
+  const { currency } = data.profile;
+  const [totalSalary, setTotalSalary] = useState(currency === 'Rp' ? '15000000' : '8000');
+  const [allocations, setAllocations] = useState([]);
+
+  useEffect(() => {
+    if (open && data.accounts.length > 0) {
+      const equalPct = Math.floor(100 / data.accounts.length);
+      const remainder = 100 - equalPct * data.accounts.length;
+      setAllocations(
+        data.accounts.map((acc, idx) => ({
+          accountId: acc.id,
+          accountName: acc.name,
+          pct: idx === 0 ? equalPct + remainder : equalPct,
+        }))
+      );
+    }
+  }, [open, data.accounts]);
+
+  const totalPct = allocations.reduce((s, a) => s + (Number(a.pct) || 0), 0);
+  const numericSalary = parseFloat(totalSalary) || 0;
+
+  const handlePctChange = (accountId, val) => {
+    setAllocations((prev) =>
+      prev.map((a) => (a.accountId === accountId ? { ...a, pct: Math.max(0, Math.min(100, Number(val) || 0)) } : a))
+    );
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (numericSalary <= 0 || totalPct !== 100) return;
+    const splits = allocations
+      .filter((a) => a.pct > 0)
+      .map((a) => ({
+        accountId: a.accountId,
+        accountName: a.accountName,
+        amount: Math.round(((numericSalary * a.pct) / 100) * 100) / 100,
+        pct: a.pct,
+      }));
+    onExecuteSplit(splits);
+    onClose();
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title={t('payday_splitter')} subtitle={t('payday_sub')}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Input
+          label={`${t('total_payday_amount')} (${currency})`}
+          type="number"
+          step="0.01"
+          min="1"
+          value={totalSalary}
+          onChange={(e) => setTotalSalary(e.target.value)}
+          required
+        />
+
+        <div className="space-y-2.5">
+          {allocations.map((al) => {
+            const share = (numericSalary * al.pct) / 100;
+            return (
+              <div
+                key={al.accountId}
+                className="p-3 rounded-xl bg-[#171412]/80 border border-[#624332]/40 flex items-center justify-between gap-3"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-[#F4E9DC] truncate">{al.accountName}</p>
+                  <p className="text-xs text-[#E4C8A6] tabular-nums">
+                    {formatMoney(share, currency)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={al.pct}
+                    onChange={(e) => handlePctChange(al.accountId, e.target.value)}
+                    className="w-16 rounded-lg bg-[#241B17] border border-[#624332]/60 px-2 py-1.5 text-right text-sm text-[#F4E9DC]"
+                  />
+                  <span className="text-xs text-[#A99B90]">%</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center justify-between text-xs pt-1">
+          <span className="text-[#A99B90]">Total Allocation</span>
+          <span className={totalPct === 100 ? 'text-[#87B082] font-semibold' : 'text-[#D96B52] font-semibold'}>
+            {totalPct}% {totalPct !== 100 && (lang === 'id' ? '(Harus 100%)' : '(Must equal 100%)')}
+          </span>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="secondary" onClick={onClose}>
+            {t('cancel')}
+          </Button>
+          <Button type="submit" disabled={totalPct !== 100 || numericSalary <= 0}>
+            {t('execute_split')}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }) => {
+  const [scanMode, setScanMode] = useState('camera');
+  const [rawText, setRawText] = useState('');
+  const [merchant, setMerchant] = useState('');
+  const [amount, setAmount] = useState('');
+  const [category, setCategory] = useState('Groceries');
+  const [accountId, setAccountId] = useState(data.accounts[0]?.id || '');
+
+  const [cameraError, setCameraError] = useState('');
+  const [cameraReady, setCameraReady] = useState(false);
+  const [detectedCode, setDetectedCode] = useState('');
+  const [capturedPreview, setCapturedPreview] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+
+  const stopCameraStream = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    setCameraReady(false);
+  }, []);
+
+  useEffect(() => {
+    if (!open) {
+      stopCameraStream();
+      setCapturedPreview('');
+      setDetectedCode('');
+      setCameraError('');
+      return undefined;
+    }
+
+    if (scanMode !== 'camera') {
+      stopCameraStream();
+      return undefined;
+    }
+
+    let cancelled = false;
+    let barcodeInterval = null;
+
+    const startCamera = async () => {
+      setCameraError('');
+      setCameraReady(false);
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error('MediaDevices API not supported');
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } },
+          audio: false,
+        });
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+          setCameraReady(true);
+        }
+
+        if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
+          const detector = new window.BarcodeDetector({
+            formats: ['qr_code', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39'],
+          });
+          barcodeInterval = setInterval(async () => {
+            if (!videoRef.current || videoRef.current.readyState !== 4) return;
+            try {
+              const codes = await detector.detect(videoRef.current);
+              if (codes && codes.length > 0 && codes[0].rawValue) {
+                const codeVal = codes[0].rawValue;
+                setDetectedCode(codeVal);
+                setMerchant((prev) => prev || `Scan: ${codeVal.slice(0, 32)}`);
+              }
+            } catch {
+              // Ignore single-frame detection errors
+            }
+          }, 700);
+        }
+      } catch {
+        if (!cancelled) {
+          setCameraError(t('camera_error_hint'));
+        }
+      }
+    };
+
+    startCamera();
+
+    return () => {
+      cancelled = true;
+      if (barcodeInterval) clearInterval(barcodeInterval);
+      stopCameraStream();
+    };
+  }, [open, scanMode, stopCameraStream, t]);
+
+  const analyzeImageWithGemini = async (base64Data, mimeType) => {
+    setIsAnalyzing(true);
+    try {
+      const apiKey = getGeminiKey();
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+      const prompt =
+        'Extract receipt or barcode purchase details from this image. Return ONLY valid JSON with keys: "merchant" (string), "amount" (number, total paid), and "category" (one of: "Housing & Utilities", "Dining & Coffee", "Groceries", "Transport & Travel", "Software & Subscriptions", "Health & Wellness", "Shopping & Lifestyle").';
+
+      const payload = {
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  mimeType,
+                  data: base64Data,
+                },
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          responseMimeType: 'application/json',
+        },
+      };
+
+      let response = null;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (response.ok) break;
+        } catch {
+          // Retry with backoff
+        }
+        await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
+      }
+
+      if (response && response.ok) {
+        const result = await response.json();
+        const textOut = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (textOut) {
+          const parsed = JSON.parse(textOut);
+          if (parsed.merchant) setMerchant(String(parsed.merchant));
+          if (parsed.amount && Number(parsed.amount) > 0) setAmount(String(parsed.amount));
+          if (parsed.category && DEFAULT_EXPENSE_CATEGORIES.includes(parsed.category)) {
+            setCategory(parsed.category);
+          }
+        }
+      }
+    } catch {
+      // Fallback gracefully
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleSnapCamera = async () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    setCapturedPreview(dataUrl);
+    const base64Only = dataUrl.split(',')[1];
+    await analyzeImageWithGemini(base64Only, 'image/jpeg');
+  };
+
+  const handleImageFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const dataUrl = String(ev.target?.result || '');
+      if (!dataUrl) return;
+      setCapturedPreview(dataUrl);
+      const base64Only = dataUrl.split(',')[1];
+      await analyzeImageWithGemini(base64Only, file.type || 'image/jpeg');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const parseReceiptText = (text) => {
+    setRawText(text);
+    const lines = text
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (lines.length > 0 && !merchant) {
+      setMerchant(lines[0].slice(0, 42));
+    }
+    const matches = text.match(/(\d[\d.,]*\d)/g);
+    if (matches && matches.length > 0) {
+      const parsedNums = matches
+        .map((m) => Number(m.replace(/[.,](?=\d{3}\b)/g, '').replace(',', '.')))
+        .filter((n) => !Number.isNaN(n) && n > 0);
+      if (parsedNums.length > 0) {
+        setAmount(String(Math.max(...parsedNums)));
+      }
+    }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const numAmt = parseFloat(amount);
+    if (!numAmt || numAmt <= 0) return;
+    stopCameraStream();
+    onSaveExtractedTx({
+      type: 'expense',
+      amount: numAmt,
+      date: TODAY_STR,
+      category,
+      description: merchant.trim() || (lang === 'id' ? 'Belanja Scan Struk' : 'Scanned Receipt'),
+      accountId: accountId || data.accounts[0]?.id,
+      paymentMethod: detectedCode ? 'QRIS / Barcode Scan' : 'Camera / Receipt Scan',
+      notes: detectedCode ? `Code: ${detectedCode}` : rawText.slice(0, 80),
+    });
+    setRawText('');
+    setMerchant('');
+    setAmount('');
+    setDetectedCode('');
+    setCapturedPreview('');
+    onClose();
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title={t('scan_receipt')} subtitle={t('scan_receipt_sub')}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-[#171412] border border-[#624332]/50">
+          {[
+            { id: 'camera', icon: Camera, label: t('mode_camera') },
+            { id: 'upload', icon: ImageIcon, label: t('mode_upload') },
+            { id: 'text', icon: Receipt, label: t('mode_text') },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setScanMode(tab.id)}
+                className={`py-2 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                  scanMode === tab.id
+                    ? 'bg-[#B68B61] text-[#171412]'
+                    : 'text-[#A99B90] hover:text-[#F4E9DC]'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {scanMode === 'camera' && (
+          <div className="space-y-2.5">
+            {cameraError ? (
+              <div className="p-4 rounded-2xl bg-[#D96B52]/15 border border-[#D96B52]/40 text-xs text-[#F29B87] space-y-2">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{cameraError}</span>
+                </div>
+                <Button size="sm" variant="secondary" onClick={() => setScanMode('upload')}>
+                  <ImageIcon className="w-3.5 h-3.5" /> {t('mode_upload')}
+                </Button>
+              </div>
+            ) : (
+              <div className="relative rounded-2xl overflow-hidden bg-black border border-[#B68B61]/50 aspect-video flex items-center justify-center">
+                <video ref={videoRef} playsInline muted className="w-full h-full object-cover" />
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                  <div className="w-56 h-36 sm:w-64 sm:h-40 border-2 border-[#B68B61]/80 rounded-2xl shadow-[0_0_0_9999px_rgba(23,20,18,0.45)] flex items-end justify-center pb-2">
+                    <span className="text-[10px] uppercase tracking-widest px-2 py-0.5 rounded bg-[#171412]/80 text-[#E4C8A6]">
+                      QRIS • Barcode • Struk
+                    </span>
+                  </div>
+                </div>
+                {!cameraReady && (
+                  <div className="absolute inset-0 bg-[#171412]/85 flex items-center justify-center gap-2 text-xs text-[#E4C8A6]">
+                    <Loader2 className="w-4 h-4 animate-spin text-[#B68B61]" />
+                    <span>{lang === 'id' ? 'Membuka kamera...' : 'Starting camera...'}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {detectedCode && (
+              <div className="p-2.5 rounded-xl bg-[#5B8056]/20 border border-[#5B8056]/50 text-xs text-[#87B082] flex items-center gap-2">
+                <QrCode className="w-4 h-4 shrink-0" />
+                <span className="truncate font-mono">{detectedCode}</span>
+              </div>
+            )}
+
+            {cameraReady && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="w-full"
+                disabled={isAnalyzing}
+                onClick={handleSnapCamera}
+              >
+                {isAnalyzing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> {t('scanning_ai')}
+                  </>
+                ) : (
+                  <>
+                    <Camera className="w-4 h-4 text-[#B68B61]" /> {t('capture_scan')}
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        )}
+
+        {scanMode === 'upload' && (
+          <div className="space-y-2.5">
+            <label className="flex flex-col items-center justify-center p-5 rounded-2xl border-2 border-dashed border-[#624332]/70 bg-[#171412]/70 hover:border-[#B68B61] cursor-pointer text-center transition-colors">
+              <Camera className="w-6 h-6 text-[#B68B61] mb-1.5" />
+              <span className="text-xs font-medium text-[#F4E9DC]">
+                {lang === 'id'
+                  ? 'Ketuk untuk ambil foto kamera HP atau pilih gambar struk/barcode'
+                  : 'Tap to take a photo or choose receipt/barcode image'}
+              </span>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleImageFileUpload}
+                className="hidden"
+              />
+            </label>
+            {isAnalyzing && (
+              <div className="flex items-center justify-center gap-2 text-xs text-[#E4C8A6] py-1">
+                <Loader2 className="w-4 h-4 animate-spin text-[#B68B61]" />
+                <span>{t('scanning_ai')}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {scanMode === 'text' && (
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium uppercase tracking-wider text-[#A99B90]">
+              {lang === 'id' ? 'Tempel Teks Struk / Invoice' : 'Paste Receipt Text'}
+            </label>
+            <textarea
+              rows={3}
+              value={rawText}
+              onChange={(e) => parseReceiptText(e.target.value)}
+              placeholder={
+                lang === 'id'
+                  ? 'Contoh:\nKopi Kenangan Bandung\n2x Kopi Susu Gula Aren\nTOTAL: 48.000'
+                  : 'Example:\nArtisan Coffee Roasters\n2x Flat White\nTOTAL: 14.50'
+              }
+              className="w-full rounded-xl bg-[#171412]/90 border border-[#624332]/55 p-3 text-xs text-[#F4E9DC] focus:outline-none focus:border-[#B68B61]"
+            />
+          </div>
+        )}
+
+        {capturedPreview && scanMode !== 'text' && (
+          <div className="flex items-center gap-3 p-2 rounded-xl bg-[#171412]/80 border border-[#624332]/40">
+            <img
+              src={capturedPreview}
+              alt="Scanned preview"
+              className="w-14 h-14 rounded-lg object-cover shrink-0"
+            />
+            <span className="text-xs text-[#A99B90]">
+              {lang === 'id'
+                ? 'Gambar berhasil ditangkap. Periksa hasil deteksi di bawah sebelum menyimpan.'
+                : 'Image captured. Review extracted details below before saving.'}
+            </span>
+          </div>
+        )}
+
+        <Input
+          label={lang === 'id' ? 'Nama Merchant / Produk' : 'Merchant / Item Name'}
+          value={merchant}
+          onChange={(e) => setMerchant(e.target.value)}
+          required
+        />
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Input
+            label={`${t('amount')} (${data.profile.currency})`}
+            type="number"
+            step="0.01"
+            min="0.01"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+          />
+          <Select label={t('category')} value={category} onChange={(e) => setCategory(e.target.value)}>
+            {DEFAULT_EXPENSE_CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        <Select
+          label={lang === 'id' ? 'Akun Pembayaran' : 'Wallet Account'}
+          value={accountId}
+          onChange={(e) => setAccountId(e.target.value)}
+        >
+          {data.accounts.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
+          ))}
+        </Select>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              stopCameraStream();
+              onClose();
+            }}
+          >
+            {t('cancel')}
+          </Button>
+          <Button type="submit">{t('save')}</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+const DailyBriefingModal = ({ open, onClose, data, derived, t, lang, onCopied }) => {
+  const textareaRef = useRef(null);
+  const { currency } = data.profile;
+
+  const briefingText = useMemo(() => {
+    const pendingTasks = data.tasks.filter((tk) => tk.status !== 'completed');
+    const todayEvents = data.events.filter((e) => e.date === TODAY_STR);
+    const unpaidSubs = (data.subscriptions || []).filter((s) => s.lastPaidMonth !== CURRENT_MONTH);
+
+    if (lang === 'id') {
+      return [
+        `📊 *LIFE OS — RINGKASAN HARIAN (${formatDateReadable(TODAY_STR, 'id')})*`,
+        `Halo ${data.profile.name}, berikut status terkini Anda:`,
+        ``,
+        `💰 *Keuangan & Brankas*`,
+        `• Total Kekayaan Bersih: ${formatMoney(derived.totalNetWorth, currency)}`,
+        `• Pemasukan Bulan Ini: ${formatMoney(derived.monthlyIncome, currency)}`,
+        `• Pengeluaran Bulan Ini: ${formatMoney(derived.monthlyExpenses, currency)}`,
+        `• Pemakaian Anggaran: ${derived.budgetUtilizationPct.toFixed(0)}%`,
+        ``,
+        `📅 *Agenda Hari Ini (${todayEvents.length})*`,
+        ...(todayEvents.length
+          ? todayEvents.map((e) => `• ${e.startTime} - ${e.title}`)
+          : ['• Tidak ada agenda terjadwal']),
+        ``,
+        `✅ *Tugas Aktif (${pendingTasks.length})*`,
+        ...(pendingTasks.length
+          ? pendingTasks.slice(0, 4).map((tk) => `• [${tk.priority}] ${tk.title}`)
+          : ['• Semua tugas selesai!']),
+        ``,
+        `🔔 *Tagihan Belum Dibayar Bulan Ini*: ${unpaidSubs.length} tagihan`,
+      ].join('\n');
+    }
+
+    return [
+      `📊 *LIFE OS — DAILY BRIEFING (${formatDateReadable(TODAY_STR, 'en')})*`,
+      `Hello ${data.profile.name}, here is your telemetry:`,
+      ``,
+      `💰 *Wealth & Vault*`,
+      `• Total Net Worth: ${formatMoney(derived.totalNetWorth, currency)}`,
+      `• Monthly Income: ${formatMoney(derived.monthlyIncome, currency)}`,
+      `• Monthly Expenses: ${formatMoney(derived.monthlyExpenses, currency)}`,
+      `• Budget Utilization: ${derived.budgetUtilizationPct.toFixed(0)}%`,
+      ``,
+      `📅 *Today's Schedule (${todayEvents.length})*`,
+      ...(todayEvents.length
+        ? todayEvents.map((e) => `• ${e.startTime} - ${e.title}`)
+        : ['• No events scheduled']),
+      ``,
+      `✅ *Active Tasks (${pendingTasks.length})*`,
+      ...(pendingTasks.length
+        ? pendingTasks.slice(0, 4).map((tk) => `• [${tk.priority}] ${tk.title}`)
+        : ['• All tasks completed!']),
+      ``,
+      `🔔 *Unpaid Bills This Month*: ${unpaidSubs.length}`,
+    ].join('\n');
+  }, [data, derived, lang, currency]);
+
+  const handleCopy = () => {
+    if (textareaRef.current) {
+      textareaRef.current.select();
+      try {
+        document.execCommand('copy');
+        onCopied();
+      } catch {
+        onCopied();
+      }
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title={t('daily_briefing')}>
+      <div className="space-y-4">
+        <textarea
+          ref={textareaRef}
+          readOnly
+          rows={12}
+          value={briefingText}
+          className="w-full rounded-xl bg-[#171412] border border-[#624332]/55 p-3.5 text-xs text-[#F4E9DC] font-mono leading-relaxed focus:outline-none"
+        />
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose}>
+            {t('cancel')}
+          </Button>
+          <Button onClick={handleCopy}>
+            <Copy className="w-4 h-4" /> {t('copy_briefing')}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+const TransactionModal = ({ open, onClose, editingTx, data, t, lang, onSave }) => {
+  const [type, setType] = useState(editingTx?.type || 'expense');
+  const [amount, setAmount] = useState(editingTx ? String(editingTx.amount) : '');
+  const [date, setDate] = useState(editingTx?.date || TODAY_STR);
+  const [category, setCategory] = useState(editingTx?.category || DEFAULT_EXPENSE_CATEGORIES[1]);
+  const [description, setDescription] = useState(editingTx?.description || '');
+  const [accountId, setAccountId] = useState(editingTx?.accountId || data.accounts[0]?.id || '');
+  const [toAccountId, setToAccountId] = useState(
+    editingTx?.toAccountId || data.accounts[1]?.id || data.accounts[0]?.id || ''
+  );
+  const [paymentMethod, setPaymentMethod] = useState(editingTx?.paymentMethod || 'Card / Digital');
+  const [notes, setNotes] = useState(editingTx?.notes || '');
+
+  useEffect(() => {
+    if (open) {
+      const nextType = editingTx?.type || 'expense';
+      setType(nextType);
+      setAmount(editingTx ? String(editingTx.amount) : '');
+      setDate(editingTx?.date || TODAY_STR);
+      setCategory(
+        editingTx?.category ||
+          (nextType === 'income'
+            ? DEFAULT_INCOME_CATEGORIES[0]
+            : nextType === 'transfer'
+            ? 'Vault Allocation'
+            : DEFAULT_EXPENSE_CATEGORIES[1])
+      );
+      setDescription(editingTx?.description || '');
+      setAccountId(editingTx?.accountId || data.accounts[0]?.id || '');
+      setToAccountId(
+        editingTx?.toAccountId || data.accounts[1]?.id || data.accounts[0]?.id || ''
+      );
+      setPaymentMethod(editingTx?.paymentMethod || 'Card / Digital');
+      setNotes(editingTx?.notes || '');
+    }
+  }, [open, editingTx, data.accounts]);
+
+  const categories = useMemo(() => {
+    if (type === 'income') {
+      return [...new Set([...DEFAULT_INCOME_CATEGORIES, ...data.customIncomeCategories])];
+    }
+    if (type === 'transfer') {
+      return ['Vault Allocation', 'Account Rebalance', 'Credit Card Settlement'];
+    }
+    return [...new Set([...DEFAULT_EXPENSE_CATEGORIES, ...data.customExpenseCategories])];
+  }, [type, data.customExpenseCategories, data.customIncomeCategories]);
+
+  const handleTypeSwitch = (nextType) => {
+    setType(nextType);
+    if (nextType === 'income') setCategory(DEFAULT_INCOME_CATEGORIES[0]);
+    else if (nextType === 'transfer') setCategory('Vault Allocation');
+    else setCategory(DEFAULT_EXPENSE_CATEGORIES[1]);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const numAmount = parseFloat(amount);
+    if (!numAmount || numAmount <= 0 || !description.trim()) return;
+    if (type === 'transfer' && accountId === toAccountId) return;
+
+    onSave({
+      id: editingTx?.id,
+      type,
+      amount: numAmount,
+      date,
+      category,
+      description: description.trim(),
+      accountId,
+      toAccountId: type === 'transfer' ? toAccountId : undefined,
+      paymentMethod: type === 'transfer' ? 'Internal Ledger Transfer' : paymentMethod,
+      notes: notes.trim(),
+    });
+    onClose();
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={editingTx ? `${t('edit')} ${t('btn_transaction')}` : t('new_transaction')}
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-3 gap-2 p-1 rounded-xl bg-[#171412] border border-[#624332]/50">
+          {[
+            { id: 'expense', label: lang === 'id' ? 'Pengeluaran' : 'Expense' },
+            { id: 'income', label: lang === 'id' ? 'Pemasukan' : 'Income' },
+            { id: 'transfer', label: 'Transfer' },
+          ].map((tp) => (
+            <button
+              key={tp.id}
+              type="button"
+              onClick={() => handleTypeSwitch(tp.id)}
+              className={`py-2 rounded-lg text-xs font-semibold transition-colors ${
+                type === tp.id ? 'bg-[#B68B61] text-[#171412]' : 'text-[#A99B90] hover:text-[#F4E9DC]'
+              }`}
+            >
+              {tp.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Input
+            label={`${t('amount')} (${data.profile.currency})`}
+            type="number"
+            step="0.01"
+            min="0.01"
+            placeholder="0"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+          />
+          <Input label={t('date')} type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+        </div>
+
+        <Input
+          label={t('description')}
+          placeholder="e.g. Kopi & Meeting Klien"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          required
+        />
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Select label={t('category')} value={category} onChange={(e) => setCategory(e.target.value)}>
+            {categories.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </Select>
+
+          <Select
+            label={
+              type === 'transfer'
+                ? lang === 'id'
+                  ? 'Dari Akun'
+                  : 'From Account'
+                : lang === 'id'
+                ? 'Akun Dompet'
+                : 'Wallet Account'
+            }
+            value={accountId}
+            onChange={(e) => setAccountId(e.target.value)}
+          >
+            {data.accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        {type === 'transfer' ? (
+          <Select
+            label={lang === 'id' ? 'Ke Akun Tujuan' : 'Destination Account'}
+            value={toAccountId}
+            onChange={(e) => setToAccountId(e.target.value)}
+          >
+            {data.accounts
+              .filter((a) => a.id !== accountId)
+              .map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+          </Select>
+        ) : (
+          <Input
+            label={lang === 'id' ? 'Metode Pembayaran' : 'Payment Method'}
+            placeholder="e.g. QRIS, Transfer Bank, Tunai"
+            value={paymentMethod}
+            onChange={(e) => setPaymentMethod(e.target.value)}
+          />
+        )}
+
+        <Input label={t('notes')} value={notes} onChange={(e) => setNotes(e.target.value)} />
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="secondary" onClick={onClose}>
+            {t('cancel')}
+          </Button>
+          <Button type="submit">{t('save')}</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+const TaskModal = ({ open, onClose, editingTask, defaultDate, t, lang, onSave }) => {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [priority, setPriority] = useState('Medium');
+  const [dueDate, setDueDate] = useState(defaultDate || TODAY_STR);
+  const [category, setCategory] = useState('Work');
+  const [status, setStatus] = useState('todo');
+  const [isTopPriority, setIsTopPriority] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setTitle(editingTask?.title || '');
+      setDescription(editingTask?.description || '');
+      setPriority(editingTask?.priority || 'Medium');
+      setDueDate(editingTask?.dueDate || defaultDate || TODAY_STR);
+      setCategory(editingTask?.category || 'Work');
+      setStatus(editingTask?.status || 'todo');
+      setIsTopPriority(Boolean(editingTask?.isTopPriority));
+    }
+  }, [open, editingTask, defaultDate]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+    onSave({
+      id: editingTask?.id,
+      title: title.trim(),
+      description: description.trim(),
+      priority,
+      dueDate,
+      category,
+      status,
+      isTopPriority,
+    });
+    onClose();
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title={editingTask ? `${t('edit')} ${t('btn_task')}` : t('new_task')}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Input
+          label={lang === 'id' ? 'Judul Tugas' : 'Task Title'}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          required
+        />
+        <Input
+          label={t('description')}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Select label={t('priority')} value={priority} onChange={(e) => setPriority(e.target.value)}>
+            <option value="Urgent">Urgent</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+          </Select>
+          <Input label={t('date')} type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} required />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Select label={t('category')} value={category} onChange={(e) => setCategory(e.target.value)}>
+            <option value="Work">Work</option>
+            <option value="Finance">Finance</option>
+            <option value="Health">Health</option>
+            <option value="Personal">Personal</option>
+            <option value="Learning">Learning</option>
+          </Select>
+          <Select label={t('status')} value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option value="todo">{t('todo')}</option>
+            <option value="in_progress">{t('in_progress')}</option>
+            <option value="completed">{t('completed')}</option>
+          </Select>
+        </div>
+        <label className="flex items-center gap-2.5 text-xs text-[#E4C8A6] cursor-pointer pt-1">
+          <input
+            type="checkbox"
+            checked={isTopPriority}
+            onChange={(e) => setIsTopPriority(e.target.checked)}
+            className="rounded accent-[#B68B61]"
+          />
+          {t('top_3_priorities')}
+        </label>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="secondary" onClick={onClose}>
+            {t('cancel')}
+          </Button>
+          <Button type="submit">{t('save')}</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+const EventModal = ({ open, onClose, editingEvent, defaultDate, t, lang, onSave }) => {
+  const [title, setTitle] = useState('');
+  const [date, setDate] = useState(defaultDate || TODAY_STR);
+  const [startTime, setStartTime] = useState('10:00');
+  const [endTime, setEndTime] = useState('11:00');
+  const [category, setCategory] = useState('Work');
+  const [location, setLocation] = useState('');
+  const [reminder, setReminder] = useState('15 min before');
+  const [notes, setNotes] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      setTitle(editingEvent?.title || '');
+      setDate(editingEvent?.date || defaultDate || TODAY_STR);
+      setStartTime(editingEvent?.startTime || '10:00');
+      setEndTime(editingEvent?.endTime || '11:00');
+      setCategory(editingEvent?.category || 'Work');
+      setLocation(editingEvent?.location || '');
+      setReminder(editingEvent?.reminder || '15 min before');
+      setNotes(editingEvent?.notes || '');
+    }
+  }, [open, editingEvent, defaultDate]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+    onSave({
+      id: editingEvent?.id,
+      title: title.trim(),
+      date,
+      startTime,
+      endTime,
+      category,
+      location: location.trim(),
+      reminder,
+      notes: notes.trim(),
+    });
+    onClose();
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title={editingEvent ? `${t('edit')} ${t('btn_event')}` : t('new_event')}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Input
+          label={lang === 'id' ? 'Judul Agenda' : 'Event Title'}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          required
+        />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Input label={t('date')} type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+          <Input
+            label={lang === 'id' ? 'Mulai' : 'Start'}
+            type="time"
+            value={startTime}
+            onChange={(e) => setStartTime(e.target.value)}
+            required
+          />
+          <Input
+            label={lang === 'id' ? 'Selesai' : 'End'}
+            type="time"
+            value={endTime}
+            onChange={(e) => setEndTime(e.target.value)}
+            required
+          />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Select label={t('category')} value={category} onChange={(e) => setCategory(e.target.value)}>
+            <option value="Work">Work</option>
+            <option value="Finance">Finance</option>
+            <option value="Personal">Personal</option>
+            <option value="Health">Health</option>
+          </Select>
+          <Select label="Reminder" value={reminder} onChange={(e) => setReminder(e.target.value)}>
+            <option value="None">None</option>
+            <option value="15 min before">15 min before</option>
+            <option value="1 hour before">1 hour before</option>
+            <option value="1 day before">1 day before</option>
+          </Select>
+        </div>
+        <Input
+          label={lang === 'id' ? 'Lokasi / Tautan' : 'Location / Link'}
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+        />
+        <Input label={t('notes')} value={notes} onChange={(e) => setNotes(e.target.value)} />
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="secondary" onClick={onClose}>
+            {t('cancel')}
+          </Button>
+          <Button type="submit">{t('save')}</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+// --- SYSTEM & DATA MANAGEMENT MODAL ---
+const SettingsModal = ({
+  open,
+  onClose,
+  data,
+  currentUser,
+  t,
+  onUpdateProfile,
+  onExportJson,
+  onImportJson,
+  onResetEmpty,
+  onRestoreDemo,
+  onLogout,
+}) => {
+  const [name, setName] = useState(data.profile.name);
+  const [currency, setCurrency] = useState(data.profile.currency);
+  const [language, setLanguage] = useState(data.profile.language || 'id');
+
+  useEffect(() => {
+    if (open) {
+      setName(data.profile.name);
+      setCurrency(data.profile.currency);
+      setLanguage(data.profile.language || 'id');
+    }
+  }, [open, data.profile]);
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const parsed = JSON.parse(String(ev.target?.result || '{}'));
+        onImportJson(parsed);
+      } catch {
+        // Handled in parent
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={t('settings_title')}
+      subtitle={t('settings_sub')}
+      maxWidth="max-w-xl"
+    >
+      <div className="space-y-5">
+        {currentUser && (
+          <div className="p-3.5 rounded-xl bg-[#171412]/90 border border-[#624332]/50 flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-[#F4E9DC] truncate">{currentUser.email}</p>
+              <p className="text-[11px] text-[#B68B61] font-mono truncate">
+                Vault ID: {currentUser.workspaceKey}
+              </p>
+            </div>
+            <Button size="sm" variant="danger" onClick={onLogout}>
+              <LogOut className="w-3.5 h-3.5" /> {t('logout')}
+            </Button>
+          </div>
+        )}
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            onUpdateProfile({
+              name: name.trim() || 'Workspace Owner',
+              currency,
+              language,
+            });
+            onClose();
+          }}
+          className="space-y-4"
+        >
+          <h4 className="text-xs uppercase tracking-wider text-[#B68B61] font-semibold">
+            {t('profile_display')}
+          </h4>
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium uppercase tracking-wider text-[#A99B90]">
+              {t('language_label')}
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {[
+                { code: 'id', title: 'Bahasa Indonesia', desc: 'Antarmuka & tanggal Indonesia' },
+                { code: 'en', title: 'English (US)', desc: 'International English UI' },
+              ].map((opt) => (
+                <button
+                  key={opt.code}
+                  type="button"
+                  onClick={() => setLanguage(opt.code)}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    language === opt.code
+                      ? 'bg-[#30231D] border-[#B68B61] text-[#F4E9DC]'
+                      : 'bg-[#171412]/80 border-[#624332]/45 text-[#A99B90]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-[#F4E9DC]">{opt.title}</span>
+                    {language === opt.code && <CheckCircle2 className="w-4 h-4 text-[#B68B61]" />}
+                  </div>
+                  <p className="text-[11px] text-[#A99B90] mt-0.5">{opt.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="sm:col-span-2">
+              <Input
+                label={t('display_name')}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
+            <Select
+              label={t('currency_symbol')}
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+            >
+              <option value="Rp">IDR (Rp)</option>
+              <option value="$">USD ($)</option>
+              <option value="€">EUR (€)</option>
+              <option value="£">GBP (£)</option>
+              <option value="¥">JPY (¥)</option>
+            </Select>
+          </div>
+          <Button type="submit" size="sm">
+            {t('save_preferences')}
+          </Button>
+        </form>
+
+        <div className="pt-4 border-t border-[#624332]/40 space-y-3">
+          <h4 className="text-xs uppercase tracking-wider text-[#E4C8A6] font-semibold">
+            {t('data_portability')}
+          </h4>
+          <div className="flex flex-wrap gap-2.5">
+            <Button size="sm" variant="secondary" onClick={onExportJson}>
+              <Download className="w-4 h-4" /> {t('export_json')}
+            </Button>
+            <label className="inline-flex items-center justify-center gap-2 px-3 py-1.5 text-xs rounded-xl min-h-[38px] bg-[#30231D] text-[#F4E9DC] border border-[#624332]/60 hover:border-[#B68B61]/70 cursor-pointer">
+              <Upload className="w-4 h-4" /> {t('import_json')}
+              <input type="file" accept=".json" onChange={handleFileUpload} className="hidden" />
+            </label>
+          </div>
+        </div>
+
+        <div className="pt-4 border-t border-[#624332]/40 space-y-3">
+          <h4 className="text-xs uppercase tracking-wider text-[#D96B52] font-semibold">
+            {t('workspace_reset')}
+          </h4>
+          <div className="flex flex-wrap gap-2.5">
+            <Button size="sm" variant="danger" onClick={onResetEmpty}>
+              <Trash2 className="w-4 h-4" /> {t('start_fresh')}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={onRestoreDemo}>
+              <RefreshCw className="w-4 h-4" /> {t('restore_demo')}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+// ============================================================================
+// 9. MAIN APPLICATION SHELL
+// ============================================================================
+
+function LifeOsWorkspace() {
+  const { scrollToTop } = useLenisAndParallax();
+
+  const savedRef = useRef(undefined);
+  if (savedRef.current === undefined) savedRef.current = loadSavedWorkspace();
+  const [currentUser, setCurrentUser] = useState(() =>
+    savedRef.current && savedRef.current.user !== undefined
+      ? savedRef.current.user
+      : {
+          email: 'alexander@lifeos.app',
+          name: 'Alexander Vance',
+          workspaceKey: deriveWorkspaceKey('alexander@lifeos.app'),
+          isCloud: Boolean(firebaseDb),
+        }
+  );
+  const [data, setData] = useState(() =>
+    savedRef.current && savedRef.current.data ? savedRef.current.data : createInitialState()
+  );
+
+  // Simpan otomatis ke perangkat setiap ada perubahan
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ user: currentUser, data }));
+    } catch (err) {
+      console.error('Local save failed:', err);
+    }
+  }, [data, currentUser]);
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [maskBalances, setMaskBalances] = useState(false);
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+  const [syncStatus, setSyncStatus] = useState('synced');
+
+  const [txModal, setTxModal] = useState({ open: false, tx: null });
+  const [taskModal, setTaskModal] = useState({ open: false, task: null, defaultDate: TODAY_STR });
+  const [eventModal, setEventModal] = useState({ open: false, event: null, defaultDate: TODAY_STR });
+  const [paydayModalOpen, setPaydayModalOpen] = useState(false);
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [splitBillModalOpen, setSplitBillModalOpen] = useState(false);
+  const [briefingModalOpen, setBriefingModalOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const [confirmState, setConfirmState] = useState({
+    open: false,
+    title: '',
+    message: '',
+    confirmLabel: 'Delete',
+    onConfirm: () => {},
+  });
+  const [toast, setToast] = useState(null);
+
+  const lang = data.profile.language || 'id';
+  const t = useCallback((key) => I18N[lang]?.[key] || I18N.en[key] || key, [lang]);
+
+  const notify = useCallback((message) => {
+    setToast(message);
+    setTimeout(() => {
+      setToast((prev) => (prev === message ? null : prev));
+    }, 3200);
+  }, []);
+
+  const navigateTab = useCallback(
+    (tabId) => {
+      setActiveTab(tabId);
+      scrollToTop();
+    },
+    [scrollToTop]
+  );
+
+  // Cloud Firestore synchronization per isolated workspaceKey
+  useEffect(() => {
+    if (!currentUser || !firebaseAuth || !firebaseDb) return undefined;
+    let active = true;
+
+    const persistWorkspace = async () => {
+      try {
+        if (!firebaseAuth.currentUser) {
+          if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            await signInWithCustomToken(firebaseAuth, __initial_auth_token);
+          } else {
+            await signInAnonymously(firebaseAuth);
+          }
+        }
+        if (!active || !firebaseAuth.currentUser) return;
+        setSyncStatus('syncing');
+        const accountRef = doc(
+          firebaseDb,
+          'artifacts',
+          appId,
+          'public',
+          'data',
+          'lifeos_accounts',
+          currentUser.workspaceKey
+        );
+        await setDoc(
+          accountRef,
+          {
+            email: currentUser.email,
+            name: data.profile.name,
+            workspaceKey: currentUser.workspaceKey,
+            updatedAt: new Date().toISOString(),
+            workspace: data,
+          },
+          { merge: true }
+        );
+        if (active) setSyncStatus('synced');
+      } catch {
+        if (active) setSyncStatus('synced');
+      }
+    };
+
+    const timer = setTimeout(persistWorkspace, 600);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [data, currentUser]);
+
+  const askConfirm = useCallback(
+    (title, message, onConfirm, confirmLabel) => {
+      setConfirmState({
+        open: true,
+        title,
+        message,
+        confirmLabel: confirmLabel || (lang === 'id' ? 'Hapus' : 'Delete'),
+        onConfirm: () => {
+          onConfirm();
+          setConfirmState((prev) => ({ ...prev, open: false }));
+        },
+      });
+    },
+    [lang]
+  );
+
+  const toggleLanguageQuick = () => {
+    const nextLang = lang === 'id' ? 'en' : 'id';
+    setData((prev) => ({
+      ...prev,
+      profile: { ...prev.profile, language: nextLang },
+    }));
+    notify(nextLang === 'id' ? 'Bahasa diubah ke Bahasa Indonesia' : 'Language switched to English');
+  };
+
+  // --- DERIVED REAL-TIME METRICS ---
+  const derived = useMemo(() => {
+    const accountBalances = {};
+    data.accounts.forEach((a) => {
+      accountBalances[a.id] = Number(a.initialBalance) || 0;
+    });
+    data.transactions.forEach((tx) => {
+      if (tx.type === 'income') {
+        if (accountBalances[tx.accountId] !== undefined) accountBalances[tx.accountId] += tx.amount;
+      } else if (tx.type === 'expense') {
+        if (accountBalances[tx.accountId] !== undefined) accountBalances[tx.accountId] -= tx.amount;
+      } else if (tx.type === 'transfer') {
+        if (accountBalances[tx.accountId] !== undefined) accountBalances[tx.accountId] -= tx.amount;
+        if (tx.toAccountId && accountBalances[tx.toAccountId] !== undefined) {
+          accountBalances[tx.toAccountId] += tx.amount;
+        }
+      }
+    });
+
+    const walletNetWorth = Object.values(accountBalances).reduce((s, v) => s + v, 0);
+    const totalInvestmentValue = (data.investments || []).reduce(
+      (s, inv) => s + (Number(inv.currentValue) || 0),
+      0
+    );
+    const totalNetWorth = walletNetWorth + totalInvestmentValue;
+
+    const monthTxs = data.transactions.filter((tx) => tx.date.startsWith(CURRENT_MONTH));
+    const monthlyIncome = monthTxs
+      .filter((tx) => tx.type === 'income')
+      .reduce((s, tx) => s + tx.amount, 0);
+    const monthlyExpenses = monthTxs
+      .filter((tx) => tx.type === 'expense')
+      .reduce((s, tx) => s + tx.amount, 0);
+
+    const catMap = {};
+    monthTxs
+      .filter((tx) => tx.type === 'expense')
+      .forEach((tx) => {
+        catMap[tx.category] = (catMap[tx.category] || 0) + tx.amount;
+      });
+    const categoryBreakdown = Object.entries(catMap)
+      .map(([category, amount]) => ({ category, amount }))
+      .sort((a, b) => b.amount - a.amount);
+
+    const currentBudgets = data.budgets.filter((b) => b.month === CURRENT_MONTH);
+    const totalBudgetLimit = currentBudgets.reduce((s, b) => s + b.limit, 0);
+    const totalBudgetSpent = currentBudgets.reduce((s, b) => s + (catMap[b.category] || 0), 0);
+    const totalBudgetRemaining = totalBudgetLimit - totalBudgetSpent;
+    const budgetUtilizationPct =
+      totalBudgetLimit > 0 ? (totalBudgetSpent / totalBudgetLimit) * 100 : 0;
+
+    const monthKeys = [...new Set(data.transactions.map((tx) => tx.date.slice(0, 7)))].sort();
+    const monthlySeries = (monthKeys.length ? monthKeys : [CURRENT_MONTH]).map((mk) => {
+      const txs = data.transactions.filter((tx) => tx.date.startsWith(mk));
+      const inc = txs.filter((tx) => tx.type === 'income').reduce((s, tx) => s + tx.amount, 0);
+      const exp = txs.filter((tx) => tx.type === 'expense').reduce((s, tx) => s + tx.amount, 0);
+      const [y, m] = mk.split('-').map(Number);
+      const label = new Date(y, m - 1, 1).toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-US', {
+        month: 'short',
+      });
+      return { month: mk, label, income: inc, expenses: exp };
+    });
+
+    const totalMilestones = data.goals.reduce((s, g) => s + g.milestones.length, 0);
+    const completedMilestones = data.goals.reduce(
+      (s, g) => s + g.milestones.filter((m) => m.completed).length,
+      0
+    );
+    const overallGoalPct = totalMilestones > 0 ? (completedMilestones / totalMilestones) * 100 : 0;
+
+    return {
+      accountBalances,
+      walletNetWorth,
+      totalInvestmentValue,
+      totalNetWorth,
+      monthlyIncome,
+      monthlyExpenses,
+      categoryBreakdown,
+      totalBudgetLimit,
+      totalBudgetSpent,
+      totalBudgetRemaining,
+      budgetUtilizationPct,
+      monthlySeries,
+      overallGoalPct,
+    };
+  }, [data, lang]);
+
+  // --- CRUD HANDLERS ---
+  const handleSaveTx = (txPayload) => {
+    setData((prev) => {
+      if (txPayload.id) {
+        return {
+          ...prev,
+          transactions: prev.transactions.map((tx) => (tx.id === txPayload.id ? txPayload : tx)),
+        };
+      }
+      return {
+        ...prev,
+        transactions: [{ ...txPayload, id: `tx-${Date.now()}` }, ...prev.transactions],
+      };
+    });
+    notify(lang === 'id' ? 'Transaksi berhasil dicatat' : 'Transaction saved');
+  };
+
+  const handleSaveWellnessLog = (entry) => {
+    setData((prev) => {
+      const logs = prev.wellnessLogs || [];
+      const exists = logs.some((w) => w.date === entry.date);
+      return {
+        ...prev,
+        wellnessLogs: exists
+          ? logs.map((w) => (w.date === entry.date ? entry : w))
+          : [...logs, entry],
+      };
+    });
+    notify(
+      lang === 'id'
+        ? `Log kesehatan (${entry.date}) tersimpan`
+        : `Wellness log (${entry.date}) saved`
+    );
+  };
+
+  const handleAddContact = (contact) => {
+    setData((prev) => ({
+      ...prev,
+      contacts: [{ ...contact, id: `cnt-${Date.now()}` }, ...(prev.contacts || [])],
+    }));
+    notify(lang === 'id' ? `Relasi ditambahkan: ${contact.name}` : `Contact added: ${contact.name}`);
+  };
+
+  const handleLogContactToday = (contactId) => {
+    setData((prev) => ({
+      ...prev,
+      contacts: (prev.contacts || []).map((c) =>
+        c.id === contactId ? { ...c, lastContacted: TODAY_STR } : c
+      ),
+    }));
+    notify(
+      lang === 'id'
+        ? 'Silaturahmi hari ini tercatat'
+        : 'Logged check-in for today'
+    );
+  };
+
+  const handleDeleteContact = (contact) => {
+    askConfirm(
+      lang === 'id' ? 'Hapus Kontak Relasi' : 'Delete Contact',
+      lang === 'id' ? `Hapus "${contact.name}" dari Personal CRM?` : `Remove "${contact.name}"?`,
+      () => {
+        setData((prev) => ({
+          ...prev,
+          contacts: (prev.contacts || []).filter((c) => c.id !== contact.id),
+        }));
+        notify(lang === 'id' ? 'Kontak dihapus' : 'Contact removed');
+      }
+    );
+  };
+
+  const handleExecutePaydaySplit = (splits) => {
+    const newTxs = splits.map((sp, idx) => ({
+      id: `tx-split-${Date.now()}-${idx}`,
+      type: 'income',
+      amount: sp.amount,
+      date: TODAY_STR,
+      category: 'Primary Salary',
+      description: `${lang === 'id' ? 'Alokasi Gaji' : 'Payday Split'} (${sp.pct}%) — ${sp.accountName}`,
+      accountId: sp.accountId,
+      paymentMethod: 'Payday Splitter',
+      notes: 'Auto-allocated payroll distribution',
+    }));
+    setData((prev) => ({
+      ...prev,
+      transactions: [...newTxs, ...prev.transactions],
+    }));
+    notify(
+      lang === 'id'
+        ? `Gaji dialokasikan ke ${splits.length} akun dompet`
+        : `Payday allocated across ${splits.length} accounts`
+    );
+  };
+
+  const handleExecuteSplitBill = ({ title, totalAmount, accountId, logTotalExpense, participants }) => {
+    const newReceivables = participants.map((p, idx) => ({
+      id: `dbt-split-${Date.now()}-${idx}`,
+      title: `Split Bill: ${title} (${p.name})`,
+      counterparty: p.name,
+      kind: 'receivable',
+      totalAmount: p.amount,
+      paidAmount: 0,
+      monthlyAmount: p.amount,
+      tenorMonths: 1,
+      dueDate: TODAY_STR,
+      accountId,
+      notes: `Auto-generated from Split Bill: ${title}`,
+    }));
+
+    setData((prev) => ({
+      ...prev,
+      debts: [...newReceivables, ...(prev.debts || [])],
+      transactions: logTotalExpense
+        ? [
+            {
+              id: `tx-sb-${Date.now()}`,
+              type: 'expense',
+              amount: totalAmount,
+              date: TODAY_STR,
+              category: 'Dining & Coffee',
+              description: `Split Bill: ${title}`,
+              accountId,
+              paymentMethod: 'Split Bill / Card',
+              notes: `Shared with ${participants.map((p) => p.name).join(', ')}`,
+            },
+            ...prev.transactions,
+          ]
+        : prev.transactions,
+    }));
+
+    notify(
+      lang === 'id'
+        ? `Split bill dicatat & ${participants.length} piutang teman dibuat`
+        : `Split bill logged & ${participants.length} receivables created`
+    );
+  };
+
+  const handleSmartCommandBatch = ({ transactions = [], tasks = [], events = [] }) => {
+    const totalCreated = transactions.length + tasks.length + events.length;
+    if (totalCreated === 0) {
+      notify(
+        lang === 'id'
+          ? 'Perintah belum dikenali. Coba sertakan nominal atau jam agenda.'
+          : 'Could not parse command. Try adding an amount or event time.'
+      );
+      return;
+    }
+
+    setData((prev) => ({
+      ...prev,
+      transactions: [
+        ...transactions.map((tx, idx) => ({ ...tx, id: `tx-cmd-${Date.now()}-${idx}` })),
+        ...prev.transactions,
+      ],
+      tasks: [
+        ...tasks.map((tk, idx) => ({ ...tk, id: `tsk-cmd-${Date.now()}-${idx}` })),
+        ...prev.tasks,
+      ],
+      events: [
+        ...events.map((ev, idx) => ({ ...ev, id: `evt-cmd-${Date.now()}-${idx}` })),
+        ...prev.events,
+      ],
+    }));
+
+    const parts = [];
+    if (transactions.length) parts.push(`${transactions.length} ${lang === 'id' ? 'transaksi' : 'tx'}`);
+    if (tasks.length) parts.push(`${tasks.length} ${lang === 'id' ? 'tugas' : 'tasks'}`);
+    if (events.length) parts.push(`${events.length} ${lang === 'id' ? 'agenda' : 'events'}`);
+    notify(
+      lang === 'id'
+        ? `Berhasil dibuat otomatis: ${parts.join(', ')}`
+        : `Auto-created: ${parts.join(', ')}`
+    );
+  };
+
+  const handleAddInvestment = (asset) => {
+    setData((prev) => ({
+      ...prev,
+      investments: [...(prev.investments || []), { ...asset, id: `inv-${Date.now()}` }],
+    }));
+    notify(lang === 'id' ? `Aset investasi ditambahkan: ${asset.name}` : `Added asset: ${asset.name}`);
+  };
+
+  const handleUpdateInvestmentValue = (assetId, newVal) => {
+    setData((prev) => ({
+      ...prev,
+      investments: (prev.investments || []).map((item) =>
+        item.id === assetId ? { ...item, currentValue: newVal, updatedAt: TODAY_STR } : item
+      ),
+    }));
+    notify(lang === 'id' ? 'Nilai pasar investasi diperbarui' : 'Market value updated');
+  };
+
+  const handleDeleteInvestment = (asset) => {
+    askConfirm(
+      lang === 'id' ? 'Hapus Aset Investasi' : 'Delete Investment Asset',
+      lang === 'id' ? `Hapus "${asset.name}" dari portofolio?` : `Remove "${asset.name}"?`,
+      () => {
+        setData((prev) => ({
+          ...prev,
+          investments: (prev.investments || []).filter((item) => item.id !== asset.id),
+        }));
+        notify(lang === 'id' ? 'Aset investasi dihapus' : 'Asset removed');
+      }
+    );
+  };
+
+  const handleDeleteTx = (tx) => {
+    askConfirm(
+      lang === 'id' ? 'Hapus Transaksi' : 'Delete Transaction',
+      lang === 'id'
+        ? `Hapus "${tx.description}" (${formatMoney(tx.amount, data.profile.currency)}) dari buku kas?`
+        : `Remove "${tx.description}" (${formatMoney(tx.amount, data.profile.currency)}) from your ledger?`,
+      () => {
+        setData((prev) => ({
+          ...prev,
+          transactions: prev.transactions.filter((item) => item.id !== tx.id),
+        }));
+        notify(lang === 'id' ? 'Transaksi dihapus' : 'Transaction removed');
+      }
+    );
+  };
+
+  const handleAddAccount = (acc) => {
+    setData((prev) => ({
+      ...prev,
+      accounts: [...prev.accounts, { ...acc, id: `acc-${Date.now()}` }],
+    }));
+    notify(lang === 'id' ? `Akun ditambahkan: ${acc.name}` : `Added account: ${acc.name}`);
+  };
+
+  const handleAddCustomCategory = (kind, catName) => {
+    setData((prev) => {
+      if (kind === 'income') {
+        return {
+          ...prev,
+          customIncomeCategories: [...new Set([...prev.customIncomeCategories, catName])],
+        };
+      }
+      return {
+        ...prev,
+        customExpenseCategories: [...new Set([...prev.customExpenseCategories, catName])],
+      };
+    });
+    notify(lang === 'id' ? `Kategori ditambahkan: ${catName}` : `Added category: ${catName}`);
+  };
+
+  const handleSaveBudget = (bud) => {
+    setData((prev) => {
+      const existing = prev.budgets.find(
+        (b) => b.id === bud.id || (b.category === bud.category && b.month === bud.month)
+      );
+      if (existing) {
+        return {
+          ...prev,
+          budgets: prev.budgets.map((b) =>
+            b.id === existing.id ? { ...existing, category: bud.category, limit: bud.limit } : b
+          ),
+        };
+      }
+      return {
+        ...prev,
+        budgets: [...prev.budgets, { ...bud, id: `bud-${Date.now()}` }],
+      };
+    });
+    notify(lang === 'id' ? `Anggaran disimpan: ${bud.category}` : `Budget saved: ${bud.category}`);
+  };
+
+  const handleDeleteBudget = (bud) => {
+    askConfirm(
+      lang === 'id' ? 'Hapus Anggaran' : 'Remove Budget',
+      lang === 'id' ? `Hapus batas anggaran ${bud.category}?` : `Delete budget for ${bud.category}?`,
+      () => {
+        setData((prev) => ({
+          ...prev,
+          budgets: prev.budgets.filter((b) => b.id !== bud.id),
+        }));
+        notify(lang === 'id' ? 'Anggaran dihapus' : 'Budget removed');
+      }
+    );
+  };
+
+  const handleCreateSavingsGoal = ({ name, targetAmount, targetDate, initialSaved }) => {
+    const contributions =
+      initialSaved > 0
+        ? [
+            {
+              id: `sc-${Date.now()}`,
+              amount: initialSaved,
+              date: TODAY_STR,
+              note: lang === 'id' ? 'Setoran awal' : 'Opening deposit',
+            },
+          ]
+        : [];
+    setData((prev) => ({
+      ...prev,
+      savingsGoals: [
+        ...prev.savingsGoals,
+        { id: `sav-${Date.now()}`, name, targetAmount, targetDate, contributions },
+      ],
+    }));
+    notify(lang === 'id' ? `Brankas dibuat: ${name}` : `Created savings vault: ${name}`);
+  };
+
+  const handleAddContribution = (goalId, amount, note) => {
+    setData((prev) => ({
+      ...prev,
+      savingsGoals: prev.savingsGoals.map((sg) =>
+        sg.id === goalId
+          ? {
+              ...sg,
+              contributions: [
+                ...sg.contributions,
+                { id: `sc-${Date.now()}`, amount, date: TODAY_STR, note },
+              ],
+            }
+          : sg
+      ),
+    }));
+    notify(lang === 'id' ? 'Setoran tabungan dicatat' : 'Savings contribution logged');
+  };
+
+  const handleDeleteSavingsGoal = (sg) => {
+    askConfirm(
+      lang === 'id' ? 'Hapus Target Tabungan' : 'Delete Savings Vault',
+      lang === 'id' ? `Hapus "${sg.name}"?` : `Remove "${sg.name}"?`,
+      () => {
+        setData((prev) => ({
+          ...prev,
+          savingsGoals: prev.savingsGoals.filter((item) => item.id !== sg.id),
+        }));
+        notify(lang === 'id' ? 'Target tabungan dihapus' : 'Savings vault deleted');
+      }
+    );
+  };
+
+  const handleAddSub = (sub) => {
+    setData((prev) => ({
+      ...prev,
+      subscriptions: [...(prev.subscriptions || []), { ...sub, id: `sub-${Date.now()}` }],
+    }));
+    notify(lang === 'id' ? `Tagihan ditambahkan: ${sub.name}` : `Added recurring bill: ${sub.name}`);
+  };
+
+  const handlePaySub = (sub) => {
+    setData((prev) => ({
+      ...prev,
+      subscriptions: (prev.subscriptions || []).map((item) =>
+        item.id === sub.id ? { ...item, lastPaidMonth: CURRENT_MONTH } : item
+      ),
+      transactions: [
+        {
+          id: `tx-${Date.now()}`,
+          type: 'expense',
+          amount: sub.amount,
+          date: TODAY_STR,
+          category: sub.category,
+          description: `${lang === 'id' ? 'Tagihan Rutin' : 'Recurring Bill'}: ${sub.name}`,
+          accountId: sub.accountId || prev.accounts[0]?.id,
+          paymentMethod: 'Auto / Recurring',
+          notes: `Paid for ${CURRENT_MONTH}`,
+        },
+        ...prev.transactions,
+      ],
+    }));
+    notify(
+      lang === 'id'
+        ? `Tagihan "${sub.name}" dibayar & tercatat di dompet`
+        : `Paid & logged "${sub.name}" to wallet`
+    );
+  };
+
+  const handleDeleteSub = (sub) => {
+    askConfirm(
+      lang === 'id' ? 'Hapus Tagihan Rutin' : 'Delete Recurring Bill',
+      lang === 'id' ? `Hapus "${sub.name}" dari daftar tagihan?` : `Remove "${sub.name}"?`,
+      () => {
+        setData((prev) => ({
+          ...prev,
+          subscriptions: (prev.subscriptions || []).filter((item) => item.id !== sub.id),
+        }));
+        notify(lang === 'id' ? 'Tagihan dihapus' : 'Recurring bill removed');
+      }
+    );
+  };
+
+  const handleAddDebt = (debt) => {
+    setData((prev) => ({
+      ...prev,
+      debts: [...(prev.debts || []), { ...debt, id: `dbt-${Date.now()}` }],
+    }));
+    notify(lang === 'id' ? `Catatan ditambahkan: ${debt.title}` : `Added: ${debt.title}`);
+  };
+
+  const handleSettleDebtInstallment = (debtItem, stepAmount) => {
+    const isDebt = debtItem.kind === 'debt';
+    setData((prev) => ({
+      ...prev,
+      debts: (prev.debts || []).map((d) =>
+        d.id === debtItem.id
+          ? { ...d, paidAmount: Math.min(d.totalAmount, d.paidAmount + stepAmount) }
+          : d
+      ),
+      transactions: [
+        {
+          id: `tx-dbt-${Date.now()}`,
+          type: isDebt ? 'expense' : 'income',
+          amount: stepAmount,
+          date: TODAY_STR,
+          category: isDebt ? 'Housing & Utilities' : 'Other Income',
+          description: `${isDebt ? (lang === 'id' ? 'Bayar Cicilan' : 'Installment Payment') : (lang === 'id' ? 'Terima Piutang' : 'Receivable Payment')}: ${debtItem.title}`,
+          accountId: debtItem.accountId || prev.accounts[0]?.id,
+          paymentMethod: 'Ledger Settlement',
+          notes: debtItem.counterparty,
+        },
+        ...prev.transactions,
+      ],
+    }));
+    notify(
+      isDebt
+        ? lang === 'id'
+          ? 'Cicilan dibayar & saldo dompet diperbarui'
+          : 'Installment paid & wallet updated'
+        : lang === 'id'
+        ? 'Pembayaran piutang dicatat ke dompet'
+        : 'Receivable payment recorded'
+    );
+  };
+
+  const handleDeleteDebt = (debtItem) => {
+    askConfirm(
+      lang === 'id' ? 'Hapus Catatan' : 'Delete Record',
+      lang === 'id' ? `Hapus "${debtItem.title}"?` : `Remove "${debtItem.title}"?`,
+      () => {
+        setData((prev) => ({
+          ...prev,
+          debts: (prev.debts || []).filter((d) => d.id !== debtItem.id),
+        }));
+        notify(lang === 'id' ? 'Catatan dihapus' : 'Record removed');
+      }
+    );
+  };
+
+  const handleSaveTask = (taskPayload) => {
+    setData((prev) => {
+      if (taskPayload.id) {
+        return {
+          ...prev,
+          tasks: prev.tasks.map((tk) => (tk.id === taskPayload.id ? taskPayload : tk)),
+        };
+      }
+      return {
+        ...prev,
+        tasks: [{ ...taskPayload, id: `tsk-${Date.now()}` }, ...prev.tasks],
+      };
+    });
+    notify(lang === 'id' ? 'Tugas disimpan' : 'Task saved');
+  };
+
+  const handleToggleTask = (taskId) => {
+    setData((prev) => ({
+      ...prev,
+      tasks: prev.tasks.map((tk) =>
+        tk.id === taskId
+          ? { ...tk, status: tk.status === 'completed' ? 'todo' : 'completed' }
+          : tk
+      ),
+    }));
+  };
+
+  const handleUpdateTaskStatus = (taskId, status) => {
+    setData((prev) => ({
+      ...prev,
+      tasks: prev.tasks.map((tk) => (tk.id === taskId ? { ...tk, status } : tk)),
+    }));
+  };
+
+  const handleToggleTopPriority = (taskId) => {
+    setData((prev) => ({
+      ...prev,
+      tasks: prev.tasks.map((tk) =>
+        tk.id === taskId ? { ...tk, isTopPriority: !tk.isTopPriority } : tk
+      ),
+    }));
+  };
+
+  const handleDeleteTask = (task) => {
+    askConfirm(
+      lang === 'id' ? 'Hapus Tugas' : 'Delete Task',
+      lang === 'id' ? `Hapus "${task.title}"?` : `Delete "${task.title}"?`,
+      () => {
+        setData((prev) => ({
+          ...prev,
+          tasks: prev.tasks.filter((tk) => tk.id !== task.id),
+        }));
+        notify(lang === 'id' ? 'Tugas dihapus' : 'Task deleted');
+      }
+    );
+  };
+
+  const handleSaveEvent = (evPayload) => {
+    setData((prev) => {
+      if (evPayload.id) {
+        return {
+          ...prev,
+          events: prev.events.map((e) => (e.id === evPayload.id ? evPayload : e)),
+        };
+      }
+      return {
+        ...prev,
+        events: [...prev.events, { ...evPayload, id: `evt-${Date.now()}` }],
+      };
+    });
+    notify(lang === 'id' ? 'Agenda disimpan' : 'Event saved');
+  };
+
+  const handleDeleteEvent = (ev) => {
+    askConfirm(
+      lang === 'id' ? 'Hapus Agenda' : 'Delete Event',
+      lang === 'id' ? `Hapus "${ev.title}" dari kalender?` : `Remove "${ev.title}"?`,
+      () => {
+        setData((prev) => ({
+          ...prev,
+          events: prev.events.filter((e) => e.id !== ev.id),
+        }));
+        notify(lang === 'id' ? 'Agenda dihapus' : 'Event deleted');
+      }
+    );
+  };
+
+  const handleToggleHabitDate = (habitId, dateStr) => {
+    setData((prev) => ({
+      ...prev,
+      habits: prev.habits.map((h) => {
+        if (h.id !== habitId) return h;
+        const exists = h.completedDates.includes(dateStr);
+        return {
+          ...h,
+          completedDates: exists
+            ? h.completedDates.filter((d) => d !== dateStr)
+            : [...h.completedDates, dateStr],
+        };
+      }),
+    }));
+  };
+
+  const handleCreateHabit = (habit) => {
+    setData((prev) => ({
+      ...prev,
+      habits: [...prev.habits, { ...habit, id: `hab-${Date.now()}`, completedDates: [] }],
+    }));
+    notify(lang === 'id' ? `Kebiasaan dibuat: ${habit.name}` : `Created habit: ${habit.name}`);
+  };
+
+  const handleDeleteHabit = (habit) => {
+    askConfirm(
+      lang === 'id' ? 'Hapus Kebiasaan' : 'Delete Habit',
+      lang === 'id' ? `Hapus "${habit.name}"?` : `Remove "${habit.name}"?`,
+      () => {
+        setData((prev) => ({
+          ...prev,
+          habits: prev.habits.filter((h) => h.id !== habit.id),
+        }));
+        notify(lang === 'id' ? 'Kebiasaan dihapus' : 'Habit deleted');
+      }
+    );
+  };
+
+  const handleCreateGoal = (goal) => {
+    setData((prev) => ({
+      ...prev,
+      goals: [...prev.goals, { ...goal, id: `gol-${Date.now()}`, status: 'Active' }],
+    }));
+    notify(lang === 'id' ? `Target dibuat: ${goal.title}` : `Created goal: ${goal.title}`);
+  };
+
+  const handleToggleMilestone = (goalId, msId) => {
+    setData((prev) => ({
+      ...prev,
+      goals: prev.goals.map((g) =>
+        g.id === goalId
+          ? {
+              ...g,
+              milestones: g.milestones.map((m) =>
+                m.id === msId ? { ...m, completed: !m.completed } : m
+              ),
+            }
+          : g
+      ),
+    }));
+  };
+
+  const handleAddMilestone = (goalId, title) => {
+    setData((prev) => ({
+      ...prev,
+      goals: prev.goals.map((g) =>
+        g.id === goalId
+          ? {
+              ...g,
+              milestones: [...g.milestones, { id: `ms-${Date.now()}`, title, completed: false }],
+            }
+          : g
+      ),
+    }));
+    notify(lang === 'id' ? 'Milestone ditambahkan' : 'Milestone added');
+  };
+
+  const handleDeleteGoal = (goal) => {
+    askConfirm(
+      lang === 'id' ? 'Hapus Target' : 'Delete Goal',
+      lang === 'id' ? `Hapus "${goal.title}"?` : `Delete "${goal.title}"?`,
+      () => {
+        setData((prev) => ({
+          ...prev,
+          goals: prev.goals.filter((g) => g.id !== goal.id),
+        }));
+        notify(lang === 'id' ? 'Target dihapus' : 'Goal deleted');
+      }
+    );
+  };
+
+  const handleSaveNote = (notePayload) => {
+    const timestamp = new Date().toISOString();
+    if (notePayload.id) {
+      setData((prev) => ({
+        ...prev,
+        notes: prev.notes.map((n) =>
+          n.id === notePayload.id ? { ...notePayload, updatedAt: timestamp } : n
+        ),
+      }));
+      return notePayload;
+    }
+    const created = { ...notePayload, id: `not-${Date.now()}`, updatedAt: timestamp };
+    setData((prev) => ({
+      ...prev,
+      notes: [created, ...prev.notes],
+    }));
+    notify(lang === 'id' ? 'Catatan dibuat' : 'Entry created');
+    return created;
+  };
+
+  const handleTogglePinNote = (noteId) => {
+    setData((prev) => ({
+      ...prev,
+      notes: prev.notes.map((n) => (n.id === noteId ? { ...n, pinned: !n.pinned } : n)),
+    }));
+  };
+
+  const handleDeleteNote = (note) => {
+    askConfirm(
+      lang === 'id' ? 'Hapus Catatan' : 'Delete Entry',
+      lang === 'id' ? `Hapus "${note.title}" secara permanen?` : `Delete "${note.title}" permanently?`,
+      () => {
+        setData((prev) => ({
+          ...prev,
+          notes: prev.notes.filter((n) => n.id !== note.id),
+        }));
+        notify(lang === 'id' ? 'Catatan dihapus' : 'Entry deleted');
+      }
+    );
+  };
+
+  const handleCreateShoppingList = (name) => {
+    const created = { id: `shp-${Date.now()}`, name, items: [] };
+    setData((prev) => ({
+      ...prev,
+      shoppingLists: [...prev.shoppingLists, created],
+    }));
+    notify(lang === 'id' ? `Daftar dibuat: ${name}` : `Created list: ${name}`);
+    return created;
+  };
+
+  const handleAddShoppingItem = (listId, item) => {
+    setData((prev) => ({
+      ...prev,
+      shoppingLists: prev.shoppingLists.map((l) =>
+        l.id === listId ? { ...l, items: [...l.items, { ...item, id: `si-${Date.now()}` }] } : l
+      ),
+    }));
+  };
+
+  const handleToggleShoppingItem = (listId, itemId) => {
+    setData((prev) => ({
+      ...prev,
+      shoppingLists: prev.shoppingLists.map((l) =>
+        l.id === listId
+          ? {
+              ...l,
+              items: l.items.map((i) => (i.id === itemId ? { ...i, purchased: !i.purchased } : i)),
+            }
+          : l
+      ),
+    }));
+  };
+
+  const handleDeleteShoppingItem = (listId, itemId) => {
+    setData((prev) => ({
+      ...prev,
+      shoppingLists: prev.shoppingLists.map((l) =>
+        l.id === listId ? { ...l, items: l.items.filter((i) => i.id !== itemId) } : l
+      ),
+    }));
+  };
+
+  const handleLogShoppingAsExpense = (listName, amount) => {
+    const defaultAcc = data.accounts[0]?.id || '';
+    handleSaveTx({
+      type: 'expense',
+      amount,
+      date: TODAY_STR,
+      category: 'Groceries',
+      description: `${lang === 'id' ? 'Belanja' : 'Shopping'}: ${listName}`,
+      accountId: defaultAcc,
+      paymentMethod: 'Card / Wallet',
+      notes: 'Synced from Shopping List',
+    });
+  };
+
+  const handleExportJson = () => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `life-os-backup-${TODAY_STR}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    notify(lang === 'id' ? 'Cadangan JSON diekspor' : 'JSON backup exported');
+  };
+
+  const handleImportJson = (parsed) => {
+    if (parsed && Array.isArray(parsed.accounts) && Array.isArray(parsed.transactions)) {
+      setData(parsed);
+      setSettingsOpen(false);
+      notify(lang === 'id' ? 'Data berhasil dipulihkan dari JSON' : 'Workspace restored from JSON');
+    } else {
+      notify(lang === 'id' ? 'Format file JSON tidak valid' : 'Invalid JSON backup format');
+    }
+  };
+
+  const handleExportCsv = () => {
+    const headers = ['Date', 'Type', 'Category', 'Description', 'Amount', 'PaymentMethod', 'Notes'];
+    const rows = data.transactions.map((tx) =>
+      [
+        tx.date,
+        tx.type,
+        `"${tx.category.replace(/"/g, '""')}"`,
+        `"${tx.description.replace(/"/g, '""')}"`,
+        tx.amount,
+        `"${(tx.paymentMethod || '').replace(/"/g, '""')}"`,
+        `"${(tx.notes || '').replace(/"/g, '""')}"`,
+      ].join(',')
+    );
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `life-os-ledger-${TODAY_STR}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    notify(lang === 'id' ? 'Buku kas diekspor ke CSV' : 'Ledger exported to CSV');
+  };
+
+  const handleResetEmpty = () => {
+    askConfirm(
+      t('start_fresh'),
+      lang === 'id'
+        ? 'Seluruh akun, transaksi, anggaran, tugas, kebiasaan, dan catatan akan dihapus untuk memulai dari nol.'
+        : 'All accounts, transactions, budgets, tasks, habits, and notes will be cleared.',
+      () => {
+        setData(createEmptyState(lang, data.profile.name));
+        setSettingsOpen(false);
+        notify(lang === 'id' ? 'Ruang kerja dikosongkan' : 'Workspace cleared');
+      },
+      t('delete')
+    );
+  };
+
+  const handleRestoreDemo = () => {
+    const fresh = createInitialState();
+    fresh.profile.language = lang;
+    fresh.profile.name = data.profile.name;
+    setData(fresh);
+    setSettingsOpen(false);
+    notify(lang === 'id' ? 'Data referensi dipulihkan' : 'Reference dataset restored');
+  };
+
+  if (!currentUser) {
+    return (
+      <AuthPortalScreen
+        lang={lang}
+        onToggleLang={toggleLanguageQuick}
+        t={t}
+        onAuthenticateSuccess={({ email, name, workspaceKey, initialData, isCloud }) => {
+          setCurrentUser({ email, name, workspaceKey, isCloud });
+          setData(initialData);
+          navigateTab('dashboard');
+          notify(lang === 'id' ? `Selamat datang, ${name}` : `Welcome back, ${name}`);
+        }}
+      />
+    );
+  }
+
+  const renderModule = () => {
+    switch (activeTab) {
+      case 'dashboard':
+        return (
+          <DashboardView
+            data={data}
+            derived={derived}
+            maskBalances={maskBalances}
+            t={t}
+            lang={lang}
+            onNavigate={navigateTab}
+            onOpenTxModal={(tx = null) => setTxModal({ open: true, tx })}
+            onOpenTaskModal={(task = null) => setTaskModal({ open: true, task, defaultDate: TODAY_STR })}
+            onOpenEventModal={(event = null) => setEventModal({ open: true, event, defaultDate: TODAY_STR })}
+            onToggleTask={handleToggleTask}
+            onToggleHabitToday={handleToggleHabitDate}
+          />
+        );
+      case 'wallet':
+        return (
+          <WalletView
+            data={data}
+            derived={derived}
+            maskBalances={maskBalances}
+            t={t}
+            lang={lang}
+            onOpenTxModal={(tx = null) => setTxModal({ open: true, tx })}
+            onDeleteTx={handleDeleteTx}
+            onAddAccount={handleAddAccount}
+            onAddCustomCategory={handleAddCustomCategory}
+            onOpenPaydayModal={() => setPaydayModalOpen(true)}
+            onOpenReceiptModal={() => setReceiptModalOpen(true)}
+            onOpenSplitBillModal={() => setSplitBillModalOpen(true)}
+          />
+        );
+      case 'budgets':
+        return (
+          <BudgetsView
+            data={data}
+            maskBalances={maskBalances}
+            t={t}
+            lang={lang}
+            onSaveBudget={handleSaveBudget}
+            onDeleteBudget={handleDeleteBudget}
+          />
+        );
+      case 'savings':
+        return (
+          <SavingsView
+            data={data}
+            maskBalances={maskBalances}
+            t={t}
+            lang={lang}
+            onCreateSavingsGoal={handleCreateSavingsGoal}
+            onAddContribution={handleAddContribution}
+            onDeleteSavingsGoal={handleDeleteSavingsGoal}
+          />
+        );
+      case 'investments':
+        return (
+          <InvestmentsView
+            data={data}
+            maskBalances={maskBalances}
+            t={t}
+            lang={lang}
+            onAddInvestment={handleAddInvestment}
+            onUpdateInvestmentValue={handleUpdateInvestmentValue}
+            onDeleteInvestment={handleDeleteInvestment}
+          />
+        );
+      case 'subscriptions':
+        return (
+          <SubscriptionsView
+            data={data}
+            maskBalances={maskBalances}
+            t={t}
+            lang={lang}
+            onAddSub={handleAddSub}
+            onPaySub={handlePaySub}
+            onDeleteSub={handleDeleteSub}
+          />
+        );
+      case 'debts':
+        return (
+          <DebtsView
+            data={data}
+            maskBalances={maskBalances}
+            t={t}
+            lang={lang}
+            onAddDebt={handleAddDebt}
+            onSettleDebtInstallment={handleSettleDebtInstallment}
+            onDeleteDebt={handleDeleteDebt}
+            onOpenSplitBillModal={() => setSplitBillModalOpen(true)}
+          />
+        );
+      case 'planner':
+        return (
+          <PlannerView
+            data={data}
+            t={t}
+            lang={lang}
+            onToggleTask={handleToggleTask}
+            onToggleTopPriority={handleToggleTopPriority}
+            onOpenTaskModal={(task = null, d = TODAY_STR) =>
+              setTaskModal({ open: true, task, defaultDate: d })
+            }
+            onOpenEventModal={(event = null, d = TODAY_STR) =>
+              setEventModal({ open: true, event, defaultDate: d })
+            }
+            onSaveWellnessLog={handleSaveWellnessLog}
+          />
+        );
+      case 'tasks':
+        return (
+          <TasksView
+            data={data}
+            t={t}
+            lang={lang}
+            onOpenTaskModal={(task = null) => setTaskModal({ open: true, task, defaultDate: TODAY_STR })}
+            onToggleTask={handleToggleTask}
+            onUpdateTaskStatus={handleUpdateTaskStatus}
+            onDeleteTask={handleDeleteTask}
+          />
+        );
+      case 'calendar':
+        return (
+          <CalendarView
+            data={data}
+            t={t}
+            lang={lang}
+            onOpenEventModal={(event = null, d = TODAY_STR) =>
+              setEventModal({ open: true, event, defaultDate: d })
+            }
+            onDeleteEvent={handleDeleteEvent}
+          />
+        );
+      case 'habits':
+        return (
+          <HabitsView
+            data={data}
+            t={t}
+            lang={lang}
+            onToggleHabitDate={handleToggleHabitDate}
+            onCreateHabit={handleCreateHabit}
+            onDeleteHabit={handleDeleteHabit}
+          />
+        );
+      case 'goals':
+        return (
+          <GoalsView
+            data={data}
+            t={t}
+            lang={lang}
+            onCreateGoal={handleCreateGoal}
+            onToggleMilestone={handleToggleMilestone}
+            onAddMilestone={handleAddMilestone}
+            onDeleteGoal={handleDeleteGoal}
+          />
+        );
+      case 'crm':
+        return (
+          <PersonalCrmView
+            data={data}
+            t={t}
+            lang={lang}
+            onAddContact={handleAddContact}
+            onLogContactToday={handleLogContactToday}
+            onDeleteContact={handleDeleteContact}
+          />
+        );
+      case 'notes':
+        return (
+          <NotesView
+            data={data}
+            t={t}
+            lang={lang}
+            onSaveNote={handleSaveNote}
+            onDeleteNote={handleDeleteNote}
+            onTogglePinNote={handleTogglePinNote}
+          />
+        );
+      case 'shopping':
+        return (
+          <ShoppingView
+            data={data}
+            maskBalances={maskBalances}
+            t={t}
+            lang={lang}
+            onCreateShoppingList={handleCreateShoppingList}
+            onAddShoppingItem={handleAddShoppingItem}
+            onToggleShoppingItem={handleToggleShoppingItem}
+            onDeleteShoppingItem={handleDeleteShoppingItem}
+            onLogShoppingAsExpense={handleLogShoppingAsExpense}
+          />
+        );
+      case 'reports':
+        return (
+          <ReportsView
+            data={data}
+            derived={derived}
+            maskBalances={maskBalances}
+            t={t}
+            lang={lang}
+            onExportCsv={handleExportCsv}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
+  const mobilePrimaryTabs = [
+    { id: 'dashboard', labelKey: 'nav_dashboard', icon: LayoutDashboard },
+    { id: 'wallet', labelKey: 'nav_wallet', icon: Wallet },
+    { id: 'planner', labelKey: 'nav_planner', icon: CalendarDays },
+    { id: 'tasks', labelKey: 'nav_tasks', icon: CheckSquare },
+  ];
+
+  const allNavItems = NAV_GROUPS.flatMap((g) => g.items);
+
+  return (
+    <div className="min-h-screen w-full overflow-x-hidden bg-[#171412] text-[#F4E9DC] flex flex-col lg:flex-row selection:bg-[#B68B61] selection:text-[#171412] relative">
+      <style>{MOTION_STYLES}</style>
+
+      {/* Ambient Multi-Layer Parallax Background Orbs */}
+      <ParallaxLayer
+        speed={-0.16}
+        pointerFactor={20}
+        className="fixed top-20 left-1/3 pointer-events-none z-0"
+      >
+        <div className="w-[460px] h-[460px] rounded-full bg-[#B68B61]/[0.06] blur-[110px]" />
+      </ParallaxLayer>
+      <ParallaxLayer
+        speed={0.12}
+        pointerFactor={-16}
+        className="fixed bottom-10 right-10 pointer-events-none z-0"
+      >
+        <div className="w-[380px] h-[380px] rounded-full bg-[#624332]/[0.14] blur-[100px]" />
+      </ParallaxLayer>
+
+      {/* DESKTOP FIXED SIDEBAR */}
+      <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 bg-[#241B17]/95 backdrop-blur-xl border-r border-[#624332]/40 z-30">
+        <div className="p-6 border-b border-[#624332]/35 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#B68B61] to-[#624332] flex items-center justify-center text-[#171412] font-bold shadow-lg">
+              L
+            </div>
+            <div>
+              <span className="text-base font-bold tracking-wider text-[#F4E9DC] block">LIFE OS</span>
+              <span className="text-[10px] uppercase tracking-widest text-[#B68B61]">
+                Private Edition
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
+          {NAV_GROUPS.map((group) => (
+            <div key={group.labelKey} className="space-y-1">
+              <div className="px-3 text-[10px] font-semibold uppercase tracking-widest text-[#A99B90]/75">
+                {t(group.labelKey)}
+              </div>
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const active = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => navigateTab(item.id)}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                      active
+                        ? 'bg-gradient-to-r from-[#30231D] to-[#241B17] text-[#E4C8A6] border border-[#B68B61]/50 shadow translate-x-0.5'
+                        : 'text-[#A99B90] hover:text-[#F4E9DC] hover:bg-[#30231D]/45'
+                    }`}
+                  >
+                    <span className="flex items-center gap-3 truncate">
+                      <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-[#B68B61]' : ''}`} />
+                      <span className="truncate">{t(item.labelKey)}</span>
+                    </span>
+                    {item.id === 'tasks' && (
+                      <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-[#171412] text-[#E4C8A6] shrink-0">
+                        {data.tasks.filter((tk) => tk.status !== 'completed').length}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </nav>
+
+        <div className="p-4 border-t border-[#624332]/35 space-y-2">
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="w-full flex items-center justify-between p-3 rounded-xl bg-[#171412]/80 border border-[#624332]/40 hover:border-[#B68B61]/60 transition-colors"
+          >
+            <div className="text-left min-w-0">
+              <p className="text-xs font-semibold text-[#F4E9DC] truncate">{data.profile.name}</p>
+              <p className="text-[11px] text-[#A99B90] truncate">
+                {lang === 'id' ? 'Bahasa Indonesia' : 'English'} • {data.profile.currency}
+              </p>
+            </div>
+            <Settings className="w-4 h-4 text-[#B68B61] shrink-0" />
+          </button>
+        </div>
+      </aside>
+
+      {/* MAIN WORKSPACE COLUMN */}
+      <div className="flex-1 lg:pl-64 flex flex-col min-h-screen min-w-0 pb-24 lg:pb-0 relative z-10">
+        {/* STICKY RESPONSIVE HEADER */}
+        <header className="sticky top-0 z-20 bg-[#171412]/90 backdrop-blur-md border-b border-[#624332]/35 px-3 sm:px-8 h-16 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="lg:hidden w-8 h-8 rounded-xl bg-gradient-to-br from-[#B68B61] to-[#624332] flex items-center justify-center text-[#171412] font-bold shrink-0">
+              L
+            </div>
+            <div className="min-w-0">
+              <span className="text-sm font-semibold text-[#F4E9DC] truncate block sm:inline">
+                {t(allNavItems.find((i) => i.id === activeTab)?.labelKey || 'nav_dashboard')}
+              </span>
+              <span className="hidden md:inline text-xs text-[#A99B90] ml-3">
+                {t('net_worth')}:{' '}
+                <strong className="text-[#E4C8A6] tabular-nums">
+                  {formatMoney(derived.totalNetWorth, data.profile.currency, maskBalances)}
+                </strong>
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <span className="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#241B17] border border-[#624332]/40 text-[11px] text-[#A99B90]">
+              <Cloud className="w-3.5 h-3.5 text-[#87B082]" />
+              {syncStatus === 'syncing' ? t('cloud_syncing') : t('cloud_synced')}
+            </span>
+
+            <button
+              onClick={() => setBriefingModalOpen(true)}
+              className="p-2 sm:p-2.5 rounded-xl bg-[#241B17] border border-[#624332]/50 text-[#A99B90] hover:text-[#E4C8A6]"
+              title={t('daily_briefing')}
+            >
+              <Send className="w-4 h-4" />
+            </button>
+
+            <button
+              onClick={toggleLanguageQuick}
+              className="inline-flex items-center gap-1 px-2.5 py-2 rounded-xl bg-[#241B17] border border-[#624332]/50 text-xs font-semibold text-[#E4C8A6] hover:border-[#B68B61]"
+              title={lang === 'id' ? 'Ganti ke English' : 'Switch to Bahasa Indonesia'}
+            >
+              <Globe className="w-3.5 h-3.5 text-[#B68B61]" />
+              <span>{lang.toUpperCase()}</span>
+            </button>
+
+            <button
+              onClick={() => setMaskBalances((prev) => !prev)}
+              className="p-2 sm:p-2.5 rounded-xl bg-[#241B17] border border-[#624332]/50 text-[#A99B90] hover:text-[#E4C8A6]"
+              aria-label="Toggle balance privacy"
+            >
+              {maskBalances ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="p-2 sm:p-2.5 rounded-xl bg-[#241B17] border border-[#624332]/50 text-[#A99B90] hover:text-[#E4C8A6]"
+              aria-label="Workspace settings"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+
+            <Button size="sm" onClick={() => setTxModal({ open: true, tx: null })}>
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">{t('quick_entry')}</span>
+            </Button>
+          </div>
+        </header>
+
+        {/* MODULE CONTENT WITH SMOOTH TRANSITION */}
+        <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-8 py-5 sm:py-8 min-w-0 space-y-6">
+          <SmartCommandBar
+            t={t}
+            lang={lang}
+            data={data}
+            onExecuteBatch={handleSmartCommandBatch}
+          />
+          <div key={activeTab} className="life-motion-enter">
+            {renderModule()}
+          </div>
+        </main>
+      </div>
+
+      {/* MOBILE BOTTOM NAVIGATION */}
+      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-[#241B17]/95 backdrop-blur-lg border-t border-[#624332]/50 px-1.5 py-1.5 flex items-center justify-around">
+        {mobilePrimaryTabs.map((tab) => {
+          const Icon = tab.icon;
+          const active = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => {
+                navigateTab(tab.id);
+                setMobileMoreOpen(false);
+              }}
+              className={`flex flex-col items-center justify-center py-1.5 px-2 rounded-xl min-w-[58px] ${
+                active ? 'text-[#B68B61]' : 'text-[#A99B90]'
+              }`}
+            >
+              <Icon className="w-5 h-5" />
+              <span className="text-[10px] font-medium mt-1 truncate max-w-[66px]">
+                {t(tab.labelKey)}
+              </span>
+            </button>
+          );
+        })}
+        <button
+          onClick={() => setMobileMoreOpen((prev) => !prev)}
+          className={`flex flex-col items-center justify-center py-1.5 px-2 rounded-xl min-w-[58px] ${
+            mobileMoreOpen ? 'text-[#B68B61]' : 'text-[#A99B90]'
+          }`}
+        >
+          <MoreHorizontal className="w-5 h-5" />
+          <span className="text-[10px] font-medium mt-1">{t('all_modules')}</span>
+        </button>
+      </nav>
+
+      {/* MOBILE ALL MODULES DRAWER */}
+      <Modal
+        open={mobileMoreOpen}
+        onClose={() => setMobileMoreOpen(false)}
+        title={t('all_modules')}
+      >
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+          {allNavItems.map((item) => {
+            const Icon = item.icon;
+            const active = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => {
+                  navigateTab(item.id);
+                  setMobileMoreOpen(false);
+                }}
+                className={`p-3.5 rounded-2xl border flex flex-col items-start gap-2 text-left ${
+                  active
+                    ? 'bg-[#30231D] border-[#B68B61] text-[#E4C8A6]'
+                    : 'bg-[#171412]/80 border-[#624332]/40 text-[#F4E9DC]'
+                }`}
+              >
+                <Icon className="w-5 h-5 text-[#B68B61]" />
+                <span className="text-xs font-medium">{t(item.labelKey)}</span>
+              </button>
+            );
+          })}
+        </div>
+      </Modal>
+
+      {/* GLOBAL MODALS */}
+      <TransactionModal
+        open={txModal.open}
+        onClose={() => setTxModal({ open: false, tx: null })}
+        editingTx={txModal.tx}
+        data={data}
+        t={t}
+        lang={lang}
+        onSave={handleSaveTx}
+      />
+
+      <PaydaySplitterModal
+        open={paydayModalOpen}
+        onClose={() => setPaydayModalOpen(false)}
+        data={data}
+        t={t}
+        lang={lang}
+        onExecuteSplit={handleExecutePaydaySplit}
+      />
+
+      <ReceiptScannerModal
+        open={receiptModalOpen}
+        onClose={() => setReceiptModalOpen(false)}
+        data={data}
+        t={t}
+        lang={lang}
+        onSaveExtractedTx={handleSaveTx}
+      />
+
+      <SplitBillModal
+        open={splitBillModalOpen}
+        onClose={() => setSplitBillModalOpen(false)}
+        data={data}
+        t={t}
+        lang={lang}
+        onExecuteSplitBill={handleExecuteSplitBill}
+      />
+
+      <DailyBriefingModal
+        open={briefingModalOpen}
+        onClose={() => setBriefingModalOpen(false)}
+        data={data}
+        derived={derived}
+        t={t}
+        lang={lang}
+        onCopied={() => notify(t('briefing_copied'))}
+      />
+
+      <TaskModal
+        open={taskModal.open}
+        onClose={() => setTaskModal({ open: false, task: null, defaultDate: TODAY_STR })}
+        editingTask={taskModal.task}
+        defaultDate={taskModal.defaultDate}
+        t={t}
+        lang={lang}
+        onSave={handleSaveTask}
+      />
+
+      <EventModal
+        open={eventModal.open}
+        onClose={() => setEventModal({ open: false, event: null, defaultDate: TODAY_STR })}
+        editingEvent={eventModal.event}
+        defaultDate={eventModal.defaultDate}
+        t={t}
+        lang={lang}
+        onSave={handleSaveEvent}
+      />
+
+      <SettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        data={data}
+        currentUser={currentUser}
+        t={t}
+        onUpdateProfile={(prof) => {
+          setData((prev) => ({ ...prev, profile: { ...prev.profile, ...prof } }));
+          notify(prof.language === 'id' ? 'Pengaturan bahasa & profil disimpan' : 'Preferences saved');
+        }}
+        onExportJson={handleExportJson}
+        onImportJson={handleImportJson}
+        onResetEmpty={handleResetEmpty}
+        onRestoreDemo={handleRestoreDemo}
+        onLogout={() => {
+          setSettingsOpen(false);
+          setCurrentUser(null);
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        confirmLabel={confirmState.confirmLabel}
+        cancelLabel={t('cancel')}
+        onConfirm={confirmState.onConfirm}
+        onCancel={() => setConfirmState((prev) => ({ ...prev, open: false }))}
+      />
+
+      {/* TOAST NOTIFICATION */}
+      {toast && (
+        <div className="fixed bottom-20 lg:bottom-6 right-4 sm:right-6 z-50 px-4 py-3 rounded-2xl bg-[#30231D] border border-[#B68B61]/70 text-xs font-medium text-[#F4E9DC] shadow-2xl flex items-center gap-2.5 max-w-[90vw] life-motion-enter">
+          <CheckCircle2 className="w-4 h-4 text-[#B68B61] shrink-0" />
+          <span className="truncate">{toast}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <WorkspaceErrorBoundary>
+      <LifeOsWorkspace />
+    </WorkspaceErrorBoundary>
+  );
+}
