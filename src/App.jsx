@@ -757,6 +757,16 @@ const _now = new Date();
 const TODAY_STR = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
 const CURRENT_MONTH = TODAY_STR.slice(0, 7);
 
+// Anggaran berlaku berkelanjutan: pakai anggaran terbaru per kategori yang bulannya <= bulan terpilih
+function effectiveBudgets(budgets = [], month) {
+  const byCat = {};
+  budgets.forEach((b) => {
+    if (!b.month || b.month > month) return;
+    if (!byCat[b.category] || b.month > byCat[b.category].month) byCat[b.category] = b;
+  });
+  return Object.values(byCat);
+}
+
 const DEFAULT_EXPENSE_CATEGORIES = [
   'Housing & Utilities',
   'Dining & Coffee',
@@ -766,6 +776,7 @@ const DEFAULT_EXPENSE_CATEGORIES = [
   'Health & Wellness',
   'Shopping & Lifestyle',
   'Investments',
+  'Debt & Installments',
 ];
 
 const DEFAULT_INCOME_CATEGORIES = [
@@ -3309,7 +3320,7 @@ const BudgetsView = ({ data, maskBalances, t, lang, onSaveBudget, onDeleteBudget
   }, [data.transactions, prevMonth]);
 
   const monthBudgets = useMemo(
-    () => data.budgets.filter((b) => b.month === selectedMonth),
+    () => effectiveBudgets(data.budgets, selectedMonth),
     [data.budgets, selectedMonth]
   );
 
@@ -3510,8 +3521,24 @@ const SavingsView = ({
   onCreateSavingsGoal,
   onAddContribution,
   onDeleteSavingsGoal,
+  accountBalances = {},
 }) => {
   const { currency } = data.profile;
+  const [sourceAccountId, setSourceAccountId] = useState(data.accounts[0]?.id || '');
+  const effectiveAccountId = data.accounts.some((a) => a.id === sourceAccountId)
+    ? sourceAccountId
+    : data.accounts[0]?.id || '';
+  const accountMapLocal = Object.fromEntries(data.accounts.map((a) => [a.id, a]));
+  const balanceOf = (id) => (accountBalances[id] ?? Number(accountMapLocal[id]?.initialBalance)) || 0;
+  const accountOptions = data.accounts.map((a) => (
+    <option key={a.id} value={a.id}>
+      {a.name} — {formatMoney(balanceOf(a.id), currency)}
+    </option>
+  ));
+  const noAccountMsg =
+    lang === 'id'
+      ? 'Belum ada akun. Buat akun di Digital Wallet dulu supaya setoran tercatat.'
+      : 'No accounts yet. Create one in Digital Wallet first so deposits are recorded.';
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [contribModalGoal, setContribModalGoal] = useState(null);
   const [historyModalGoal, setHistoryModalGoal] = useState(null);
@@ -3528,11 +3555,14 @@ const SavingsView = ({
     e.preventDefault();
     const target = parseFloat(targetAmount);
     if (!name.trim() || !target || target <= 0) return;
+    const initial = Math.max(0, parseFloat(initialSaved) || 0);
+    if (initial > 0 && !effectiveAccountId) return;
     onCreateSavingsGoal({
       name: name.trim(),
       targetAmount: target,
       targetDate,
-      initialSaved: Math.max(0, parseFloat(initialSaved) || 0),
+      initialSaved: initial,
+      accountId: initial > 0 ? effectiveAccountId : undefined,
     });
     setName('');
     setTargetAmount('');
@@ -3543,11 +3573,12 @@ const SavingsView = ({
   const handleContrib = (e) => {
     e.preventDefault();
     const amt = parseFloat(contribAmount);
-    if (!contribModalGoal || !amt || amt <= 0) return;
+    if (!contribModalGoal || !amt || amt <= 0 || !effectiveAccountId) return;
     onAddContribution(
       contribModalGoal.id,
       amt,
-      contribNote.trim() || (lang === 'id' ? 'Setoran tabungan' : 'Savings deposit')
+      contribNote.trim() || (lang === 'id' ? 'Setoran tabungan' : 'Savings deposit'),
+      effectiveAccountId
     );
     setContribAmount('');
     setContribNote('');
@@ -3665,6 +3696,28 @@ const SavingsView = ({
               onChange={(e) => setInitialSaved(e.target.value)}
             />
           </div>
+          {(parseFloat(initialSaved) || 0) > 0 && (
+            <div className="space-y-1.5">
+              {data.accounts.length === 0 ? (
+                <p className="text-[11px] text-[#F29B87]">{noAccountMsg}</p>
+              ) : (
+                <>
+                  <Select
+                    label={lang === 'id' ? 'Ambil dari Akun' : 'Pay from Account'}
+                    value={effectiveAccountId}
+                    onChange={(e) => setSourceAccountId(e.target.value)}
+                  >
+                    {accountOptions}
+                  </Select>
+                  {(parseFloat(initialSaved) || 0) > balanceOf(effectiveAccountId) && (
+                    <p className="text-[11px] text-[#F29B87]">
+                      {lang === 'id' ? 'Saldo akun ini tidak cukup untuk setoran tersebut.' : 'This account balance is lower than the deposit.'}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
           <Input
             label={lang === 'id' ? 'Target Tanggal Tercapai' : 'Target Date'}
             type="date"
@@ -3696,6 +3749,24 @@ const SavingsView = ({
             onChange={(e) => setContribAmount(e.target.value)}
             required
           />
+          {data.accounts.length === 0 ? (
+            <p className="text-[11px] text-[#F29B87]">{noAccountMsg}</p>
+          ) : (
+            <div className="space-y-1.5">
+              <Select
+                label={lang === 'id' ? 'Ambil dari Akun' : 'Pay from Account'}
+                value={effectiveAccountId}
+                onChange={(e) => setSourceAccountId(e.target.value)}
+              >
+                {accountOptions}
+              </Select>
+              {(parseFloat(contribAmount) || 0) > balanceOf(effectiveAccountId) && (
+                <p className="text-[11px] text-[#F29B87]">
+                  {lang === 'id' ? 'Saldo akun ini tidak cukup untuk setoran tersebut.' : 'This account balance is lower than the deposit.'}
+                </p>
+              )}
+            </div>
+          )}
           <Input
             label={t('notes')}
             placeholder="e.g. Setoran gaji bulanan"
@@ -3729,7 +3800,14 @@ const SavingsView = ({
               >
                 <div>
                   <p className="text-sm font-medium text-life-text">{c.note}</p>
-                  <p className="text-xs text-life-muted">{formatDateReadable(c.date, lang)}</p>
+                  <p className="text-xs text-life-muted">
+                    {formatDateReadable(c.date, lang)} ·{' '}
+                    {c.accountId && accountMapLocal[c.accountId]
+                      ? accountMapLocal[c.accountId].name
+                      : lang === 'id'
+                      ? 'tidak terhubung ke akun'
+                      : 'not linked to an account'}
+                  </p>
                 </div>
                 <span className="text-sm font-semibold text-life-soft tabular-nums">
                   +{formatMoney(c.amount, currency, maskBalances)}
@@ -4246,6 +4324,7 @@ const InvestmentsView = ({
   const [quantity, setQuantity] = useState('');
   const [investedAmount, setInvestedAmount] = useState('');
   const [currentValue, setCurrentValue] = useState('');
+  const [sourceAccountId, setSourceAccountId] = useState('');
 
   const holdings = data.investments || [];
 
@@ -4270,7 +4349,9 @@ const InvestmentsView = ({
       investedAmount: invAmt,
       currentValue: curVal,
       updatedAt: TODAY_STR,
+      accountId: sourceAccountId || undefined,
     });
+    setSourceAccountId('');
     setName('');
     setQuantity('');
     setInvestedAmount('');
@@ -4458,6 +4539,20 @@ const InvestmentsView = ({
               required
             />
           </div>
+          <Select
+            label={lang === 'id' ? 'Dibayar dari Akun' : 'Paid from Account'}
+            value={sourceAccountId}
+            onChange={(e) => setSourceAccountId(e.target.value)}
+          >
+            <option value="">
+              {lang === 'id' ? 'Aset yang sudah dimiliki (tidak memotong saldo)' : 'Already owned (does not debit an account)'}
+            </option>
+            {data.accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </Select>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="secondary" onClick={() => setShowAddModal(false)}>
               {t('cancel')}
@@ -6458,6 +6553,7 @@ const ShoppingView = ({
 }) => {
   const { currency } = data.profile;
   const [selectedListId, setSelectedListId] = useState(data.shoppingLists[0]?.id || null);
+  const [shopAccountId, setShopAccountId] = useState(data.accounts[0]?.id || '');
   const [showNewListModal, setShowNewListModal] = useState(false);
   const [newListName, setNewListName] = useState('');
 
@@ -6517,14 +6613,38 @@ const ShoppingView = ({
           <Button size="sm" variant="secondary" onClick={() => setShowNewListModal(true)}>
             <Plus className="w-4 h-4" /> {t('new_list')}
           </Button>
-          {activeList && totals.purchased > 0 && (
-            <Button
-              size="sm"
-              onClick={() => onLogShoppingAsExpense(activeList.name, totals.purchased)}
-            >
-              <Wallet className="w-4 h-4" /> {t('log_purchased')} (
-              {formatMoney(totals.purchased, currency, maskBalances)})
-            </Button>
+          {activeList && totals.purchased - (activeList.loggedAmount || 0) > 0 && (
+            <>
+              {data.accounts.length > 0 && (
+                <select
+                  value={data.accounts.some((a) => a.id === shopAccountId) ? shopAccountId : data.accounts[0].id}
+                  onChange={(e) => setShopAccountId(e.target.value)}
+                  className="rounded-xl bg-life-bg/90 border border-life-border/55 px-3 py-2 text-xs text-life-text min-h-[36px]"
+                  aria-label={lang === 'id' ? 'Akun pembayaran' : 'Payment account'}
+                >
+                  {data.accounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <Button
+                size="sm"
+                onClick={() =>
+                  onLogShoppingAsExpense(
+                    activeList.name,
+                    totals.purchased - (activeList.loggedAmount || 0),
+                    data.accounts.some((a) => a.id === shopAccountId) ? shopAccountId : data.accounts[0]?.id,
+                    activeList.id,
+                    totals.purchased
+                  )
+                }
+              >
+                <Wallet className="w-4 h-4" /> {t('log_purchased')} (
+                {formatMoney(totals.purchased - (activeList.loggedAmount || 0), currency, maskBalances)})
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -6843,8 +6963,7 @@ const ReportsView = ({ data, derived, maskBalances, t, lang, onExportCsv }) => {
       .forEach((tx) => {
         spendMap[tx.category] = (spendMap[tx.category] || 0) + tx.amount;
       });
-    return data.budgets
-      .filter((b) => b.month === CURRENT_MONTH)
+    return effectiveBudgets(data.budgets, CURRENT_MONTH)
       .map((b) => ({
         category: b.category.split(' ')[0],
         Planned: b.limit,
@@ -7320,6 +7439,7 @@ const SplitBillModal = ({ open, onClose, data, t, lang, onExecuteSplitBill }) =>
     if (!title.trim() || numericTotal <= 0) return;
     const validParticipants = computedFriends.filter((f) => f.name.trim() && f.owedAmount > 0);
     if (validParticipants.length === 0) return;
+    if (friendsSum > numericTotal + 0.01) return; // total piutang tidak boleh melebihi tagihan
 
     onExecuteSplitBill({
       title: title.trim(),
@@ -7457,6 +7577,13 @@ const SplitBillModal = ({ open, onClose, data, t, lang, onExecuteSplitBill }) =>
             {formatMoney(yourOwnShare, currency)}
           </span>
         </div>
+        {friendsSum > numericTotal + 0.01 && (
+          <p className="text-[11px] text-[#F29B87]">
+            {lang === 'id'
+              ? 'Total bagian teman melebihi total tagihan. Kurangi nominalnya.'
+              : "Friends' shares exceed the bill total. Reduce the amounts."}
+          </p>
+        )}
 
         <label className="flex items-center gap-2.5 text-xs text-life-soft cursor-pointer">
           <input
@@ -8832,7 +8959,12 @@ function LifeOsWorkspace() {
       (s, inv) => s + (Number(inv.currentValue) || 0),
       0
     );
-    const totalNetWorth = walletNetWorth + totalInvestmentValue;
+    // Dana di brankas tabungan yang bersumber dari akun tetap bagian dari kekayaan bersih
+    const totalVaultLinked = (data.savingsGoals || []).reduce(
+      (sum, sg) => sum + sg.contributions.reduce((s, c) => s + (c.accountId ? Number(c.amount) || 0 : 0), 0),
+      0
+    );
+    const totalNetWorth = walletNetWorth + totalInvestmentValue + totalVaultLinked;
 
     const monthTxs = data.transactions.filter((tx) => tx.date.startsWith(CURRENT_MONTH));
     const monthlyIncome = monthTxs
@@ -8852,7 +8984,7 @@ function LifeOsWorkspace() {
       .map(([category, amount]) => ({ category, amount }))
       .sort((a, b) => b.amount - a.amount);
 
-    const currentBudgets = data.budgets.filter((b) => b.month === CURRENT_MONTH);
+    const currentBudgets = effectiveBudgets(data.budgets, CURRENT_MONTH);
     const totalBudgetLimit = currentBudgets.reduce((s, b) => s + b.limit, 0);
     const totalBudgetSpent = currentBudgets.reduce((s, b) => s + (catMap[b.category] || 0), 0);
     const totalBudgetRemaining = totalBudgetLimit - totalBudgetSpent;
@@ -8882,6 +9014,7 @@ function LifeOsWorkspace() {
       accountBalances,
       walletNetWorth,
       totalInvestmentValue,
+      totalVaultLinked,
       totalNetWorth,
       monthlyIncome,
       monthlyExpenses,
@@ -8899,6 +9032,36 @@ function LifeOsWorkspace() {
   const handleSaveTx = (txPayload) => {
     setData((prev) => {
       if (txPayload.id) {
+        const old = prev.transactions.find((tx) => tx.id === txPayload.id);
+        // Transaksi tabungan/investasi tetap berupa potongan saldo; jumlah & akun disinkronkan ke brankas/aset
+        if (old && (old.savingsContribId || old.investmentId)) {
+          const merged = { ...old, amount: txPayload.amount, date: txPayload.date, accountId: txPayload.accountId, notes: txPayload.notes };
+          return {
+            ...prev,
+            transactions: prev.transactions.map((tx) => (tx.id === old.id ? merged : tx)),
+            savingsGoals: old.savingsContribId
+              ? prev.savingsGoals.map((sg) =>
+                  sg.id === old.savingsGoalId
+                    ? {
+                        ...sg,
+                        contributions: sg.contributions.map((c) =>
+                          c.id === old.savingsContribId
+                            ? { ...c, amount: merged.amount, date: merged.date, accountId: merged.accountId }
+                            : c
+                        ),
+                      }
+                    : sg
+                )
+              : prev.savingsGoals,
+            investments: old.investmentId
+              ? (prev.investments || []).map((inv) =>
+                  inv.id === old.investmentId
+                    ? { ...inv, investedAmount: merged.amount, accountId: merged.accountId }
+                    : inv
+                )
+              : prev.investments,
+          };
+        }
         return {
           ...prev,
           transactions: prev.transactions.map((tx) => (tx.id === txPayload.id ? txPayload : tx)),
@@ -9071,9 +9234,30 @@ function LifeOsWorkspace() {
   };
 
   const handleAddInvestment = (asset) => {
+    const { accountId, ...rest } = asset;
+    const id = `inv-${Date.now()}`;
+    const linked = Boolean(accountId) && rest.investedAmount > 0;
     setData((prev) => ({
       ...prev,
-      investments: [...(prev.investments || []), { ...asset, id: `inv-${Date.now()}` }],
+      investments: [...(prev.investments || []), { ...rest, id, accountId: linked ? accountId : undefined }],
+      // Pembelian aset memotong saldo akun sumber (transfer, bukan pengeluaran)
+      transactions: linked
+        ? [
+            {
+              id: `tx-inv-${id}`,
+              type: 'transfer',
+              amount: rest.investedAmount,
+              date: TODAY_STR,
+              category: 'Investments',
+              description: `${lang === 'id' ? 'Beli aset' : 'Buy asset'}: ${rest.name}`,
+              accountId,
+              investmentId: id,
+              paymentMethod: 'Internal Ledger Transfer',
+              notes: '',
+            },
+            ...prev.transactions,
+          ]
+        : prev.transactions,
     }));
     notify(lang === 'id' ? `Aset investasi ditambahkan: ${asset.name}` : `Added asset: ${asset.name}`);
   };
@@ -9091,11 +9275,14 @@ function LifeOsWorkspace() {
   const handleDeleteInvestment = (asset) => {
     askConfirm(
       lang === 'id' ? 'Hapus Aset Investasi' : 'Delete Investment Asset',
-      lang === 'id' ? `Hapus "${asset.name}" dari portofolio?` : `Remove "${asset.name}"?`,
+      lang === 'id'
+        ? `Hapus "${asset.name}" dari portofolio?${asset.accountId ? ' Dana pembelian dikembalikan ke akun asal.' : ''}`
+        : `Remove "${asset.name}"?${asset.accountId ? ' The purchase amount returns to the source account.' : ''}`,
       () => {
         setData((prev) => ({
           ...prev,
           investments: (prev.investments || []).filter((item) => item.id !== asset.id),
+          transactions: prev.transactions.filter((tx) => tx.investmentId !== asset.id),
         }));
         notify(lang === 'id' ? 'Aset investasi dihapus' : 'Asset removed');
       }
@@ -9112,6 +9299,13 @@ function LifeOsWorkspace() {
         setData((prev) => ({
           ...prev,
           transactions: prev.transactions.filter((item) => item.id !== tx.id),
+          savingsGoals: tx.savingsContribId
+            ? prev.savingsGoals.map((sg) =>
+                sg.id === tx.savingsGoalId
+                  ? { ...sg, contributions: sg.contributions.filter((c) => c.id !== tx.savingsContribId) }
+                  : sg
+              )
+            : prev.savingsGoals,
         }));
         notify(lang === 'id' ? 'Transaksi dihapus' : 'Transaction removed');
       }
@@ -9147,7 +9341,7 @@ function LifeOsWorkspace() {
       const existing = prev.budgets.find(
         (b) => b.id === bud.id || (b.category === bud.category && b.month === bud.month)
       );
-      if (existing) {
+      if (existing && existing.month === bud.month) {
         return {
           ...prev,
           budgets: prev.budgets.map((b) =>
@@ -9177,54 +9371,73 @@ function LifeOsWorkspace() {
     );
   };
 
-  const handleCreateSavingsGoal = ({ name, targetAmount, targetDate, initialSaved }) => {
-    const contributions =
-      initialSaved > 0
-        ? [
-            {
-              id: `sc-${Date.now()}`,
-              amount: initialSaved,
-              date: TODAY_STR,
-              note: lang === 'id' ? 'Setoran awal' : 'Opening deposit',
-            },
-          ]
-        : [];
+  // Setoran tabungan selalu memotong saldo akun sumber lewat transaksi transfer (tercatat di buku kas)
+  const buildVaultTx = (goalName, goalId, contribId, amount, note, accountId) => ({
+    id: `tx-sv-${contribId}`,
+    type: 'transfer',
+    amount,
+    date: TODAY_STR,
+    category: 'Vault Allocation',
+    description: `${lang === 'id' ? 'Tabungan' : 'Savings'}: ${goalName}`,
+    accountId,
+    savingsGoalId: goalId,
+    savingsContribId: contribId,
+    paymentMethod: 'Internal Ledger Transfer',
+    notes: note || '',
+  });
+
+  const handleCreateSavingsGoal = ({ name, targetAmount, targetDate, initialSaved, accountId }) => {
+    const stamp = Date.now();
+    const goalId = `sav-${stamp}`;
+    const hasInitial = initialSaved > 0 && accountId;
+    const contribId = `sc-${stamp}`;
+    const note = lang === 'id' ? 'Setoran awal' : 'Opening deposit';
+    const contributions = hasInitial
+      ? [{ id: contribId, amount: initialSaved, date: TODAY_STR, note, accountId }]
+      : [];
     setData((prev) => ({
       ...prev,
-      savingsGoals: [
-        ...prev.savingsGoals,
-        { id: `sav-${Date.now()}`, name, targetAmount, targetDate, contributions },
-      ],
+      savingsGoals: [...prev.savingsGoals, { id: goalId, name, targetAmount, targetDate, contributions }],
+      transactions: hasInitial
+        ? [buildVaultTx(name, goalId, contribId, initialSaved, note, accountId), ...prev.transactions]
+        : prev.transactions,
     }));
     notify(lang === 'id' ? `Brankas dibuat: ${name}` : `Created savings vault: ${name}`);
   };
 
-  const handleAddContribution = (goalId, amount, note) => {
-    setData((prev) => ({
-      ...prev,
-      savingsGoals: prev.savingsGoals.map((sg) =>
-        sg.id === goalId
-          ? {
-              ...sg,
-              contributions: [
-                ...sg.contributions,
-                { id: `sc-${Date.now()}`, amount, date: TODAY_STR, note },
-              ],
-            }
-          : sg
-      ),
-    }));
-    notify(lang === 'id' ? 'Setoran tabungan dicatat' : 'Savings contribution logged');
+  const handleAddContribution = (goalId, amount, note, accountId) => {
+    const contribId = `sc-${Date.now()}`;
+    setData((prev) => {
+      const goal = prev.savingsGoals.find((sg) => sg.id === goalId);
+      if (!goal || !accountId) return prev;
+      return {
+        ...prev,
+        savingsGoals: prev.savingsGoals.map((sg) =>
+          sg.id === goalId
+            ? {
+                ...sg,
+                contributions: [...sg.contributions, { id: contribId, amount, date: TODAY_STR, note, accountId }],
+              }
+            : sg
+        ),
+        transactions: [buildVaultTx(goal.name, goalId, contribId, amount, note, accountId), ...prev.transactions],
+      };
+    });
+    notify(lang === 'id' ? 'Setoran tabungan dicatat & saldo akun dipotong' : 'Deposit logged and account debited');
   };
 
   const handleDeleteSavingsGoal = (sg) => {
+    const linked = sg.contributions.filter((c) => c.accountId).reduce((sum, c) => sum + c.amount, 0);
     askConfirm(
       lang === 'id' ? 'Hapus Target Tabungan' : 'Delete Savings Vault',
-      lang === 'id' ? `Hapus "${sg.name}"?` : `Remove "${sg.name}"?`,
+      lang === 'id'
+        ? `Hapus "${sg.name}"?${linked > 0 ? ` Dana ${formatMoney(linked, data.profile.currency)} dikembalikan ke akun asal.` : ''}`
+        : `Remove "${sg.name}"?${linked > 0 ? ` ${formatMoney(linked, data.profile.currency)} returns to the source accounts.` : ''}`,
       () => {
         setData((prev) => ({
           ...prev,
           savingsGoals: prev.savingsGoals.filter((item) => item.id !== sg.id),
+          transactions: prev.transactions.filter((tx) => tx.savingsGoalId !== sg.id),
         }));
         notify(lang === 'id' ? 'Target tabungan dihapus' : 'Savings vault deleted');
       }
@@ -9289,8 +9502,11 @@ function LifeOsWorkspace() {
     notify(lang === 'id' ? `Catatan ditambahkan: ${debt.title}` : `Added: ${debt.title}`);
   };
 
-  const handleSettleDebtInstallment = (debtItem, stepAmount) => {
+  const handleSettleDebtInstallment = (debtItem, requestedAmount) => {
     const isDebt = debtItem.kind === 'debt';
+    // Jangan bayar melebihi sisa utang (cicilan terakhir bisa lebih kecil dari cicilan bulanan)
+    const stepAmount = Math.min(requestedAmount, debtItem.totalAmount - debtItem.paidAmount);
+    if (!(stepAmount > 0)) return;
     setData((prev) => ({
       ...prev,
       debts: (prev.debts || []).map((d) =>
@@ -9304,7 +9520,7 @@ function LifeOsWorkspace() {
           type: isDebt ? 'expense' : 'income',
           amount: stepAmount,
           date: TODAY_STR,
-          category: isDebt ? 'Housing & Utilities' : 'Other Income',
+          category: isDebt ? 'Debt & Installments' : 'Other Income',
           description: `${isDebt ? (lang === 'id' ? 'Bayar Cicilan' : 'Installment Payment') : (lang === 'id' ? 'Terima Piutang' : 'Receivable Payment')}: ${debtItem.title}`,
           accountId: debtItem.accountId || prev.accounts[0]?.id,
           paymentMethod: 'Ledger Settlement',
@@ -9599,8 +9815,17 @@ function LifeOsWorkspace() {
     }));
   };
 
-  const handleLogShoppingAsExpense = (listName, amount) => {
-    const defaultAcc = data.accounts[0]?.id || '';
+  const handleLogShoppingAsExpense = (listName, amount, accountId, listId, newLoggedTotal) => {
+    const defaultAcc = accountId || data.accounts[0]?.id || '';
+    if (!defaultAcc) {
+      notify(lang === 'id' ? 'Buat akun dompet dulu' : 'Create a wallet account first');
+      return;
+    }
+    // Tandai total yang sudah dicatat agar tidak tercatat dua kali
+    setData((prev) => ({
+      ...prev,
+      shoppingLists: prev.shoppingLists.map((l) => (l.id === listId ? { ...l, loggedAmount: newLoggedTotal } : l)),
+    }));
     handleSaveTx({
       type: 'expense',
       amount,
@@ -9626,7 +9851,8 @@ function LifeOsWorkspace() {
 
   const handleImportJson = (parsed) => {
     if (parsed && Array.isArray(parsed.accounts) && Array.isArray(parsed.transactions)) {
-      setData(parsed);
+      const base = createEmptyState(lang, parsed.profile?.name || '');
+      setData({ ...base, ...parsed, profile: { ...base.profile, ...(parsed.profile || {}) } });
       setSettingsOpen(false);
       notify(lang === 'id' ? 'Data berhasil dipulihkan dari JSON' : 'Workspace restored from JSON');
     } else {
@@ -9754,6 +9980,7 @@ function LifeOsWorkspace() {
             onCreateSavingsGoal={handleCreateSavingsGoal}
             onAddContribution={handleAddContribution}
             onDeleteSavingsGoal={handleDeleteSavingsGoal}
+            accountBalances={derived.accountBalances}
           />
         );
       case 'investments':
