@@ -93,6 +93,7 @@ import {
   PieChart as RePieChart,
   Pie,
 } from 'recharts';
+import ThemeSettings from './ThemeSettings.jsx';
 import { initializeApp, getApps } from 'firebase/app';
 import {
   getAuth,
@@ -776,14 +777,14 @@ const DEFAULT_INCOME_CATEGORIES = [
 ];
 
 const CHART_PALETTE = [
-  '#B68B61',
-  '#E4C8A6',
-  '#8C6440',
-  '#C99E74',
-  '#7A553A',
-  '#D4B48C',
-  '#9E7652',
-  '#624332',
+  'rgb(var(--life-accent))',
+  'rgb(var(--life-soft))',
+  'rgb(var(--life-accent-dark))',
+  'rgb(var(--life-accent))',
+  'rgb(var(--life-accent-dark))',
+  'rgb(var(--life-soft))',
+  'rgb(var(--life-accent-dark))',
+  'rgb(var(--life-border))',
 ];
 
 const NAV_GROUPS = [
@@ -1790,13 +1791,13 @@ class WorkspaceErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-[#171412] text-[#F4E9DC] flex items-center justify-center p-6">
-          <div className="max-w-md w-full rounded-2xl bg-[#241B17] border border-[#B68B61]/60 p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-[#E4C8A6]">LIFE OS Recovery</h2>
-            <p className="text-xs text-[#A99B90]">{this.state.errorMsg}</p>
+        <div className="min-h-screen bg-life-bg text-life-text flex items-center justify-center p-6">
+          <div className="max-w-md w-full rounded-2xl bg-life-surface border border-life-accent/60 p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-life-soft">LIFE OS Recovery</h2>
+            <p className="text-xs text-life-muted">{this.state.errorMsg}</p>
             <button
               onClick={() => this.setState({ hasError: false, errorMsg: '' })}
-              className="px-4 py-2 rounded-xl bg-[#B68B61] text-[#171412] text-sm font-semibold"
+              className="px-4 py-2 rounded-xl bg-life-accent text-life-bg text-sm font-semibold"
             >
               Reload Workspace
             </button>
@@ -1811,8 +1812,8 @@ class WorkspaceErrorBoundary extends React.Component {
 const GlassCard = ({ children, className = '', onClick }) => (
   <div
     onClick={onClick}
-    className={`rounded-2xl bg-[#241B17]/85 backdrop-blur-md border border-[#624332]/40 shadow-[0_12px_32px_rgba(0,0,0,0.42)] life-glass-interactive min-w-0 ${
-      onClick ? 'cursor-pointer hover:border-[#B68B61]/60 hover:bg-[#2A201B]' : ''
+    className={`rounded-2xl bg-life-surface/85 backdrop-blur-md border border-life-border/40 shadow-[0_12px_32px_rgba(0,0,0,0.42)] life-glass-interactive min-w-0 ${
+      onClick ? 'cursor-pointer hover:border-life-accent/60 hover:bg-life-surface2' : ''
     } ${className}`}
   >
     {children}
@@ -1830,10 +1831,10 @@ const Button = ({
 }) => {
   const variants = {
     primary:
-      'bg-gradient-to-r from-[#B68B61] to-[#9B7048] text-[#171412] font-semibold hover:from-[#C79C72] hover:to-[#B68B61] shadow-[0_4px_16px_rgba(182,139,97,0.28)]',
+      'bg-gradient-to-r from-life-accent to-life-accent-dark text-life-bg font-semibold hover:from-life-accent hover:to-life-accent shadow-[0_4px_16px_rgba(182,139,97,0.28)]',
     secondary:
-      'bg-[#30231D] text-[#F4E9DC] border border-[#624332]/60 hover:border-[#B68B61]/70 hover:bg-[#3A2B24]',
-    ghost: 'text-[#A99B90] hover:text-[#F4E9DC] hover:bg-[#30231D]/70',
+      'bg-life-surface2 text-life-text border border-life-border/60 hover:border-life-accent/70 hover:bg-life-surface2',
+    ghost: 'text-life-muted hover:text-life-text hover:bg-life-surface2/70',
     danger:
       'bg-[#D96B52]/20 text-[#F29B87] border border-[#D96B52]/40 hover:bg-[#D96B52]/30',
   };
@@ -1859,13 +1860,13 @@ const Button = ({
 const Input = ({ label, className = '', ...props }) => (
   <div className="space-y-1.5 min-w-0">
     {label && (
-      <label className="block text-xs font-medium uppercase tracking-wider text-[#A99B90]">
+      <label className="block text-xs font-medium uppercase tracking-wider text-life-muted">
         {label}
       </label>
     )}
     <input
       {...props}
-      className={`w-full rounded-xl bg-[#171412]/90 border border-[#624332]/55 px-3.5 py-2.5 text-sm text-[#F4E9DC] placeholder-[#A99B90]/50 focus:outline-none focus:border-[#B68B61] transition-colors min-h-[44px] ${className}`}
+      className={`w-full rounded-xl bg-life-bg/90 border border-life-border/55 px-3.5 py-2.5 text-sm text-life-text placeholder-life-muted/50 focus:outline-none focus:border-life-accent transition-colors min-h-[44px] ${className}`}
     />
   </div>
 );
@@ -1873,13 +1874,13 @@ const Input = ({ label, className = '', ...props }) => (
 const Select = ({ label, children, className = '', ...props }) => (
   <div className="space-y-1.5 min-w-0">
     {label && (
-      <label className="block text-xs font-medium uppercase tracking-wider text-[#A99B90]">
+      <label className="block text-xs font-medium uppercase tracking-wider text-life-muted">
         {label}
       </label>
     )}
     <select
       {...props}
-      className={`w-full rounded-xl bg-[#171412]/90 border border-[#624332]/55 px-3.5 py-2.5 text-sm text-[#F4E9DC] focus:outline-none focus:border-[#B68B61] transition-colors min-h-[44px] ${className}`}
+      className={`w-full rounded-xl bg-life-bg/90 border border-life-border/55 px-3.5 py-2.5 text-sm text-life-text focus:outline-none focus:border-life-accent transition-colors min-h-[44px] ${className}`}
     >
       {children}
     </select>
@@ -1889,13 +1890,13 @@ const Select = ({ label, children, className = '', ...props }) => (
 const ProgressBar = ({ value, max = 100, tone = 'bronze', height = 'h-2' }) => {
   const pct = max > 0 ? Math.min(100, Math.max(0, (value / max) * 100)) : 0;
   const tones = {
-    bronze: 'bg-gradient-to-r from-[#8C6440] to-[#B68B61]',
-    champagne: 'bg-gradient-to-r from-[#B68B61] to-[#E4C8A6]',
+    bronze: 'bg-gradient-to-r from-life-accent-dark to-life-accent',
+    champagne: 'bg-gradient-to-r from-life-accent to-life-soft',
     danger: 'bg-gradient-to-r from-[#B84D35] to-[#D96B52]',
     success: 'bg-gradient-to-r from-[#5B8056] to-[#87B082]',
   };
   return (
-    <div className={`w-full rounded-full bg-[#171412] overflow-hidden border border-[#624332]/30 ${height}`}>
+    <div className={`w-full rounded-full bg-life-bg overflow-hidden border border-life-border/30 ${height}`}>
       <div
         className={`h-full rounded-full transition-all duration-700 ease-out ${tones[tone]}`}
         style={{ width: `${pct}%` }}
@@ -1909,16 +1910,16 @@ const Modal = ({ open, onClose, title, subtitle, children, maxWidth = 'max-w-lg'
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75 backdrop-blur-sm">
       <div
-        className={`w-full ${maxWidth} rounded-t-3xl sm:rounded-2xl bg-[#241B17] border border-[#624332]/70 shadow-2xl overflow-hidden max-h-[92vh] flex flex-col life-motion-enter`}
+        className={`w-full ${maxWidth} rounded-t-3xl sm:rounded-2xl bg-life-surface border border-life-border/70 shadow-2xl overflow-hidden max-h-[92vh] flex flex-col life-motion-enter`}
       >
-        <div className="flex items-start justify-between p-4 sm:p-5 border-b border-[#624332]/40 bg-[#171412]/50">
+        <div className="flex items-start justify-between p-4 sm:p-5 border-b border-life-border/40 bg-life-bg/50">
           <div className="min-w-0 pr-2">
-            <h3 className="text-base sm:text-lg font-semibold text-[#F4E9DC] truncate">{title}</h3>
-            {subtitle && <p className="text-xs text-[#A99B90] mt-0.5">{subtitle}</p>}
+            <h3 className="text-base sm:text-lg font-semibold text-life-text truncate">{title}</h3>
+            {subtitle && <p className="text-xs text-life-muted mt-0.5">{subtitle}</p>}
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-[#A99B90] hover:text-[#F4E9DC] hover:bg-[#30231D] shrink-0"
+            className="p-2 rounded-xl text-life-muted hover:text-life-text hover:bg-life-surface2 shrink-0"
             aria-label="Close modal"
           >
             <X className="w-5 h-5" />
@@ -1932,7 +1933,7 @@ const Modal = ({ open, onClose, title, subtitle, children, maxWidth = 'max-w-lg'
 
 const ConfirmDialog = ({ open, title, message, confirmLabel = 'Delete', cancelLabel = 'Cancel', onConfirm, onCancel }) => (
   <Modal open={open} onClose={onCancel} title={title} maxWidth="max-w-md">
-    <p className="text-sm text-[#E4C8A6]/90 leading-relaxed">{message}</p>
+    <p className="text-sm text-life-soft/90 leading-relaxed">{message}</p>
     <div className="flex items-center justify-end gap-3 pt-3">
       <Button variant="secondary" onClick={onCancel}>
         {cancelLabel}
@@ -1945,12 +1946,12 @@ const ConfirmDialog = ({ open, title, message, confirmLabel = 'Delete', cancelLa
 );
 
 const EmptyState = ({ icon: Icon, title, description, actionLabel, onAction }) => (
-  <div className="flex flex-col items-center justify-center text-center py-10 px-4 rounded-2xl border border-dashed border-[#624332]/50 bg-[#171412]/40">
-    <div className="w-12 h-12 rounded-2xl bg-[#30231D] border border-[#624332]/60 flex items-center justify-center text-[#B68B61] mb-3">
+  <div className="flex flex-col items-center justify-center text-center py-10 px-4 rounded-2xl border border-dashed border-life-border/50 bg-life-bg/40">
+    <div className="w-12 h-12 rounded-2xl bg-life-surface2 border border-life-border/60 flex items-center justify-center text-life-accent mb-3">
       <Icon className="w-6 h-6" />
     </div>
-    <h4 className="text-base font-medium text-[#F4E9DC]">{title}</h4>
-    <p className="text-xs text-[#A99B90] max-w-sm mt-1">{description}</p>
+    <h4 className="text-base font-medium text-life-text">{title}</h4>
+    <p className="text-xs text-life-muted max-w-sm mt-1">{description}</p>
     {actionLabel && onAction && (
       <Button size="sm" className="mt-4" onClick={onAction}>
         <Plus className="w-4 h-4" /> {actionLabel}
@@ -2096,23 +2097,23 @@ const AuthPortalScreen = ({ lang, onToggleLang, t, onAuthenticateSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#171412] text-[#F4E9DC] flex flex-col justify-between p-4 sm:p-8 relative overflow-x-hidden">
+    <div className="min-h-screen bg-life-bg text-life-text flex flex-col justify-between p-4 sm:p-8 relative overflow-x-hidden">
       <style>{MOTION_STYLES}</style>
       <ParallaxLayer speed={-0.12} pointerFactor={18} className="fixed -top-24 -left-24 pointer-events-none">
-        <div className="w-96 h-96 rounded-full bg-[#B68B61]/12 blur-3xl life-pulse-glow" />
+        <div className="w-96 h-96 rounded-full bg-life-accent/12 blur-3xl life-pulse-glow" />
       </ParallaxLayer>
       <ParallaxLayer speed={0.14} pointerFactor={-16} className="fixed -bottom-24 -right-24 pointer-events-none">
-        <div className="w-96 h-96 rounded-full bg-[#624332]/25 blur-3xl" />
+        <div className="w-96 h-96 rounded-full bg-life-border/25 blur-3xl" />
       </ParallaxLayer>
 
       <div className="max-w-5xl w-full mx-auto flex items-center justify-between relative z-10">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#B68B61] to-[#624332] flex items-center justify-center text-[#171412] font-bold text-lg shadow-lg">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-life-accent to-life-border flex items-center justify-center text-life-bg font-bold text-lg shadow-lg">
             L
           </div>
           <div>
-            <span className="text-base font-bold tracking-wider text-[#F4E9DC] block">LIFE OS</span>
-            <span className="text-[10px] uppercase tracking-widest text-[#B68B61]">
+            <span className="text-base font-bold tracking-wider text-life-text block">LIFE OS</span>
+            <span className="text-[10px] uppercase tracking-widest text-life-accent">
               Dark Chocolate Edition
             </span>
           </div>
@@ -2120,25 +2121,25 @@ const AuthPortalScreen = ({ lang, onToggleLang, t, onAuthenticateSuccess }) => {
 
         <button
           onClick={onToggleLang}
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#241B17] border border-[#624332]/60 text-xs font-semibold text-[#E4C8A6] hover:border-[#B68B61]"
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-life-surface border border-life-border/60 text-xs font-semibold text-life-soft hover:border-life-accent"
         >
-          <Globe className="w-4 h-4 text-[#B68B61]" />
+          <Globe className="w-4 h-4 text-life-accent" />
           <span>{lang === 'id' ? 'Bahasa Indonesia' : 'English'}</span>
         </button>
       </div>
 
       <div className="max-w-md w-full mx-auto my-8 relative z-10 life-motion-enter">
-        <GlassCard className="p-6 sm:p-8 space-y-6 border-[#B68B61]/35">
+        <GlassCard className="p-6 sm:p-8 space-y-6 border-life-accent/35">
           <div className="text-center space-y-2">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#171412] border border-[#624332]/60 text-[11px] text-[#E4C8A6]">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#B68B61]" />
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-life-bg border border-life-border/60 text-[11px] text-life-soft">
+              <ShieldCheck className="w-3.5 h-3.5 text-life-accent" />
               <span>{t('auth_badge')}</span>
             </div>
-            <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('auth_title')}</h1>
-            <p className="text-xs text-[#A99B90]">{t('auth_subtitle')}</p>
+            <h1 className="text-xl sm:text-2xl font-semibold text-life-text">{t('auth_title')}</h1>
+            <p className="text-xs text-life-muted">{t('auth_subtitle')}</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-[#171412] border border-[#624332]/50">
+          <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-life-bg border border-life-border/50">
             <button
               type="button"
               onClick={() => {
@@ -2146,7 +2147,7 @@ const AuthPortalScreen = ({ lang, onToggleLang, t, onAuthenticateSuccess }) => {
                 setErrorMsg('');
               }}
               className={`py-2.5 rounded-lg text-xs font-semibold transition-all ${
-                mode === 'login' ? 'bg-[#B68B61] text-[#171412]' : 'text-[#A99B90] hover:text-[#F4E9DC]'
+                mode === 'login' ? 'bg-life-accent text-life-bg' : 'text-life-muted hover:text-life-text'
               }`}
             >
               {t('tab_login')}
@@ -2158,7 +2159,7 @@ const AuthPortalScreen = ({ lang, onToggleLang, t, onAuthenticateSuccess }) => {
                 setErrorMsg('');
               }}
               className={`py-2.5 rounded-lg text-xs font-semibold transition-all ${
-                mode === 'register' ? 'bg-[#B68B61] text-[#171412]' : 'text-[#A99B90] hover:text-[#F4E9DC]'
+                mode === 'register' ? 'bg-life-accent text-life-bg' : 'text-life-muted hover:text-life-text'
               }`}
             >
               {t('tab_register')}
@@ -2203,7 +2204,7 @@ const AuthPortalScreen = ({ lang, onToggleLang, t, onAuthenticateSuccess }) => {
 
             {mode === 'register' && (
               <div className="space-y-1.5">
-                <label className="block text-xs font-medium uppercase tracking-wider text-[#A99B90]">
+                <label className="block text-xs font-medium uppercase tracking-wider text-life-muted">
                   {t('workspace_mode_label')}
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -2217,8 +2218,8 @@ const AuthPortalScreen = ({ lang, onToggleLang, t, onAuthenticateSuccess }) => {
                       onClick={() => setSeedMode(opt.id)}
                       className={`p-2.5 rounded-xl border text-left text-xs font-medium transition-all ${
                         seedMode === opt.id
-                          ? 'bg-[#30231D] border-[#B68B61] text-[#E4C8A6]'
-                          : 'bg-[#171412]/80 border-[#624332]/45 text-[#A99B90]'
+                          ? 'bg-life-surface2 border-life-accent text-life-soft'
+                          : 'bg-life-bg/80 border-life-border/45 text-life-muted'
                       }`}
                     >
                       {opt.label}
@@ -2233,15 +2234,15 @@ const AuthPortalScreen = ({ lang, onToggleLang, t, onAuthenticateSuccess }) => {
             </Button>
           </form>
 
-          <div className="pt-3 border-t border-[#624332]/35">
+          <div className="pt-3 border-t border-life-border/35">
             <Button variant="secondary" className="w-full" onClick={handleQuickDemoAccess}>
-              <Sparkles className="w-4 h-4 text-[#B68B61]" /> {t('btn_demo_access')}
+              <Sparkles className="w-4 h-4 text-life-accent" /> {t('btn_demo_access')}
             </Button>
           </div>
         </GlassCard>
       </div>
 
-      <div className="text-center text-[11px] text-[#A99B90]/70 relative z-10">
+      <div className="text-center text-[11px] text-life-muted/70 relative z-10">
         LIFE OS • Private Personal Wealth & Productivity Architecture
       </div>
     </div>
@@ -2292,29 +2293,29 @@ const DashboardView = ({
     <div className="space-y-6">
       {/* Multi-Layer Parallax Hero Banner */}
       <MotionReveal delay={0}>
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#30231D] via-[#241B17] to-[#171412] border border-[#B68B61]/35 p-5 sm:p-8 shadow-2xl">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-life-surface2 via-life-surface to-life-bg border border-life-accent/35 p-5 sm:p-8 shadow-2xl">
           {/* Parallax Deep Layer 1: Radial Bronze Glow */}
           <ParallaxLayer speed={-0.14} pointerFactor={16} className="absolute -right-16 -top-16 pointer-events-none">
-            <div className="w-72 h-72 rounded-full bg-[#B68B61]/15 blur-3xl life-pulse-glow" />
+            <div className="w-72 h-72 rounded-full bg-life-accent/15 blur-3xl life-pulse-glow" />
           </ParallaxLayer>
 
           {/* Parallax Mid Layer 2: Luxury Geometric Ring Watermark */}
           <ParallaxLayer speed={0.09} pointerFactor={-10} className="absolute right-8 -bottom-10 pointer-events-none hidden sm:block">
-            <div className="w-44 h-44 rounded-full border border-[#E4C8A6]/12 flex items-center justify-center life-float-slow">
-              <div className="w-28 h-28 rounded-full border border-[#B68B61]/18" />
+            <div className="w-44 h-44 rounded-full border border-life-soft/12 flex items-center justify-center life-float-slow">
+              <div className="w-28 h-28 rounded-full border border-life-accent/18" />
             </div>
           </ParallaxLayer>
 
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5 relative z-10">
             <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#171412]/80 border border-[#624332]/60 text-xs text-[#E4C8A6] mb-3">
-                <Sparkles className="w-3.5 h-3.5 text-[#B68B61]" />
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-life-bg/80 border border-life-border/60 text-xs text-life-soft mb-3">
+                <Sparkles className="w-3.5 h-3.5 text-life-accent" />
                 <span>{new Date().toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
               </div>
-              <h1 className="text-xl sm:text-3xl font-semibold tracking-tight text-[#F4E9DC] break-words">
+              <h1 className="text-xl sm:text-3xl font-semibold tracking-tight text-life-text break-words">
                 {t('welcome_back')}, {data.profile.name}
               </h1>
-              <p className="text-xs sm:text-sm text-[#A99B90] mt-1">{t('welcome_subtitle')}</p>
+              <p className="text-xs sm:text-sm text-life-muted mt-1">{t('welcome_subtitle')}</p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -2336,16 +2337,16 @@ const DashboardView = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <MotionReveal delay={60}>
           <GlassCard className="p-5 h-full" onClick={() => onNavigate('wallet')}>
-            <div className="flex items-center justify-between text-[#A99B90] text-xs uppercase tracking-wider">
+            <div className="flex items-center justify-between text-life-muted text-xs uppercase tracking-wider">
               <span>{t('kpi_total_balance')}</span>
-              <div className="p-2 rounded-xl bg-[#30231D] text-[#B68B61]">
+              <div className="p-2 rounded-xl bg-life-surface2 text-life-accent">
                 <Wallet className="w-4 h-4" />
               </div>
             </div>
-            <div className="mt-3 text-xl sm:text-2xl font-semibold text-[#F4E9DC] tabular-nums truncate">
+            <div className="mt-3 text-xl sm:text-2xl font-semibold text-life-text tabular-nums truncate">
               {formatMoney(derived.totalNetWorth, currency, maskBalances)}
             </div>
-            <div className="mt-2 flex items-center gap-1.5 text-xs text-[#E4C8A6] truncate">
+            <div className="mt-2 flex items-center gap-1.5 text-xs text-life-soft truncate">
               <span>
                 {data.accounts.length} {t('kpi_active_accounts')}
                 {(data.investments || []).length > 0
@@ -2358,33 +2359,33 @@ const DashboardView = ({
 
         <MotionReveal delay={120}>
           <GlassCard className="p-5 h-full" onClick={() => onNavigate('wallet')}>
-            <div className="flex items-center justify-between text-[#A99B90] text-xs uppercase tracking-wider">
+            <div className="flex items-center justify-between text-life-muted text-xs uppercase tracking-wider">
               <span>{t('kpi_monthly_income')}</span>
-              <div className="p-2 rounded-xl bg-[#30231D] text-[#E4C8A6]">
+              <div className="p-2 rounded-xl bg-life-surface2 text-life-soft">
                 <ArrowUpRight className="w-4 h-4" />
               </div>
             </div>
-            <div className="mt-3 text-xl sm:text-2xl font-semibold text-[#E4C8A6] tabular-nums truncate">
+            <div className="mt-3 text-xl sm:text-2xl font-semibold text-life-soft tabular-nums truncate">
               {formatMoney(derived.monthlyIncome, currency, maskBalances)}
             </div>
-            <div className="mt-2 text-xs text-[#A99B90]">{t('kpi_inflows_label')}</div>
+            <div className="mt-2 text-xs text-life-muted">{t('kpi_inflows_label')}</div>
           </GlassCard>
         </MotionReveal>
 
         <MotionReveal delay={180}>
           <GlassCard className="p-5 h-full" onClick={() => onNavigate('wallet')}>
-            <div className="flex items-center justify-between text-[#A99B90] text-xs uppercase tracking-wider">
+            <div className="flex items-center justify-between text-life-muted text-xs uppercase tracking-wider">
               <span>{t('kpi_monthly_expenses')}</span>
-              <div className="p-2 rounded-xl bg-[#30231D] text-[#D96B52]">
+              <div className="p-2 rounded-xl bg-life-surface2 text-[#D96B52]">
                 <ArrowDownRight className="w-4 h-4" />
               </div>
             </div>
-            <div className="mt-3 text-xl sm:text-2xl font-semibold text-[#F4E9DC] tabular-nums truncate">
+            <div className="mt-3 text-xl sm:text-2xl font-semibold text-life-text tabular-nums truncate">
               {formatMoney(derived.monthlyExpenses, currency, maskBalances)}
             </div>
-            <div className="mt-2 text-xs text-[#A99B90] truncate">
+            <div className="mt-2 text-xs text-life-muted truncate">
               {t('kpi_net_savings')}:{' '}
-              <span className="text-[#B68B61] font-medium tabular-nums">
+              <span className="text-life-accent font-medium tabular-nums">
                 {formatMoney(derived.monthlyIncome - derived.monthlyExpenses, currency, maskBalances)}
               </span>
             </div>
@@ -2393,17 +2394,17 @@ const DashboardView = ({
 
         <MotionReveal delay={240}>
           <GlassCard className="p-5 h-full" onClick={() => onNavigate('budgets')}>
-            <div className="flex items-center justify-between text-[#A99B90] text-xs uppercase tracking-wider">
+            <div className="flex items-center justify-between text-life-muted text-xs uppercase tracking-wider">
               <span>{t('kpi_budget_util')}</span>
-              <div className="p-2 rounded-xl bg-[#30231D] text-[#B68B61]">
+              <div className="p-2 rounded-xl bg-life-surface2 text-life-accent">
                 <PieChart className="w-4 h-4" />
               </div>
             </div>
             <div className="mt-3 flex items-baseline justify-between gap-2">
-              <span className="text-xl sm:text-2xl font-semibold text-[#F4E9DC] tabular-nums">
+              <span className="text-xl sm:text-2xl font-semibold text-life-text tabular-nums">
                 {derived.budgetUtilizationPct.toFixed(0)}%
               </span>
-              <span className="text-xs text-[#A99B90] tabular-nums truncate">
+              <span className="text-xs text-life-muted tabular-nums truncate">
                 {formatMoney(derived.totalBudgetRemaining, currency, maskBalances)} {t('kpi_left')}
               </span>
             </div>
@@ -2424,8 +2425,8 @@ const DashboardView = ({
           <GlassCard className="p-5 h-full">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
               <div>
-                <h2 className="text-base font-semibold text-[#F4E9DC]">{t('chart_cashflow_title')}</h2>
-                <p className="text-xs text-[#A99B90]">{t('chart_cashflow_sub')}</p>
+                <h2 className="text-base font-semibold text-life-text">{t('chart_cashflow_title')}</h2>
+                <p className="text-xs text-life-muted">{t('chart_cashflow_sub')}</p>
               </div>
               <Button variant="ghost" size="sm" onClick={() => onNavigate('reports')}>
                 {t('btn_full_analytics')}
@@ -2436,30 +2437,30 @@ const DashboardView = ({
                 <AreaChart data={derived.monthlySeries} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                   <defs>
                     <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#E4C8A6" stopOpacity={0.35} />
-                      <stop offset="95%" stopColor="#E4C8A6" stopOpacity={0} />
+                      <stop offset="5%" stopColor="rgb(var(--life-soft))" stopOpacity={0.35} />
+                      <stop offset="95%" stopColor="rgb(var(--life-soft))" stopOpacity={0} />
                     </linearGradient>
                     <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#B68B61" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#B68B61" stopOpacity={0} />
+                      <stop offset="5%" stopColor="rgb(var(--life-accent))" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="rgb(var(--life-accent))" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#624332" strokeOpacity={0.25} />
-                  <XAxis dataKey="label" stroke="#A99B90" fontSize={12} tickLine={false} />
-                  <YAxis stroke="#A99B90" fontSize={11} tickLine={false} width={45} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--life-border))" strokeOpacity={0.25} />
+                  <XAxis dataKey="label" stroke="rgb(var(--life-muted))" fontSize={12} tickLine={false} />
+                  <YAxis stroke="rgb(var(--life-muted))" fontSize={11} tickLine={false} width={45} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: '#241B17',
-                      borderColor: '#624332',
+                      backgroundColor: 'rgb(var(--life-surface))',
+                      borderColor: 'rgb(var(--life-border))',
                       borderRadius: '12px',
-                      color: '#F4E9DC',
+                      color: 'rgb(var(--life-text))',
                     }}
                   />
                   <Area
                     type="monotone"
                     dataKey="income"
                     name={lang === 'id' ? 'Pemasukan' : 'Income'}
-                    stroke="#E4C8A6"
+                    stroke="rgb(var(--life-soft))"
                     strokeWidth={2.2}
                     fillOpacity={1}
                     fill="url(#incomeGrad)"
@@ -2468,7 +2469,7 @@ const DashboardView = ({
                     type="monotone"
                     dataKey="expenses"
                     name={lang === 'id' ? 'Pengeluaran' : 'Expenses'}
-                    stroke="#B68B61"
+                    stroke="rgb(var(--life-accent))"
                     strokeWidth={2.2}
                     fillOpacity={1}
                     fill="url(#expenseGrad)"
@@ -2484,8 +2485,8 @@ const DashboardView = ({
             <div>
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-base font-semibold text-[#F4E9DC]">{t('todays_schedule')}</h2>
-                  <p className="text-xs text-[#A99B90]">
+                  <h2 className="text-base font-semibold text-life-text">{t('todays_schedule')}</h2>
+                  <p className="text-xs text-life-muted">
                     {todaysEvents.length} {t('events_scheduled')}
                   </p>
                 </div>
@@ -2494,20 +2495,20 @@ const DashboardView = ({
                 </Button>
               </div>
               {todaysEvents.length === 0 ? (
-                <p className="text-xs text-[#A99B90] py-8 text-center">{t('no_events_today')}</p>
+                <p className="text-xs text-life-muted py-8 text-center">{t('no_events_today')}</p>
               ) : (
                 <div className="space-y-3">
                   {todaysEvents.map((evt) => (
                     <div
                       key={evt.id}
-                      className="p-3 rounded-xl bg-[#171412]/80 border border-[#624332]/40 flex items-start gap-3"
+                      className="p-3 rounded-xl bg-life-bg/80 border border-life-border/40 flex items-start gap-3"
                     >
-                      <div className="px-2 py-1 rounded-lg bg-[#30231D] text-[#E4C8A6] text-xs font-medium tabular-nums shrink-0">
+                      <div className="px-2 py-1 rounded-lg bg-life-surface2 text-life-soft text-xs font-medium tabular-nums shrink-0">
                         {evt.startTime}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-[#F4E9DC] truncate">{evt.title}</p>
-                        <p className="text-xs text-[#A99B90] mt-0.5 truncate">
+                        <p className="text-sm font-medium text-life-text truncate">{evt.title}</p>
+                        <p className="text-xs text-life-muted mt-0.5 truncate">
                           {evt.startTime} – {evt.endTime} • {evt.location || evt.category}
                         </p>
                       </div>
@@ -2528,13 +2529,13 @@ const DashboardView = ({
         <MotionReveal delay={80}>
           <GlassCard className="p-5 h-full">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-semibold text-[#F4E9DC]">{t('recent_ledger')}</h2>
+              <h2 className="text-base font-semibold text-life-text">{t('recent_ledger')}</h2>
               <Button variant="ghost" size="sm" onClick={() => onNavigate('wallet')}>
                 {t('view_all')}
               </Button>
             </div>
             {recentTransactions.length === 0 ? (
-              <p className="text-xs text-[#A99B90] py-6 text-center">
+              <p className="text-xs text-life-muted py-6 text-center">
                 {lang === 'id' ? 'Belum ada transaksi tercatat.' : 'No transactions logged yet.'}
               </p>
             ) : (
@@ -2545,21 +2546,21 @@ const DashboardView = ({
                   return (
                     <div
                       key={tx.id}
-                      className="flex items-center justify-between p-2.5 rounded-xl bg-[#171412]/70 border border-[#624332]/30"
+                      className="flex items-center justify-between p-2.5 rounded-xl bg-life-bg/70 border border-life-border/30"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-9 h-9 rounded-xl bg-[#30231D] flex items-center justify-center text-[#B68B61] shrink-0">
+                        <div className="w-9 h-9 rounded-xl bg-life-surface2 flex items-center justify-center text-life-accent shrink-0">
                           {isIncome ? (
-                            <ArrowUpRight className="w-4 h-4 text-[#E4C8A6]" />
+                            <ArrowUpRight className="w-4 h-4 text-life-soft" />
                           ) : isTransfer ? (
-                            <ArrowLeftRight className="w-4 h-4 text-[#B68B61]" />
+                            <ArrowLeftRight className="w-4 h-4 text-life-accent" />
                           ) : (
                             <ArrowDownRight className="w-4 h-4 text-[#D96B52]" />
                           )}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-[#F4E9DC] truncate">{tx.description}</p>
-                          <p className="text-[11px] text-[#A99B90] truncate">
+                          <p className="text-sm font-medium text-life-text truncate">{tx.description}</p>
+                          <p className="text-[11px] text-life-muted truncate">
                             {tx.category} • {formatDateReadable(tx.date, lang)}
                           </p>
                         </div>
@@ -2567,10 +2568,10 @@ const DashboardView = ({
                       <span
                         className={`text-xs sm:text-sm font-semibold tabular-nums shrink-0 ml-2 ${
                           isIncome
-                            ? 'text-[#E4C8A6]'
+                            ? 'text-life-soft'
                             : isTransfer
-                            ? 'text-[#B68B61]'
-                            : 'text-[#F4E9DC]'
+                            ? 'text-life-accent'
+                            : 'text-life-text'
                         }`}
                       >
                         {isIncome ? '+' : isTransfer ? '' : '-'}
@@ -2588,8 +2589,8 @@ const DashboardView = ({
           <GlassCard className="p-5 h-full">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-base font-semibold text-[#F4E9DC]">{t('priority_tasks')}</h2>
-                <p className="text-xs text-[#A99B90]">
+                <h2 className="text-base font-semibold text-life-text">{t('priority_tasks')}</h2>
+                <p className="text-xs text-life-muted">
                   {data.tasks.filter((tk) => tk.status === 'completed').length}/{data.tasks.length}{' '}
                   {t('completed_count')}
                 </p>
@@ -2599,7 +2600,7 @@ const DashboardView = ({
               </Button>
             </div>
             {upcomingTasks.length === 0 ? (
-              <p className="text-xs text-[#A99B90] py-6 text-center">
+              <p className="text-xs text-life-muted py-6 text-center">
                 {lang === 'id' ? 'Semua tugas selesai.' : 'All tasks completed.'}
               </p>
             ) : (
@@ -2608,22 +2609,22 @@ const DashboardView = ({
                   <div
                     key={task.id}
                     onClick={() => onToggleTask(task.id)}
-                    className="flex items-start gap-3 p-2.5 rounded-xl bg-[#171412]/70 border border-[#624332]/30 hover:border-[#B68B61]/50 cursor-pointer transition-colors"
+                    className="flex items-start gap-3 p-2.5 rounded-xl bg-life-bg/70 border border-life-border/30 hover:border-life-accent/50 cursor-pointer transition-colors"
                   >
                     <button
                       type="button"
-                      className="mt-0.5 text-[#B68B61] hover:text-[#E4C8A6] shrink-0"
+                      className="mt-0.5 text-life-accent hover:text-life-soft shrink-0"
                       aria-label="Toggle task completion"
                     >
                       <Circle className="w-4 h-4" />
                     </button>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-[#F4E9DC] truncate">{task.title}</p>
+                      <p className="text-sm font-medium text-life-text truncate">{task.title}</p>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#30231D] text-[#E4C8A6]">
+                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-life-surface2 text-life-soft">
                           {task.priority}
                         </span>
-                        <span className="text-[11px] text-[#A99B90]">
+                        <span className="text-[11px] text-life-muted">
                           {formatDateReadable(task.dueDate, lang)}
                         </span>
                       </div>
@@ -2640,8 +2641,8 @@ const DashboardView = ({
             <div>
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <h2 className="text-base font-semibold text-[#F4E9DC]">{t('daily_habit_checkin')}</h2>
-                  <p className="text-xs text-[#A99B90]">
+                  <h2 className="text-base font-semibold text-life-text">{t('daily_habit_checkin')}</h2>
+                  <p className="text-xs text-life-muted">
                     {completedHabitsToday}/{data.habits.length} {t('completed_today')}
                   </p>
                 </div>
@@ -2659,22 +2660,22 @@ const DashboardView = ({
                       onClick={() => onToggleHabitToday(habit.id, TODAY_STR)}
                       className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition-all ${
                         doneToday
-                          ? 'bg-[#30231D]/90 border-[#B68B61]/60 text-[#F4E9DC]'
-                          : 'bg-[#171412]/70 border-[#624332]/30 text-[#A99B90] hover:text-[#F4E9DC]'
+                          ? 'bg-life-surface2/90 border-life-accent/60 text-life-text'
+                          : 'bg-life-bg/70 border-life-border/30 text-life-muted hover:text-life-text'
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div
                           className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${
-                            doneToday ? 'bg-[#B68B61] text-[#171412]' : 'border border-[#624332]'
+                            doneToday ? 'bg-life-accent text-life-bg' : 'border border-life-border'
                           }`}
                         >
                           {doneToday && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
                         </div>
                         <span className="text-xs font-medium truncate">{habit.name}</span>
                       </div>
-                      <span className="inline-flex items-center gap-1 text-[11px] text-[#E4C8A6] shrink-0 ml-2">
-                        <Flame className="w-3.5 h-3.5 text-[#B68B61]" /> {streak}d
+                      <span className="inline-flex items-center gap-1 text-[11px] text-life-soft shrink-0 ml-2">
+                        <Flame className="w-3.5 h-3.5 text-life-accent" /> {streak}d
                       </span>
                     </button>
                   );
@@ -2682,11 +2683,11 @@ const DashboardView = ({
               </div>
             </div>
 
-            <div className="pt-3 border-t border-[#624332]/30 space-y-3">
+            <div className="pt-3 border-t border-life-border/30 space-y-3">
               <div>
                 <div className="flex items-center justify-between text-xs mb-1.5">
-                  <span className="text-[#A99B90]">{t('active_goals_completion')}</span>
-                  <span className="text-[#E4C8A6] font-semibold tabular-nums">
+                  <span className="text-life-muted">{t('active_goals_completion')}</span>
+                  <span className="text-life-soft font-semibold tabular-nums">
                     {derived.overallGoalPct.toFixed(0)}%
                   </span>
                 </div>
@@ -2696,13 +2697,13 @@ const DashboardView = ({
               {dueFollowUpsCount > 0 && (
                 <button
                   onClick={() => onNavigate('crm')}
-                  className="w-full p-2.5 rounded-xl bg-[#30231D]/80 border border-[#B68B61]/45 flex items-center justify-between text-xs text-[#E4C8A6] hover:border-[#B68B61]"
+                  className="w-full p-2.5 rounded-xl bg-life-surface2/80 border border-life-accent/45 flex items-center justify-between text-xs text-life-soft hover:border-life-accent"
                 >
                   <span className="flex items-center gap-2">
-                    <HeartHandshake className="w-4 h-4 text-[#B68B61]" />
+                    <HeartHandshake className="w-4 h-4 text-life-accent" />
                     <span>{t('due_followups')}</span>
                   </span>
-                  <span className="px-2 py-0.5 rounded-full bg-[#B68B61] text-[#171412] font-bold">
+                  <span className="px-2 py-0.5 rounded-full bg-life-accent text-life-bg font-bold">
                     {dueFollowUpsCount}
                   </span>
                 </button>
@@ -2829,21 +2830,21 @@ const WalletView = ({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('wallet_title')}</h1>
-          <p className="text-xs text-[#A99B90] mt-1 flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-[#B68B61] shrink-0" />
+          <h1 className="text-xl sm:text-2xl font-semibold text-life-text">{t('wallet_title')}</h1>
+          <p className="text-xs text-life-muted mt-1 flex items-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5 text-life-accent shrink-0" />
             <span>{t('wallet_subtitle')}</span>
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="secondary" size="sm" onClick={onOpenReceiptModal}>
-            <ScanLine className="w-4 h-4 text-[#B68B61]" /> {t('scan_receipt')}
+            <ScanLine className="w-4 h-4 text-life-accent" /> {t('scan_receipt')}
           </Button>
           <Button variant="secondary" size="sm" onClick={onOpenSplitBillModal}>
-            <Users className="w-4 h-4 text-[#E4C8A6]" /> {t('split_bill')}
+            <Users className="w-4 h-4 text-life-soft" /> {t('split_bill')}
           </Button>
           <Button variant="secondary" size="sm" onClick={onOpenPaydayModal}>
-            <Split className="w-4 h-4 text-[#E4C8A6]" /> {t('payday_splitter')}
+            <Split className="w-4 h-4 text-life-soft" /> {t('payday_splitter')}
           </Button>
           <Button variant="secondary" size="sm" onClick={() => setShowCategoryModal(true)}>
             <Tag className="w-4 h-4" /> {t('custom_category')}
@@ -2867,31 +2868,31 @@ const WalletView = ({
               onClick={() => setAccountFilter(isSelected ? 'all' : acc.id)}
               className={`cursor-pointer rounded-2xl p-5 life-glass-interactive border relative overflow-hidden ${
                 isSelected
-                  ? 'bg-gradient-to-br from-[#3D2C24] to-[#241B17] border-[#E4C8A6] shadow-lg'
-                  : 'bg-gradient-to-br from-[#2B201B] to-[#171412] border-[#624332]/50 hover:border-[#B68B61]/70'
+                  ? 'bg-gradient-to-br from-life-surface2 to-life-surface border-life-soft shadow-lg'
+                  : 'bg-gradient-to-br from-life-surface2 to-life-bg border-life-border/50 hover:border-life-accent/70'
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#171412]/80 text-[#E4C8A6] border border-[#624332]/50">
+                <span className="text-[11px] uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-life-bg/80 text-life-soft border border-life-border/50">
                   {acc.type}
                 </span>
                 {acc.type === 'Credit' ? (
-                  <CreditCard className="w-4 h-4 text-[#B68B61]" />
+                  <CreditCard className="w-4 h-4 text-life-accent" />
                 ) : acc.type === 'Cash' ? (
-                  <Banknote className="w-4 h-4 text-[#B68B61]" />
+                  <Banknote className="w-4 h-4 text-life-accent" />
                 ) : (
-                  <Landmark className="w-4 h-4 text-[#B68B61]" />
+                  <Landmark className="w-4 h-4 text-life-accent" />
                 )}
               </div>
               <div className="mt-4">
-                <p className="text-xs text-[#A99B90] truncate">{acc.institution}</p>
-                <h3 className="text-sm font-medium text-[#F4E9DC] truncate">{acc.name}</h3>
+                <p className="text-xs text-life-muted truncate">{acc.institution}</p>
+                <h3 className="text-sm font-medium text-life-text truncate">{acc.name}</h3>
               </div>
               <div className="mt-4 flex items-end justify-between gap-2">
-                <span className="text-lg sm:text-xl font-semibold text-[#F4E9DC] tabular-nums truncate">
+                <span className="text-lg sm:text-xl font-semibold text-life-text tabular-nums truncate">
                   {formatMoney(bal, currency, maskBalances)}
                 </span>
-                <span className="text-xs text-[#A99B90] font-mono shrink-0">•••• {acc.lastFour}</span>
+                <span className="text-xs text-life-muted font-mono shrink-0">•••• {acc.lastFour}</span>
               </div>
             </div>
           );
@@ -2900,10 +2901,10 @@ const WalletView = ({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <GlassCard className="p-5 lg:col-span-2">
-          <h2 className="text-base font-semibold text-[#F4E9DC] mb-1">{t('spending_by_cat')}</h2>
-          <p className="text-xs text-[#A99B90] mb-4">{t('excludes_transfers')}</p>
+          <h2 className="text-base font-semibold text-life-text mb-1">{t('spending_by_cat')}</h2>
+          <p className="text-xs text-life-muted mb-4">{t('excludes_transfers')}</p>
           {derived.categoryBreakdown.length === 0 ? (
-            <p className="text-xs text-[#A99B90] py-12 text-center">
+            <p className="text-xs text-life-muted py-12 text-center">
               {lang === 'id' ? 'Belum ada pengeluaran bulan ini.' : 'No expenses recorded this month.'}
             </p>
           ) : (
@@ -2914,22 +2915,22 @@ const WalletView = ({
                   layout="vertical"
                   margin={{ top: 0, right: 15, left: 10, bottom: 0 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#624332" strokeOpacity={0.2} horizontal={false} />
-                  <XAxis type="number" stroke="#A99B90" fontSize={11} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--life-border))" strokeOpacity={0.2} horizontal={false} />
+                  <XAxis type="number" stroke="rgb(var(--life-muted))" fontSize={11} />
                   <YAxis
                     type="category"
                     dataKey="category"
-                    stroke="#F4E9DC"
+                    stroke="rgb(var(--life-text))"
                     fontSize={11}
                     width={110}
                     tickLine={false}
                   />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: '#241B17',
-                      borderColor: '#624332',
+                      backgroundColor: 'rgb(var(--life-surface))',
+                      borderColor: 'rgb(var(--life-border))',
                       borderRadius: '12px',
-                      color: '#F4E9DC',
+                      color: 'rgb(var(--life-text))',
                     }}
                   />
                   <Bar dataKey="amount" name={t('amount')} radius={[0, 8, 8, 0]}>
@@ -2945,30 +2946,30 @@ const WalletView = ({
 
         <GlassCard className="p-5 flex flex-col justify-between space-y-4">
           <div>
-            <h2 className="text-base font-semibold text-[#F4E9DC] mb-1">{t('ledger_summary')}</h2>
-            <p className="text-xs text-[#A99B90]">{t('chart_cashflow_sub')}</p>
+            <h2 className="text-base font-semibold text-life-text mb-1">{t('ledger_summary')}</h2>
+            <p className="text-xs text-life-muted">{t('chart_cashflow_sub')}</p>
             <div className="mt-5 space-y-3">
-              <div className="flex justify-between items-center p-3 rounded-xl bg-[#171412]/80 gap-2">
-                <span className="text-xs text-[#A99B90]">{t('net_worth')}</span>
-                <span className="text-sm font-semibold text-[#E4C8A6] tabular-nums truncate">
+              <div className="flex justify-between items-center p-3 rounded-xl bg-life-bg/80 gap-2">
+                <span className="text-xs text-life-muted">{t('net_worth')}</span>
+                <span className="text-sm font-semibold text-life-soft tabular-nums truncate">
                   {formatMoney(derived.totalNetWorth, currency, maskBalances)}
                 </span>
               </div>
-              <div className="flex justify-between items-center p-3 rounded-xl bg-[#171412]/80 gap-2">
-                <span className="text-xs text-[#A99B90]">{t('kpi_monthly_income')}</span>
-                <span className="text-sm font-semibold text-[#F4E9DC] tabular-nums truncate">
+              <div className="flex justify-between items-center p-3 rounded-xl bg-life-bg/80 gap-2">
+                <span className="text-xs text-life-muted">{t('kpi_monthly_income')}</span>
+                <span className="text-sm font-semibold text-life-text tabular-nums truncate">
                   +{formatMoney(derived.monthlyIncome, currency, maskBalances)}
                 </span>
               </div>
-              <div className="flex justify-between items-center p-3 rounded-xl bg-[#171412]/80 gap-2">
-                <span className="text-xs text-[#A99B90]">{t('kpi_monthly_expenses')}</span>
+              <div className="flex justify-between items-center p-3 rounded-xl bg-life-bg/80 gap-2">
+                <span className="text-xs text-life-muted">{t('kpi_monthly_expenses')}</span>
                 <span className="text-sm font-semibold text-[#D96B52] tabular-nums truncate">
                   -{formatMoney(derived.monthlyExpenses, currency, maskBalances)}
                 </span>
               </div>
-              <div className="flex justify-between items-center p-3 rounded-xl bg-[#30231D]/70 border border-[#B68B61]/40 gap-2">
-                <span className="text-xs text-[#E4C8A6]">{t('savings_rate')}</span>
-                <span className="text-sm font-bold text-[#E4C8A6] tabular-nums">
+              <div className="flex justify-between items-center p-3 rounded-xl bg-life-surface2/70 border border-life-accent/40 gap-2">
+                <span className="text-xs text-life-soft">{t('savings_rate')}</span>
+                <span className="text-sm font-bold text-life-soft tabular-nums">
                   {derived.monthlyIncome > 0
                     ? `${Math.max(
                         0,
@@ -2985,19 +2986,19 @@ const WalletView = ({
       <GlassCard className="p-4 sm:p-5 space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 text-[#A99B90] absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-life-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t('search_placeholder')}
-              className="w-full rounded-xl bg-[#171412] border border-[#624332]/55 pl-10 pr-4 py-2 text-sm text-[#F4E9DC] placeholder-[#A99B90]/50 focus:outline-none focus:border-[#B68B61]"
+              className="w-full rounded-xl bg-life-bg border border-life-border/55 pl-10 pr-4 py-2 text-sm text-life-text placeholder-life-muted/50 focus:outline-none focus:border-life-accent"
             />
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className="rounded-xl bg-[#171412] border border-[#624332]/55 px-3 py-2 text-xs text-[#F4E9DC]"
+              className="rounded-xl bg-life-bg border border-life-border/55 px-3 py-2 text-xs text-life-text"
             >
               <option value="all">{t('all_types')}</option>
               <option value="income">{lang === 'id' ? 'Pemasukan' : 'Income'}</option>
@@ -3007,7 +3008,7 @@ const WalletView = ({
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="rounded-xl bg-[#171412] border border-[#624332]/55 px-3 py-2 text-xs text-[#F4E9DC]"
+              className="rounded-xl bg-life-bg border border-life-border/55 px-3 py-2 text-xs text-life-text"
             >
               <option value="all">{t('all_categories')}</option>
               {allCategories.map((c) => (
@@ -3019,7 +3020,7 @@ const WalletView = ({
             <select
               value={monthFilter}
               onChange={(e) => setMonthFilter(e.target.value)}
-              className="rounded-xl bg-[#171412] border border-[#624332]/55 px-3 py-2 text-xs text-[#F4E9DC]"
+              className="rounded-xl bg-life-bg border border-life-border/55 px-3 py-2 text-xs text-life-text"
             >
               <option value="all">{t('all_months')}</option>
               {availableMonths.map((m) => (
@@ -3057,42 +3058,42 @@ const WalletView = ({
                 return (
                   <div
                     key={tx.id}
-                    className="p-3.5 rounded-xl bg-[#171412]/85 border border-[#624332]/40 space-y-2"
+                    className="p-3.5 rounded-xl bg-life-bg/85 border border-life-border/40 space-y-2"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-[#F4E9DC] truncate">{tx.description}</p>
-                        <p className="text-[11px] text-[#A99B90]">
+                        <p className="text-sm font-medium text-life-text truncate">{tx.description}</p>
+                        <p className="text-[11px] text-life-muted">
                           {formatDateReadable(tx.date, lang)} • {tx.category}
                         </p>
                       </div>
                       <span
                         className={`text-sm font-semibold tabular-nums shrink-0 ${
                           tx.type === 'income'
-                            ? 'text-[#E4C8A6]'
+                            ? 'text-life-soft'
                             : tx.type === 'transfer'
-                            ? 'text-[#B68B61]'
-                            : 'text-[#F4E9DC]'
+                            ? 'text-life-accent'
+                            : 'text-life-text'
                         }`}
                       >
                         {tx.type === 'income' ? '+' : tx.type === 'transfer' ? '⇄ ' : '-'}
                         {formatMoney(tx.amount, currency, maskBalances)}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between pt-1.5 border-t border-[#624332]/25 text-xs text-[#A99B90]">
+                    <div className="flex items-center justify-between pt-1.5 border-t border-life-border/25 text-xs text-life-muted">
                       <span className="truncate">
                         {tx.type === 'transfer' && dstAcc ? `${srcAcc} → ${dstAcc}` : srcAcc}
                       </span>
                       <div className="flex items-center gap-1 shrink-0">
                         <button
                           onClick={() => onOpenTxModal(tx)}
-                          className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#E4C8A6]"
+                          className="p-1.5 rounded-lg text-life-muted hover:text-life-soft"
                         >
                           <Edit3 className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => onDeleteTx(tx)}
-                          className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#D96B52]"
+                          className="p-1.5 rounded-lg text-life-muted hover:text-[#D96B52]"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -3106,7 +3107,7 @@ const WalletView = ({
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-[#624332]/40 text-[11px] uppercase tracking-wider text-[#A99B90]">
+                  <tr className="border-b border-life-border/40 text-[11px] uppercase tracking-wider text-life-muted">
                     <th className="py-3 px-3">{t('date')}</th>
                     <th className="py-3 px-3">{t('description')}</th>
                     <th className="py-3 px-3">{t('category')}</th>
@@ -3115,28 +3116,28 @@ const WalletView = ({
                     <th className="py-3 px-3 text-right">{t('actions')}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#624332]/25 text-sm">
+                <tbody className="divide-y divide-life-border/25 text-sm">
                   {filteredTransactions.map((tx) => {
                     const srcAcc = accountMap[tx.accountId]?.name || 'Wallet';
                     const dstAcc = tx.toAccountId ? accountMap[tx.toAccountId]?.name : null;
                     return (
-                      <tr key={tx.id} className="hover:bg-[#30231D]/35 transition-colors">
-                        <td className="py-3 px-3 text-xs text-[#A99B90] whitespace-nowrap">
+                      <tr key={tx.id} className="hover:bg-life-surface2/35 transition-colors">
+                        <td className="py-3 px-3 text-xs text-life-muted whitespace-nowrap">
                           {formatDateReadable(tx.date, lang)}
                         </td>
                         <td className="py-3 px-3">
-                          <div className="font-medium text-[#F4E9DC]">{tx.description}</div>
-                          {tx.notes && <div className="text-xs text-[#A99B90]">{tx.notes}</div>}
+                          <div className="font-medium text-life-text">{tx.description}</div>
+                          {tx.notes && <div className="text-xs text-life-muted">{tx.notes}</div>}
                         </td>
                         <td className="py-3 px-3">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs bg-[#30231D] text-[#E4C8A6] border border-[#624332]/40">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs bg-life-surface2 text-life-soft border border-life-border/40">
                             {tx.category}
                           </span>
                         </td>
-                        <td className="py-3 px-3 text-xs text-[#A99B90]">
+                        <td className="py-3 px-3 text-xs text-life-muted">
                           {tx.type === 'transfer' && dstAcc ? (
                             <span>
-                              {srcAcc} → <strong className="text-[#E4C8A6]">{dstAcc}</strong>
+                              {srcAcc} → <strong className="text-life-soft">{dstAcc}</strong>
                             </span>
                           ) : (
                             <span>
@@ -3147,10 +3148,10 @@ const WalletView = ({
                         <td
                           className={`py-3 px-3 text-right font-semibold tabular-nums whitespace-nowrap ${
                             tx.type === 'income'
-                              ? 'text-[#E4C8A6]'
+                              ? 'text-life-soft'
                               : tx.type === 'transfer'
-                              ? 'text-[#B68B61]'
-                              : 'text-[#F4E9DC]'
+                              ? 'text-life-accent'
+                              : 'text-life-text'
                           }`}
                         >
                           {tx.type === 'income' ? '+' : tx.type === 'transfer' ? '⇄ ' : '-'}
@@ -3160,14 +3161,14 @@ const WalletView = ({
                           <div className="inline-flex items-center gap-1">
                             <button
                               onClick={() => onOpenTxModal(tx)}
-                              className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#E4C8A6] hover:bg-[#30231D]"
+                              className="p-1.5 rounded-lg text-life-muted hover:text-life-soft hover:bg-life-surface2"
                               title={t('edit')}
                             >
                               <Edit3 className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => onDeleteTx(tx)}
-                              className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#D96B52] hover:bg-[#30231D]"
+                              className="p-1.5 rounded-lg text-life-muted hover:text-[#D96B52] hover:bg-life-surface2"
                               title={t('delete')}
                             >
                               <Trash2 className="w-4 h-4" />
@@ -3348,15 +3349,15 @@ const BudgetsView = ({ data, maskBalances, t, lang, onSaveBudget, onDeleteBudget
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('budget_title')}</h1>
-          <p className="text-xs text-[#A99B90] mt-1">{t('budget_subtitle')}</p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-life-text">{t('budget_title')}</h1>
+          <p className="text-xs text-life-muted mt-1">{t('budget_subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
           <input
             type="month"
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
-            className="rounded-xl bg-[#241B17] border border-[#624332]/60 px-3 py-2 text-sm text-[#F4E9DC]"
+            className="rounded-xl bg-life-surface border border-life-border/60 px-3 py-2 text-sm text-life-text"
           />
           <Button size="sm" onClick={() => openModal()}>
             <Plus className="w-4 h-4" /> {t('set_cat_limit')}
@@ -3368,8 +3369,8 @@ const BudgetsView = ({ data, maskBalances, t, lang, onSaveBudget, onDeleteBudget
         <div className="p-4 rounded-2xl bg-[#D96B52]/15 border border-[#D96B52]/40 flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-[#D96B52] shrink-0 mt-0.5" />
           <div>
-            <h3 className="text-sm font-semibold text-[#F4E9DC]">{t('budget_alert_title')}</h3>
-            <p className="text-xs text-[#E4C8A6] mt-0.5">
+            <h3 className="text-sm font-semibold text-life-text">{t('budget_alert_title')}</h3>
+            <p className="text-xs text-life-soft mt-0.5">
               {summary.alerts
                 .map(
                   (a) =>
@@ -3383,22 +3384,22 @@ const BudgetsView = ({ data, maskBalances, t, lang, onSaveBudget, onDeleteBudget
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <GlassCard className="p-5">
-          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('allocated_budget')}</span>
-          <div className="mt-2 text-xl sm:text-2xl font-semibold text-[#F4E9DC] tabular-nums">
+          <span className="text-xs uppercase tracking-wider text-life-muted">{t('allocated_budget')}</span>
+          <div className="mt-2 text-xl sm:text-2xl font-semibold text-life-text tabular-nums">
             {formatMoney(summary.totalLimit, currency, maskBalances)}
           </div>
         </GlassCard>
         <GlassCard className="p-5">
-          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('tracked_spend')}</span>
-          <div className="mt-2 text-xl sm:text-2xl font-semibold text-[#B68B61] tabular-nums">
+          <span className="text-xs uppercase tracking-wider text-life-muted">{t('tracked_spend')}</span>
+          <div className="mt-2 text-xl sm:text-2xl font-semibold text-life-accent tabular-nums">
             {formatMoney(summary.totalSpent, currency, maskBalances)}
           </div>
         </GlassCard>
         <GlassCard className="p-5">
-          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('remaining_allowance')}</span>
+          <span className="text-xs uppercase tracking-wider text-life-muted">{t('remaining_allowance')}</span>
           <div
             className={`mt-2 text-xl sm:text-2xl font-semibold tabular-nums ${
-              summary.remaining < 0 ? 'text-[#D96B52]' : 'text-[#E4C8A6]'
+              summary.remaining < 0 ? 'text-[#D96B52]' : 'text-life-soft'
             }`}
           >
             {formatMoney(summary.remaining, currency, maskBalances)}
@@ -3430,8 +3431,8 @@ const BudgetsView = ({ data, maskBalances, t, lang, onSaveBudget, onDeleteBudget
               <GlassCard key={b.id} className="p-5 space-y-3">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <h3 className="text-base font-semibold text-[#F4E9DC]">{b.category}</h3>
-                    <p className="text-xs text-[#A99B90] mt-0.5 tabular-nums">
+                    <h3 className="text-base font-semibold text-life-text">{b.category}</h3>
+                    <p className="text-xs text-life-muted mt-0.5 tabular-nums">
                       {formatMoney(spent, currency, maskBalances)} /{' '}
                       {formatMoney(b.limit, currency, maskBalances)}
                     </p>
@@ -3439,13 +3440,13 @@ const BudgetsView = ({ data, maskBalances, t, lang, onSaveBudget, onDeleteBudget
                   <div className="flex items-center gap-1 shrink-0">
                     <button
                       onClick={() => openModal(b)}
-                      className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#E4C8A6] hover:bg-[#30231D]"
+                      className="p-1.5 rounded-lg text-life-muted hover:text-life-soft hover:bg-life-surface2"
                     >
                       <Edit3 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => onDeleteBudget(b)}
-                      className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#D96B52] hover:bg-[#30231D]"
+                      className="p-1.5 rounded-lg text-life-muted hover:text-[#D96B52] hover:bg-life-surface2"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -3455,12 +3456,12 @@ const BudgetsView = ({ data, maskBalances, t, lang, onSaveBudget, onDeleteBudget
                 <ProgressBar value={spent} max={b.limit} tone={tone} height="h-2.5" />
 
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1">
-                  <span className={rem < 0 ? 'text-[#D96B52] font-medium' : 'text-[#E4C8A6]'}>
+                  <span className={rem < 0 ? 'text-[#D96B52] font-medium' : 'text-life-soft'}>
                     {rem < 0
                       ? `${t('over_by')} ${formatMoney(Math.abs(rem), currency, maskBalances)}`
                       : `${formatMoney(rem, currency, maskBalances)} ${t('remaining')}`}
                   </span>
-                  <span className="text-[#A99B90] tabular-nums">
+                  <span className="text-life-muted tabular-nums">
                     {t('prev_month')}: {formatMoney(prevSpent, currency, maskBalances)} ({pct.toFixed(0)}%)
                   </span>
                 </div>
@@ -3557,8 +3558,8 @@ const SavingsView = ({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('savings_title')}</h1>
-          <p className="text-xs text-[#A99B90] mt-1">{t('savings_subtitle')}</p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-life-text">{t('savings_title')}</h1>
+          <p className="text-xs text-life-muted mt-1">{t('savings_subtitle')}</p>
         </div>
         <Button size="sm" onClick={() => setShowCreateModal(true)}>
           <Plus className="w-4 h-4" /> {t('new_savings_vault')}
@@ -3590,14 +3591,14 @@ const SavingsView = ({
                 <div className="space-y-3">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <h3 className="text-base font-semibold text-[#F4E9DC]">{sg.name}</h3>
-                      <p className="text-xs text-[#A99B90] mt-0.5">
+                      <h3 className="text-base font-semibold text-life-text">{sg.name}</h3>
+                      <p className="text-xs text-life-muted mt-0.5">
                         Target: {formatDateReadable(sg.targetDate, lang)}
                       </p>
                     </div>
                     <button
                       onClick={() => onDeleteSavingsGoal(sg)}
-                      className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#D96B52]"
+                      className="p-1.5 rounded-lg text-life-muted hover:text-[#D96B52]"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -3605,24 +3606,24 @@ const SavingsView = ({
 
                   <div className="pt-1">
                     <div className="flex items-baseline justify-between text-xs mb-1.5 tabular-nums">
-                      <span className="text-base font-semibold text-[#E4C8A6]">
+                      <span className="text-base font-semibold text-life-soft">
                         {formatMoney(saved, currency, maskBalances)}
                       </span>
-                      <span className="text-[#A99B90]">
+                      <span className="text-life-muted">
                         / {formatMoney(sg.targetAmount, currency, maskBalances)} ({pct.toFixed(0)}%)
                       </span>
                     </div>
                     <ProgressBar value={saved} max={sg.targetAmount} tone={funded ? 'success' : 'champagne'} height="h-2.5" />
                   </div>
 
-                  <p className="text-xs text-[#A99B90]">
+                  <p className="text-xs text-life-muted">
                     {funded
                       ? t('target_funded')
                       : `${formatMoney(rem, currency, maskBalances)} ${t('remaining_to_target')}`}
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2 pt-3 border-t border-[#624332]/35">
+                <div className="flex items-center gap-2 pt-3 border-t border-life-border/35">
                   <Button size="sm" className="flex-1" onClick={() => setContribModalGoal(sg)}>
                     <Plus className="w-3.5 h-3.5" /> {t('contribute')}
                   </Button>
@@ -3717,20 +3718,20 @@ const SavingsView = ({
       >
         <div className="space-y-2.5">
           {(historyModalGoal?.contributions || []).length === 0 ? (
-            <p className="text-xs text-[#A99B90] text-center py-6">
+            <p className="text-xs text-life-muted text-center py-6">
               {lang === 'id' ? 'Belum ada riwayat setoran.' : 'No contributions logged yet.'}
             </p>
           ) : (
             [...(historyModalGoal?.contributions || [])].reverse().map((c) => (
               <div
                 key={c.id}
-                className="flex items-center justify-between p-3 rounded-xl bg-[#171412]/80 border border-[#624332]/40"
+                className="flex items-center justify-between p-3 rounded-xl bg-life-bg/80 border border-life-border/40"
               >
                 <div>
-                  <p className="text-sm font-medium text-[#F4E9DC]">{c.note}</p>
-                  <p className="text-xs text-[#A99B90]">{formatDateReadable(c.date, lang)}</p>
+                  <p className="text-sm font-medium text-life-text">{c.note}</p>
+                  <p className="text-xs text-life-muted">{formatDateReadable(c.date, lang)}</p>
                 </div>
-                <span className="text-sm font-semibold text-[#E4C8A6] tabular-nums">
+                <span className="text-sm font-semibold text-life-soft tabular-nums">
                   +{formatMoney(c.amount, currency, maskBalances)}
                 </span>
               </div>
@@ -3788,8 +3789,8 @@ const SubscriptionsView = ({ data, maskBalances, t, lang, onAddSub, onPaySub, on
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('subs_title')}</h1>
-          <p className="text-xs text-[#A99B90] mt-1">{t('subs_subtitle')}</p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-life-text">{t('subs_title')}</h1>
+          <p className="text-xs text-life-muted mt-1">{t('subs_subtitle')}</p>
         </div>
         <Button size="sm" onClick={() => setShowModal(true)}>
           <Plus className="w-4 h-4" /> {t('add_subscription')}
@@ -3798,20 +3799,20 @@ const SubscriptionsView = ({ data, maskBalances, t, lang, onAddSub, onPaySub, on
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <GlassCard className="p-5">
-          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('monthly_fixed_burn')}</span>
-          <div className="mt-2 text-xl sm:text-2xl font-semibold text-[#F4E9DC] tabular-nums">
+          <span className="text-xs uppercase tracking-wider text-life-muted">{t('monthly_fixed_burn')}</span>
+          <div className="mt-2 text-xl sm:text-2xl font-semibold text-life-text tabular-nums">
             {formatMoney(summary.monthlyTotal, currency, maskBalances)}
           </div>
         </GlassCard>
         <GlassCard className="p-5">
-          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('annualized_cost')}</span>
-          <div className="mt-2 text-xl sm:text-2xl font-semibold text-[#B68B61] tabular-nums">
+          <span className="text-xs uppercase tracking-wider text-life-muted">{t('annualized_cost')}</span>
+          <div className="mt-2 text-xl sm:text-2xl font-semibold text-life-accent tabular-nums">
             {formatMoney(summary.annualized, currency, maskBalances)}
           </div>
         </GlassCard>
         <GlassCard className="p-5">
-          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('paid_this_month')}</span>
-          <div className="mt-2 text-xl sm:text-2xl font-semibold text-[#E4C8A6] tabular-nums">
+          <span className="text-xs uppercase tracking-wider text-life-muted">{t('paid_this_month')}</span>
+          <div className="mt-2 text-xl sm:text-2xl font-semibold text-life-soft tabular-nums">
             {formatMoney(summary.paidThisMonth, currency, maskBalances)}
           </div>
         </GlassCard>
@@ -3837,17 +3838,17 @@ const SubscriptionsView = ({ data, maskBalances, t, lang, onAddSub, onPaySub, on
               <GlassCard key={sub.id} className="p-5 flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-base font-semibold text-[#F4E9DC] truncate">{sub.name}</h3>
+                    <h3 className="text-base font-semibold text-life-text truncate">{sub.name}</h3>
                     {isPaid && (
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#5B8056]/25 text-[#87B082] border border-[#5B8056]/40 shrink-0">
                         {t('paid_badge')}
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-[#A99B90] mt-1">
+                  <p className="text-xs text-life-muted mt-1">
                     {sub.category} • {t('due_day')} {sub.dueDay}
                   </p>
-                  <p className="text-sm font-semibold text-[#E4C8A6] tabular-nums mt-2">
+                  <p className="text-sm font-semibold text-life-soft tabular-nums mt-2">
                     {formatMoney(sub.amount, currency, maskBalances)} / {lang === 'id' ? 'bln' : 'mo'}
                   </p>
                 </div>
@@ -3860,7 +3861,7 @@ const SubscriptionsView = ({ data, maskBalances, t, lang, onAddSub, onPaySub, on
                   )}
                   <button
                     onClick={() => onDeleteSub(sub)}
-                    className="p-2 rounded-xl text-[#A99B90] hover:text-[#D96B52] hover:bg-[#30231D]"
+                    className="p-2 rounded-xl text-life-muted hover:text-[#D96B52] hover:bg-life-surface2"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -4001,12 +4002,12 @@ const DebtsView = ({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('debts_title')}</h1>
-          <p className="text-xs text-[#A99B90] mt-1">{t('debts_subtitle')}</p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-life-text">{t('debts_title')}</h1>
+          <p className="text-xs text-life-muted mt-1">{t('debts_subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="secondary" onClick={onOpenSplitBillModal}>
-            <Users className="w-4 h-4 text-[#E4C8A6]" /> {t('split_bill')}
+            <Users className="w-4 h-4 text-life-soft" /> {t('split_bill')}
           </Button>
           <Button size="sm" onClick={() => setShowModal(true)}>
             <Plus className="w-4 h-4" /> {t('add_debt')}
@@ -4016,20 +4017,20 @@ const DebtsView = ({
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <GlassCard className="p-5">
-          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('total_debt_owed')}</span>
+          <span className="text-xs uppercase tracking-wider text-life-muted">{t('total_debt_owed')}</span>
           <div className="mt-2 text-xl sm:text-2xl font-semibold text-[#D96B52] tabular-nums">
             {formatMoney(summary.totalOwed, currency, maskBalances)}
           </div>
         </GlassCard>
         <GlassCard className="p-5">
-          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('total_receivable')}</span>
-          <div className="mt-2 text-xl sm:text-2xl font-semibold text-[#E4C8A6] tabular-nums">
+          <span className="text-xs uppercase tracking-wider text-life-muted">{t('total_receivable')}</span>
+          <div className="mt-2 text-xl sm:text-2xl font-semibold text-life-soft tabular-nums">
             {formatMoney(summary.totalReceivable, currency, maskBalances)}
           </div>
         </GlassCard>
         <GlassCard className="p-5">
-          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('monthly_installments')}</span>
-          <div className="mt-2 text-xl sm:text-2xl font-semibold text-[#B68B61] tabular-nums">
+          <span className="text-xs uppercase tracking-wider text-life-muted">{t('monthly_installments')}</span>
+          <div className="mt-2 text-xl sm:text-2xl font-semibold text-life-accent tabular-nums">
             {formatMoney(summary.monthlyCommitment, currency, maskBalances)}
           </div>
         </GlassCard>
@@ -4065,19 +4066,19 @@ const DebtsView = ({
                         className={`text-[10px] uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
                           isDebt
                             ? 'bg-[#D96B52]/15 text-[#F29B87] border-[#D96B52]/40'
-                            : 'bg-[#B68B61]/20 text-[#E4C8A6] border-[#B68B61]/40'
+                            : 'bg-life-accent/20 text-life-soft border-life-accent/40'
                         }`}
                       >
                         {isDebt ? t('debt_type_owe') : t('debt_type_receivable')}
                       </span>
-                      <h3 className="text-base font-semibold text-[#F4E9DC] mt-2">{item.title}</h3>
-                      <p className="text-xs text-[#A99B90]">
+                      <h3 className="text-base font-semibold text-life-text mt-2">{item.title}</h3>
+                      <p className="text-xs text-life-muted">
                         {item.counterparty} • Due: {formatDateReadable(item.dueDate, lang)}
                       </p>
                     </div>
                     <button
                       onClick={() => onDeleteDebt(item)}
-                      className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#D96B52]"
+                      className="p-1.5 rounded-lg text-life-muted hover:text-[#D96B52]"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -4085,14 +4086,14 @@ const DebtsView = ({
 
                   <div className="mt-4 space-y-2">
                     <div className="flex flex-wrap justify-between gap-1 text-xs tabular-nums">
-                      <span className="text-[#A99B90]">
+                      <span className="text-life-muted">
                         {lang === 'id' ? 'Terbayar' : 'Settled'}:{' '}
-                        <strong className="text-[#F4E9DC]">
+                        <strong className="text-life-text">
                           {formatMoney(item.paidAmount, currency, maskBalances)}
                         </strong>{' '}
                         / {formatMoney(item.totalAmount, currency, maskBalances)}
                       </span>
-                      <span className="text-[#E4C8A6] font-semibold">{pct.toFixed(0)}%</span>
+                      <span className="text-life-soft font-semibold">{pct.toFixed(0)}%</span>
                     </div>
                     <ProgressBar
                       value={item.paidAmount}
@@ -4102,10 +4103,10 @@ const DebtsView = ({
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[#624332]/35">
-                  <div className="text-xs text-[#A99B90] tabular-nums">
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-life-border/35">
+                  <div className="text-xs text-life-muted tabular-nums">
                     {lang === 'id' ? 'Sisa' : 'Remaining'}:{' '}
-                    <strong className="text-[#F4E9DC]">
+                    <strong className="text-life-text">
                       {formatMoney(remaining, currency, maskBalances)}
                     </strong>
                   </div>
@@ -4129,7 +4130,7 @@ const DebtsView = ({
 
       <Modal open={showModal} onClose={() => setShowModal(false)} title={t('add_debt')}>
         <form onSubmit={handleCreate} className="space-y-4">
-          <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-[#171412] border border-[#624332]/50">
+          <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-life-bg border border-life-border/50">
             {[
               { id: 'debt', label: t('debt_type_owe') },
               { id: 'receivable', label: t('debt_type_receivable') },
@@ -4139,7 +4140,7 @@ const DebtsView = ({
                 type="button"
                 onClick={() => setKind(opt.id)}
                 className={`py-2 rounded-lg text-xs font-semibold ${
-                  kind === opt.id ? 'bg-[#B68B61] text-[#171412]' : 'text-[#A99B90]'
+                  kind === opt.id ? 'bg-life-accent text-life-bg' : 'text-life-muted'
                 }`}
               >
                 {opt.label}
@@ -4289,8 +4290,8 @@ const InvestmentsView = ({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('inv_title')}</h1>
-          <p className="text-xs text-[#A99B90] mt-1">{t('inv_subtitle')}</p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-life-text">{t('inv_title')}</h1>
+          <p className="text-xs text-life-muted mt-1">{t('inv_subtitle')}</p>
         </div>
         <Button size="sm" onClick={() => setShowAddModal(true)}>
           <Plus className="w-4 h-4" /> {t('add_investment')}
@@ -4299,19 +4300,19 @@ const InvestmentsView = ({
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <GlassCard className="p-5">
-          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('inv_current_value')}</span>
-          <div className="mt-2 text-xl sm:text-2xl font-semibold text-[#E4C8A6] tabular-nums">
+          <span className="text-xs uppercase tracking-wider text-life-muted">{t('inv_current_value')}</span>
+          <div className="mt-2 text-xl sm:text-2xl font-semibold text-life-soft tabular-nums">
             {formatMoney(summary.totalCurrent, currency, maskBalances)}
           </div>
         </GlassCard>
         <GlassCard className="p-5">
-          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('inv_invested_capital')}</span>
-          <div className="mt-2 text-xl sm:text-2xl font-semibold text-[#F4E9DC] tabular-nums">
+          <span className="text-xs uppercase tracking-wider text-life-muted">{t('inv_invested_capital')}</span>
+          <div className="mt-2 text-xl sm:text-2xl font-semibold text-life-text tabular-nums">
             {formatMoney(summary.totalInvested, currency, maskBalances)}
           </div>
         </GlassCard>
         <GlassCard className="p-5">
-          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('inv_unrealized_pnl')}</span>
+          <span className="text-xs uppercase tracking-wider text-life-muted">{t('inv_unrealized_pnl')}</span>
           <div
             className={`mt-2 text-xl sm:text-2xl font-semibold tabular-nums ${
               summary.pnl >= 0 ? 'text-[#87B082]' : 'text-[#D96B52]'
@@ -4348,33 +4349,33 @@ const InvestmentsView = ({
               <GlassCard key={asset.id} className="p-5 flex flex-col justify-between space-y-4">
                 <div>
                   <div className="flex items-start justify-between gap-2">
-                    <span className="text-[10px] uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#30231D] text-[#E4C8A6] border border-[#624332]/50">
+                    <span className="text-[10px] uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-life-surface2 text-life-soft border border-life-border/50">
                       {asset.assetClass} • {asset.quantity}
                     </span>
                     <button
                       onClick={() => onDeleteInvestment(asset)}
-                      className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#D96B52]"
+                      className="p-1.5 rounded-lg text-life-muted hover:text-[#D96B52]"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
-                  <h3 className="text-base font-semibold text-[#F4E9DC] mt-2">{asset.name}</h3>
+                  <h3 className="text-base font-semibold text-life-text mt-2">{asset.name}</h3>
 
                   <div className="mt-4 space-y-1.5">
                     <div className="flex justify-between text-xs">
-                      <span className="text-[#A99B90]">{t('inv_current_value')}</span>
-                      <span className="text-sm font-semibold text-[#F4E9DC] tabular-nums">
+                      <span className="text-life-muted">{t('inv_current_value')}</span>
+                      <span className="text-sm font-semibold text-life-text tabular-nums">
                         {formatMoney(asset.currentValue, currency, maskBalances)}
                       </span>
                     </div>
                     <div className="flex justify-between text-xs">
-                      <span className="text-[#A99B90]">{t('inv_invested_capital')}</span>
-                      <span className="text-[#A99B90] tabular-nums">
+                      <span className="text-life-muted">{t('inv_invested_capital')}</span>
+                      <span className="text-life-muted tabular-nums">
                         {formatMoney(asset.investedAmount, currency, maskBalances)}
                       </span>
                     </div>
                     <div className="flex justify-between text-xs pt-1">
-                      <span className="text-[#A99B90]">Return</span>
+                      <span className="text-life-muted">Return</span>
                       <span
                         className={`font-semibold tabular-nums ${
                           gain >= 0 ? 'text-[#87B082]' : 'text-[#D96B52]'
@@ -4388,8 +4389,8 @@ const InvestmentsView = ({
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-[#624332]/35 flex items-center justify-between">
-                  <span className="text-[11px] text-[#A99B90]">
+                <div className="pt-3 border-t border-life-border/35 flex items-center justify-between">
+                  <span className="text-[11px] text-life-muted">
                     {formatDateReadable(asset.updatedAt, lang)}
                   </span>
                   <Button
@@ -4620,11 +4621,11 @@ const PlannerView = ({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('planner_title')}</h1>
-          <p className="text-xs text-[#A99B90] mt-1">{t('planner_subtitle')}</p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-life-text">{t('planner_title')}</h1>
+          <p className="text-xs text-life-muted mt-1">{t('planner_subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex rounded-xl bg-[#241B17] p-1 border border-[#624332]/50">
+          <div className="inline-flex rounded-xl bg-life-surface p-1 border border-life-border/50">
             {[
               { id: 'daily', label: t('mode_daily') },
               { id: 'weekly', label: t('mode_weekly') },
@@ -4635,8 +4636,8 @@ const PlannerView = ({
                 onClick={() => setHorizon(mode.id)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                   horizon === mode.id
-                    ? 'bg-[#B68B61] text-[#171412]'
-                    : 'text-[#A99B90] hover:text-[#F4E9DC]'
+                    ? 'bg-life-accent text-life-bg'
+                    : 'text-life-muted hover:text-life-text'
                 }`}
               >
                 {mode.label}
@@ -4647,7 +4648,7 @@ const PlannerView = ({
             type="date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            className="rounded-xl bg-[#241B17] border border-[#624332]/60 px-3 py-2 text-xs text-[#F4E9DC]"
+            className="rounded-xl bg-life-surface border border-life-border/60 px-3 py-2 text-xs text-life-text"
           />
         </div>
       </div>
@@ -4665,13 +4666,13 @@ const PlannerView = ({
               onClick={() => setSelectedDate(wd.dateStr)}
               className={`p-2 sm:p-3 rounded-2xl border text-center transition-all ${
                 active
-                  ? 'bg-gradient-to-b from-[#3A2B24] to-[#241B17] border-[#B68B61] text-[#F4E9DC]'
-                  : 'bg-[#241B17]/60 border-[#624332]/35 text-[#A99B90] hover:border-[#624332]'
+                  ? 'bg-gradient-to-b from-life-surface2 to-life-surface border-life-accent text-life-text'
+                  : 'bg-life-surface/60 border-life-border/35 text-life-muted hover:border-life-border'
               }`}
             >
               <div className="text-[10px] sm:text-[11px] uppercase truncate">{wd.weekday}</div>
-              <div className="text-sm sm:text-lg font-semibold mt-0.5 text-[#F4E9DC]">{wd.dayNum}</div>
-              <div className="text-[10px] text-[#B68B61] mt-1">{count}</div>
+              <div className="text-sm sm:text-lg font-semibold mt-0.5 text-life-text">{wd.dayNum}</div>
+              <div className="text-[10px] text-life-accent mt-1">{count}</div>
             </button>
           );
         })}
@@ -4681,11 +4682,11 @@ const PlannerView = ({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="space-y-6">
             {/* Focus Timer Card */}
-            <GlassCard className="p-5 space-y-4 bg-gradient-to-br from-[#2C211C] to-[#171412]">
+            <GlassCard className="p-5 space-y-4 bg-gradient-to-br from-life-surface2 to-life-bg">
               <div className="flex items-center justify-between gap-2">
                 <div>
-                  <h2 className="text-base font-semibold text-[#F4E9DC]">{t('focus_timer_title')}</h2>
-                  <p className="text-xs text-[#A99B90]">
+                  <h2 className="text-base font-semibold text-life-text">{t('focus_timer_title')}</h2>
+                  <p className="text-xs text-life-muted">
                     {sessionsCompleted} {t('focus_sessions_done')}
                   </p>
                 </div>
@@ -4696,8 +4697,8 @@ const PlannerView = ({
                       onClick={() => selectPreset(m)}
                       className={`px-2 py-1 rounded-lg text-[11px] font-medium ${
                         focusDuration === m
-                          ? 'bg-[#B68B61] text-[#171412]'
-                          : 'bg-[#171412] text-[#A99B90]'
+                          ? 'bg-life-accent text-life-bg'
+                          : 'bg-life-bg text-life-muted'
                       }`}
                     >
                       {m}m
@@ -4706,8 +4707,8 @@ const PlannerView = ({
                 </div>
               </div>
 
-              <div className="text-center py-3 rounded-2xl bg-[#171412]/90 border border-[#624332]/40">
-                <div className="text-3xl sm:text-4xl font-bold tracking-wider text-[#E4C8A6] tabular-nums font-mono">
+              <div className="text-center py-3 rounded-2xl bg-life-bg/90 border border-life-border/40">
+                <div className="text-3xl sm:text-4xl font-bold tracking-wider text-life-soft tabular-nums font-mono">
                   {formattedClock}
                 </div>
               </div>
@@ -4744,19 +4745,19 @@ const PlannerView = ({
             <GlassCard className="p-5 space-y-4">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <h2 className="text-base font-semibold text-[#F4E9DC] flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-[#B68B61]" />
+                  <h2 className="text-base font-semibold text-life-text flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-life-accent" />
                     <span>{t('wellness_title')}</span>
                   </h2>
-                  <p className="text-xs text-[#A99B90] mt-0.5">{t('wellness_sub')}</p>
+                  <p className="text-xs text-life-muted mt-0.5">{t('wellness_sub')}</p>
                 </div>
               </div>
 
               <form onSubmit={handleWellnessSubmit} className="space-y-3.5">
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 rounded-xl bg-[#171412]/80 border border-[#624332]/40 space-y-1">
-                    <label className="text-[11px] text-[#A99B90] flex items-center gap-1.5">
-                      <Moon className="w-3.5 h-3.5 text-[#E4C8A6]" /> {t('sleep_hours')}
+                  <div className="p-3 rounded-xl bg-life-bg/80 border border-life-border/40 space-y-1">
+                    <label className="text-[11px] text-life-muted flex items-center gap-1.5">
+                      <Moon className="w-3.5 h-3.5 text-life-soft" /> {t('sleep_hours')}
                     </label>
                     <input
                       type="number"
@@ -4765,13 +4766,13 @@ const PlannerView = ({
                       max="24"
                       value={sleepHours}
                       onChange={(e) => setSleepHours(e.target.value)}
-                      className="w-full bg-transparent text-base font-semibold text-[#F4E9DC] focus:outline-none tabular-nums"
+                      className="w-full bg-transparent text-base font-semibold text-life-text focus:outline-none tabular-nums"
                     />
                   </div>
 
-                  <div className="p-3 rounded-xl bg-[#171412]/80 border border-[#624332]/40 space-y-1">
-                    <label className="text-[11px] text-[#A99B90] flex items-center gap-1.5">
-                      <Scale className="w-3.5 h-3.5 text-[#B68B61]" /> {t('body_weight')}
+                  <div className="p-3 rounded-xl bg-life-bg/80 border border-life-border/40 space-y-1">
+                    <label className="text-[11px] text-life-muted flex items-center gap-1.5">
+                      <Scale className="w-3.5 h-3.5 text-life-accent" /> {t('body_weight')}
                     </label>
                     <input
                       type="number"
@@ -4780,18 +4781,18 @@ const PlannerView = ({
                       max="250"
                       value={weightKg}
                       onChange={(e) => setWeightKg(e.target.value)}
-                      className="w-full bg-transparent text-base font-semibold text-[#F4E9DC] focus:outline-none tabular-nums"
+                      className="w-full bg-transparent text-base font-semibold text-life-text focus:outline-none tabular-nums"
                     />
                   </div>
                 </div>
 
                 {/* Hydration Interactive Glasses */}
-                <div className="p-3 rounded-xl bg-[#171412]/80 border border-[#624332]/40 space-y-2">
+                <div className="p-3 rounded-xl bg-life-bg/80 border border-life-border/40 space-y-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-[#A99B90] flex items-center gap-1.5">
-                      <Droplets className="w-3.5 h-3.5 text-[#E4C8A6]" /> {t('water_glasses')}
+                    <span className="text-life-muted flex items-center gap-1.5">
+                      <Droplets className="w-3.5 h-3.5 text-life-soft" /> {t('water_glasses')}
                     </span>
-                    <span className="font-semibold text-[#E4C8A6] tabular-nums">{waterGlasses} / 8</span>
+                    <span className="font-semibold text-life-soft tabular-nums">{waterGlasses} / 8</span>
                   </div>
                   <div className="grid grid-cols-8 gap-1.5">
                     {Array.from({ length: 8 }, (_, idx) => {
@@ -4803,8 +4804,8 @@ const PlannerView = ({
                           onClick={() => setWaterGlasses(idx + 1)}
                           className={`h-7 rounded-lg flex items-center justify-center transition-all ${
                             filled
-                              ? 'bg-[#B68B61] text-[#171412]'
-                              : 'bg-[#241B17] border border-[#624332]/45 text-[#A99B90]/50'
+                              ? 'bg-life-accent text-life-bg'
+                              : 'bg-life-surface border border-life-border/45 text-life-muted/50'
                           }`}
                           aria-label={`Water glass ${idx + 1}`}
                         >
@@ -4816,10 +4817,10 @@ const PlannerView = ({
                 </div>
 
                 {/* Energy Score Selector (1 - 10) */}
-                <div className="p-3 rounded-xl bg-[#171412]/80 border border-[#624332]/40 space-y-2">
+                <div className="p-3 rounded-xl bg-life-bg/80 border border-life-border/40 space-y-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-[#A99B90]">{t('energy_score')}</span>
-                    <span className="font-semibold text-[#E4C8A6] tabular-nums">{energyScore} / 10</span>
+                    <span className="text-life-muted">{t('energy_score')}</span>
+                    <span className="font-semibold text-life-soft tabular-nums">{energyScore} / 10</span>
                   </div>
                   <input
                     type="range"
@@ -4827,12 +4828,12 @@ const PlannerView = ({
                     max="10"
                     value={energyScore}
                     onChange={(e) => setEnergyScore(Number(e.target.value))}
-                    className="w-full accent-[#B68B61] cursor-pointer"
+                    className="w-full accent-life-accent cursor-pointer"
                   />
                 </div>
 
                 <Button type="submit" size="sm" variant="secondary" className="w-full">
-                  <Check className="w-3.5 h-3.5 text-[#B68B61]" /> {t('save_wellness')}
+                  <Check className="w-3.5 h-3.5 text-life-accent" /> {t('save_wellness')}
                 </Button>
               </form>
             </GlassCard>
@@ -4841,13 +4842,13 @@ const PlannerView = ({
             <GlassCard className="p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-base font-semibold text-[#F4E9DC]">{t('top_3_priorities')}</h2>
-                  <p className="text-xs text-[#A99B90]">{t('high_leverage_sub')}</p>
+                  <h2 className="text-base font-semibold text-life-text">{t('top_3_priorities')}</h2>
+                  <p className="text-xs text-life-muted">{t('high_leverage_sub')}</p>
                 </div>
-                <Award className="w-5 h-5 text-[#B68B61]" />
+                <Award className="w-5 h-5 text-life-accent" />
               </div>
               {topPriorities.length === 0 ? (
-                <p className="text-xs text-[#A99B90]">
+                <p className="text-xs text-life-muted">
                   {lang === 'id'
                     ? 'Sematkan hingga 3 tugas prioritas utama di bawah.'
                     : 'Pin up to 3 tasks as Top Priority below.'}
@@ -4857,15 +4858,15 @@ const PlannerView = ({
                   {topPriorities.map((tp, idx) => (
                     <div
                       key={tp.id}
-                      className="p-3 rounded-xl bg-gradient-to-r from-[#30231D] to-[#241B17] border border-[#B68B61]/45 flex items-center gap-3"
+                      className="p-3 rounded-xl bg-gradient-to-r from-life-surface2 to-life-surface border border-life-accent/45 flex items-center gap-3"
                     >
-                      <span className="w-6 h-6 rounded-lg bg-[#B68B61] text-[#171412] text-xs font-bold flex items-center justify-center shrink-0">
+                      <span className="w-6 h-6 rounded-lg bg-life-accent text-life-bg text-xs font-bold flex items-center justify-center shrink-0">
                         {idx + 1}
                       </span>
-                      <span className="text-sm font-medium text-[#F4E9DC] flex-1 truncate">{tp.title}</span>
+                      <span className="text-sm font-medium text-life-text flex-1 truncate">{tp.title}</span>
                       <button
                         onClick={() => onToggleTask(tp.id)}
-                        className="p-1.5 rounded-lg bg-[#171412]/70 text-[#E4C8A6] hover:bg-[#B68B61] hover:text-[#171412] shrink-0"
+                        className="p-1.5 rounded-lg bg-life-bg/70 text-life-soft hover:bg-life-accent hover:text-life-bg shrink-0"
                       >
                         <Check className="w-3.5 h-3.5" />
                       </button>
@@ -4881,8 +4882,8 @@ const PlannerView = ({
             <GlassCard className="p-5 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h2 className="text-base font-semibold text-[#F4E9DC]">{t('daily_timeline')}</h2>
-                  <p className="text-xs text-[#A99B90]">{formatDateReadable(selectedDate, lang)}</p>
+                  <h2 className="text-base font-semibold text-life-text">{t('daily_timeline')}</h2>
+                  <p className="text-xs text-life-muted">{formatDateReadable(selectedDate, lang)}</p>
                 </div>
                 <Button size="sm" onClick={() => onOpenEventModal(null, selectedDate)}>
                   <Plus className="w-4 h-4" /> {t('add_time_block')}
@@ -4907,18 +4908,18 @@ const PlannerView = ({
                     <div
                       key={ev.id}
                       onClick={() => onOpenEventModal(ev)}
-                      className="cursor-pointer p-4 rounded-2xl bg-[#171412]/80 border border-[#624332]/45 hover:border-[#B68B61]/70 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      className="cursor-pointer p-4 rounded-2xl bg-life-bg/80 border border-life-border/45 hover:border-life-accent/70 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                     >
                       <div className="flex items-start gap-3 sm:gap-4 min-w-0">
-                        <div className="px-3 py-1.5 rounded-xl bg-[#30231D] border border-[#624332]/50 text-xs font-semibold text-[#E4C8A6] tabular-nums shrink-0">
+                        <div className="px-3 py-1.5 rounded-xl bg-life-surface2 border border-life-border/50 text-xs font-semibold text-life-soft tabular-nums shrink-0">
                           {ev.startTime} – {ev.endTime}
                         </div>
                         <div className="min-w-0">
-                          <h3 className="text-sm font-semibold text-[#F4E9DC]">{ev.title}</h3>
-                          {ev.notes && <p className="text-xs text-[#A99B90] mt-1">{ev.notes}</p>}
+                          <h3 className="text-sm font-semibold text-life-text">{ev.title}</h3>
+                          {ev.notes && <p className="text-xs text-life-muted mt-1">{ev.notes}</p>}
                         </div>
                       </div>
-                      <span className="text-xs px-2.5 py-1 rounded-lg bg-[#241B17] border border-[#624332]/40 text-[#B68B61] self-start sm:self-center shrink-0">
+                      <span className="text-xs px-2.5 py-1 rounded-lg bg-life-surface border border-life-border/40 text-life-accent self-start sm:self-center shrink-0">
                         {ev.location || ev.category}
                       </span>
                     </div>
@@ -4930,10 +4931,10 @@ const PlannerView = ({
             <GlassCard className="p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-base font-semibold text-[#F4E9DC]">
+                  <h2 className="text-base font-semibold text-life-text">
                     {t('nav_tasks')} — {formatDateReadable(selectedDate, lang)}
                   </h2>
-                  <p className="text-xs text-[#A99B90]">
+                  <p className="text-xs text-life-muted">
                     {dayCompletionPct.toFixed(0)}% {t('completed_count')}
                   </p>
                 </div>
@@ -4943,7 +4944,7 @@ const PlannerView = ({
               </div>
               <ProgressBar value={dayCompletionPct} max={100} />
               {dayTasks.length === 0 ? (
-                <p className="text-xs text-[#A99B90] py-4 text-center">
+                <p className="text-xs text-life-muted py-4 text-center">
                   {lang === 'id' ? 'Tidak ada tugas jatuh tempo tanggal ini.' : 'No tasks due on this date.'}
                 </p>
               ) : (
@@ -4951,20 +4952,20 @@ const PlannerView = ({
                   {dayTasks.map((tk) => (
                     <div
                       key={tk.id}
-                      className="flex items-center justify-between p-2.5 rounded-xl bg-[#171412]/75 border border-[#624332]/35"
+                      className="flex items-center justify-between p-2.5 rounded-xl bg-life-bg/75 border border-life-border/35"
                     >
                       <button
                         onClick={() => onToggleTask(tk.id)}
                         className="flex items-center gap-2.5 text-left min-w-0 flex-1"
                       >
                         {tk.status === 'completed' ? (
-                          <CheckCircle2 className="w-4 h-4 text-[#B68B61] shrink-0" />
+                          <CheckCircle2 className="w-4 h-4 text-life-accent shrink-0" />
                         ) : (
-                          <Circle className="w-4 h-4 text-[#A99B90] shrink-0" />
+                          <Circle className="w-4 h-4 text-life-muted shrink-0" />
                         )}
                         <span
                           className={`text-sm truncate ${
-                            tk.status === 'completed' ? 'line-through text-[#A99B90]' : 'text-[#F4E9DC]'
+                            tk.status === 'completed' ? 'line-through text-life-muted' : 'text-life-text'
                           }`}
                         >
                           {tk.title}
@@ -4973,7 +4974,7 @@ const PlannerView = ({
                       <button
                         onClick={() => onToggleTopPriority(tk.id)}
                         className={`p-1.5 rounded-lg ml-2 shrink-0 ${
-                          tk.isTopPriority ? 'text-[#B68B61]' : 'text-[#A99B90]/40 hover:text-[#A99B90]'
+                          tk.isTopPriority ? 'text-life-accent' : 'text-life-muted/40 hover:text-life-muted'
                         }`}
                       >
                         <Pin className="w-3.5 h-3.5" />
@@ -4994,15 +4995,15 @@ const PlannerView = ({
             const wEvents = data.events.filter((e) => e.date === wd.dateStr);
             return (
               <GlassCard key={wd.dateStr} className="p-4 space-y-3">
-                <div className="flex items-center justify-between border-b border-[#624332]/30 pb-2">
-                  <span className="text-sm font-semibold text-[#F4E9DC]">
+                <div className="flex items-center justify-between border-b border-life-border/30 pb-2">
+                  <span className="text-sm font-semibold text-life-text">
                     {wd.weekday} {wd.dayNum}
                   </span>
-                  <span className="text-xs text-[#B68B61]">{wEvents.length + wTasks.length}</span>
+                  <span className="text-xs text-life-accent">{wEvents.length + wTasks.length}</span>
                 </div>
                 <div className="space-y-2 min-h-[110px]">
                   {wEvents.map((e) => (
-                    <div key={e.id} className="p-2 rounded-lg bg-[#30231D]/80 text-xs text-[#E4C8A6]">
+                    <div key={e.id} className="p-2 rounded-lg bg-life-surface2/80 text-xs text-life-soft">
                       <span className="font-semibold">{e.startTime}</span> {e.title}
                     </div>
                   ))}
@@ -5010,14 +5011,14 @@ const PlannerView = ({
                     <div
                       key={tk.id}
                       onClick={() => onToggleTask(tk.id)}
-                      className="cursor-pointer p-2 rounded-lg bg-[#171412]/80 text-xs text-[#F4E9DC] flex items-center gap-2"
+                      className="cursor-pointer p-2 rounded-lg bg-life-bg/80 text-xs text-life-text flex items-center gap-2"
                     >
                       {tk.status === 'completed' ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-[#B68B61] shrink-0" />
+                        <CheckCircle2 className="w-3.5 h-3.5 text-life-accent shrink-0" />
                       ) : (
-                        <Circle className="w-3.5 h-3.5 text-[#A99B90] shrink-0" />
+                        <Circle className="w-3.5 h-3.5 text-life-muted shrink-0" />
                       )}
-                      <span className={tk.status === 'completed' ? 'line-through text-[#A99B90]' : ''}>
+                      <span className={tk.status === 'completed' ? 'line-through text-life-muted' : ''}>
                         {tk.title}
                       </span>
                     </div>
@@ -5031,12 +5032,12 @@ const PlannerView = ({
 
       {horizon === 'monthly' && (
         <GlassCard className="p-5 sm:p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-[#F4E9DC]">
+          <h2 className="text-lg font-semibold text-life-text">
             {t('mode_monthly')} ({selectedDate.slice(0, 7)})
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2.5">
-              <h3 className="text-xs uppercase tracking-wider text-[#B68B61] font-semibold">
+              <h3 className="text-xs uppercase tracking-wider text-life-accent font-semibold">
                 {t('task_deadlines')}
               </h3>
               {data.tasks
@@ -5045,15 +5046,15 @@ const PlannerView = ({
                 .map((tk) => (
                   <div
                     key={tk.id}
-                    className="p-3 rounded-xl bg-[#171412]/80 border border-[#624332]/40 flex items-center justify-between gap-2"
+                    className="p-3 rounded-xl bg-life-bg/80 border border-life-border/40 flex items-center justify-between gap-2"
                   >
-                    <span className="text-sm text-[#F4E9DC] truncate">{tk.title}</span>
-                    <span className="text-xs text-[#A99B90] shrink-0">{formatDateReadable(tk.dueDate, lang)}</span>
+                    <span className="text-sm text-life-text truncate">{tk.title}</span>
+                    <span className="text-xs text-life-muted shrink-0">{formatDateReadable(tk.dueDate, lang)}</span>
                   </div>
                 ))}
             </div>
             <div className="space-y-2.5">
-              <h3 className="text-xs uppercase tracking-wider text-[#E4C8A6] font-semibold">
+              <h3 className="text-xs uppercase tracking-wider text-life-soft font-semibold">
                 {t('daily_agenda')}
               </h3>
               {data.events
@@ -5062,10 +5063,10 @@ const PlannerView = ({
                 .map((e) => (
                   <div
                     key={e.id}
-                    className="p-3 rounded-xl bg-[#171412]/80 border border-[#624332]/40 flex items-center justify-between gap-2"
+                    className="p-3 rounded-xl bg-life-bg/80 border border-life-border/40 flex items-center justify-between gap-2"
                   >
-                    <span className="text-sm text-[#F4E9DC] truncate">{e.title}</span>
-                    <span className="text-xs text-[#B68B61] shrink-0">
+                    <span className="text-sm text-life-text truncate">{e.title}</span>
+                    <span className="text-xs text-life-accent shrink-0">
                       {formatDateReadable(e.date, lang)} • {e.startTime}
                     </span>
                   </div>
@@ -5112,24 +5113,24 @@ const TasksView = ({ data, t, lang, onOpenTaskModal, onToggleTask, onUpdateTaskS
 
   const priorityTone = {
     Urgent: 'bg-[#D96B52]/20 text-[#F29B87] border-[#D96B52]/40',
-    High: 'bg-[#B68B61]/25 text-[#E4C8A6] border-[#B68B61]/50',
-    Medium: 'bg-[#30231D] text-[#E4C8A6] border-[#624332]/50',
-    Low: 'bg-[#171412] text-[#A99B90] border-[#624332]/40',
+    High: 'bg-life-accent/25 text-life-soft border-life-accent/50',
+    Medium: 'bg-life-surface2 text-life-soft border-life-border/50',
+    Low: 'bg-life-bg text-life-muted border-life-border/40',
   };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('tasks_title')}</h1>
-          <p className="text-xs text-[#A99B90] mt-1">{t('tasks_subtitle')}</p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-life-text">{t('tasks_title')}</h1>
+          <p className="text-xs text-life-muted mt-1">{t('tasks_subtitle')}</p>
         </div>
         <div className="flex items-center gap-2.5">
-          <div className="inline-flex rounded-xl bg-[#241B17] p-1 border border-[#624332]/50">
+          <div className="inline-flex rounded-xl bg-life-surface p-1 border border-life-border/50">
             <button
               onClick={() => setViewMode('list')}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium ${
-                viewMode === 'list' ? 'bg-[#B68B61] text-[#171412]' : 'text-[#A99B90]'
+                viewMode === 'list' ? 'bg-life-accent text-life-bg' : 'text-life-muted'
               }`}
             >
               <ListTodo className="w-3.5 h-3.5" /> {t('view_list')}
@@ -5137,7 +5138,7 @@ const TasksView = ({ data, t, lang, onOpenTaskModal, onToggleTask, onUpdateTaskS
             <button
               onClick={() => setViewMode('board')}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium ${
-                viewMode === 'board' ? 'bg-[#B68B61] text-[#171412]' : 'text-[#A99B90]'
+                viewMode === 'board' ? 'bg-life-accent text-life-bg' : 'text-life-muted'
               }`}
             >
               <Kanban className="w-3.5 h-3.5" /> {t('view_board')}
@@ -5151,19 +5152,19 @@ const TasksView = ({ data, t, lang, onOpenTaskModal, onToggleTask, onUpdateTaskS
 
       <GlassCard className="p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div className="relative flex-1 max-w-md">
-          <Search className="w-4 h-4 text-[#A99B90] absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-life-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('search_placeholder')}
-            className="w-full rounded-xl bg-[#171412] border border-[#624332]/55 pl-10 pr-4 py-2 text-sm text-[#F4E9DC]"
+            className="w-full rounded-xl bg-life-bg border border-life-border/55 pl-10 pr-4 py-2 text-sm text-life-text"
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-xl bg-[#171412] border border-[#624332]/55 px-3 py-2 text-xs text-[#F4E9DC]"
+            className="rounded-xl bg-life-bg border border-life-border/55 px-3 py-2 text-xs text-life-text"
           >
             <option value="all">{t('status')}: All</option>
             <option value="todo">{t('todo')}</option>
@@ -5173,7 +5174,7 @@ const TasksView = ({ data, t, lang, onOpenTaskModal, onToggleTask, onUpdateTaskS
           <select
             value={priorityFilter}
             onChange={(e) => setPriorityFilter(e.target.value)}
-            className="rounded-xl bg-[#171412] border border-[#624332]/55 px-3 py-2 text-xs text-[#F4E9DC]"
+            className="rounded-xl bg-life-bg border border-life-border/55 px-3 py-2 text-xs text-life-text"
           >
             <option value="all">{t('priority')}: All</option>
             <option value="Urgent">Urgent</option>
@@ -5184,7 +5185,7 @@ const TasksView = ({ data, t, lang, onOpenTaskModal, onToggleTask, onUpdateTaskS
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="rounded-xl bg-[#171412] border border-[#624332]/55 px-3 py-2 text-xs text-[#F4E9DC]"
+            className="rounded-xl bg-life-bg border border-life-border/55 px-3 py-2 text-xs text-life-text"
           >
             <option value="all">{t('all_categories')}</option>
             <option value="Work">Work</option>
@@ -5218,7 +5219,7 @@ const TasksView = ({ data, t, lang, onOpenTaskModal, onToggleTask, onUpdateTaskS
               <div className="flex items-start gap-3 min-w-0">
                 <button
                   onClick={() => onToggleTask(task.id)}
-                  className="mt-0.5 text-[#B68B61] hover:text-[#E4C8A6] shrink-0"
+                  className="mt-0.5 text-life-accent hover:text-life-soft shrink-0"
                 >
                   {task.status === 'completed' ? (
                     <CheckCircle2 className="w-5 h-5" />
@@ -5229,13 +5230,13 @@ const TasksView = ({ data, t, lang, onOpenTaskModal, onToggleTask, onUpdateTaskS
                 <div className="min-w-0">
                   <p
                     className={`text-sm font-medium ${
-                      task.status === 'completed' ? 'line-through text-[#A99B90]' : 'text-[#F4E9DC]'
+                      task.status === 'completed' ? 'line-through text-life-muted' : 'text-life-text'
                     }`}
                   >
                     {task.title}
                   </p>
                   {task.description && (
-                    <p className="text-xs text-[#A99B90] mt-0.5">{task.description}</p>
+                    <p className="text-xs text-life-muted mt-0.5">{task.description}</p>
                   )}
                   <div className="flex flex-wrap items-center gap-2 mt-2">
                     <span
@@ -5245,10 +5246,10 @@ const TasksView = ({ data, t, lang, onOpenTaskModal, onToggleTask, onUpdateTaskS
                     >
                       {task.priority}
                     </span>
-                    <span className="text-[11px] px-2 py-0.5 rounded-md bg-[#171412] text-[#A99B90]">
+                    <span className="text-[11px] px-2 py-0.5 rounded-md bg-life-bg text-life-muted">
                       {task.category}
                     </span>
-                    <span className="text-[11px] text-[#A99B90]">
+                    <span className="text-[11px] text-life-muted">
                       {formatDateReadable(task.dueDate, lang)}
                     </span>
                   </div>
@@ -5259,7 +5260,7 @@ const TasksView = ({ data, t, lang, onOpenTaskModal, onToggleTask, onUpdateTaskS
                 <select
                   value={task.status}
                   onChange={(e) => onUpdateTaskStatus(task.id, e.target.value)}
-                  className="rounded-xl bg-[#171412] border border-[#624332]/55 px-2.5 py-1.5 text-xs text-[#E4C8A6]"
+                  className="rounded-xl bg-life-bg border border-life-border/55 px-2.5 py-1.5 text-xs text-life-soft"
                 >
                   <option value="todo">{t('todo')}</option>
                   <option value="in_progress">{t('in_progress')}</option>
@@ -5267,13 +5268,13 @@ const TasksView = ({ data, t, lang, onOpenTaskModal, onToggleTask, onUpdateTaskS
                 </select>
                 <button
                   onClick={() => onOpenTaskModal(task)}
-                  className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#E4C8A6] hover:bg-[#30231D]"
+                  className="p-1.5 rounded-lg text-life-muted hover:text-life-soft hover:bg-life-surface2"
                 >
                   <Edit3 className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => onDeleteTask(task)}
-                  className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#D96B52] hover:bg-[#30231D]"
+                  className="p-1.5 rounded-lg text-life-muted hover:text-[#D96B52] hover:bg-life-surface2"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -5287,9 +5288,9 @@ const TasksView = ({ data, t, lang, onOpenTaskModal, onToggleTask, onUpdateTaskS
             const colTasks = filteredTasks.filter((tk) => tk.status === col.key);
             return (
               <GlassCard key={col.key} className="p-4 space-y-3">
-                <div className="flex items-center justify-between border-b border-[#624332]/35 pb-2.5">
-                  <h3 className="text-sm font-semibold text-[#F4E9DC]">{col.label}</h3>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-[#30231D] text-[#E4C8A6]">
+                <div className="flex items-center justify-between border-b border-life-border/35 pb-2.5">
+                  <h3 className="text-sm font-semibold text-life-text">{col.label}</h3>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-life-surface2 text-life-soft">
                     {colTasks.length}
                   </span>
                 </div>
@@ -5297,13 +5298,13 @@ const TasksView = ({ data, t, lang, onOpenTaskModal, onToggleTask, onUpdateTaskS
                   {colTasks.map((task) => (
                     <div
                       key={task.id}
-                      className="p-3.5 rounded-xl bg-[#171412]/85 border border-[#624332]/45 space-y-2.5"
+                      className="p-3.5 rounded-xl bg-life-bg/85 border border-life-border/45 space-y-2.5"
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <p className="text-sm font-medium text-[#F4E9DC]">{task.title}</p>
+                        <p className="text-sm font-medium text-life-text">{task.title}</p>
                         <button
                           onClick={() => onOpenTaskModal(task)}
-                          className="text-[#A99B90] hover:text-[#E4C8A6] shrink-0"
+                          className="text-life-muted hover:text-life-soft shrink-0"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
@@ -5312,7 +5313,7 @@ const TasksView = ({ data, t, lang, onOpenTaskModal, onToggleTask, onUpdateTaskS
                         <span className={`px-2 py-0.5 rounded border ${priorityTone[task.priority]}`}>
                           {task.priority}
                         </span>
-                        <span className="text-[#A99B90]">{formatDateReadable(task.dueDate, lang)}</span>
+                        <span className="text-life-muted">{formatDateReadable(task.dueDate, lang)}</span>
                       </div>
                       <div className="flex flex-wrap gap-1.5 pt-1">
                         {statusColumns
@@ -5321,7 +5322,7 @@ const TasksView = ({ data, t, lang, onOpenTaskModal, onToggleTask, onUpdateTaskS
                             <button
                               key={target.key}
                               onClick={() => onUpdateTaskStatus(task.id, target.key)}
-                              className="text-[10px] px-2 py-1 rounded-lg bg-[#241B17] hover:bg-[#30231D] text-[#E4C8A6] border border-[#624332]/40"
+                              className="text-[10px] px-2 py-1 rounded-lg bg-life-surface hover:bg-life-surface2 text-life-soft border border-life-border/40"
                             >
                               → {target.label}
                             </button>
@@ -5392,14 +5393,14 @@ const CalendarView = ({ data, t, lang, onOpenEventModal, onDeleteEvent }) => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('calendar_title')}</h1>
-          <p className="text-xs text-[#A99B90] mt-1">{t('calendar_subtitle')}</p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-life-text">{t('calendar_title')}</h1>
+          <p className="text-xs text-life-muted mt-1">{t('calendar_subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="secondary" size="sm" onClick={() => shiftMonth(-1)}>
             <ChevronLeft className="w-4 h-4" />
           </Button>
-          <span className="px-2 text-sm font-semibold text-[#F4E9DC] min-w-[130px] text-center">
+          <span className="px-2 text-sm font-semibold text-life-text min-w-[130px] text-center">
             {monthLabel}
           </span>
           <Button variant="secondary" size="sm" onClick={() => shiftMonth(1)}>
@@ -5413,7 +5414,7 @@ const CalendarView = ({ data, t, lang, onOpenEventModal, onDeleteEvent }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <GlassCard className="p-3 sm:p-5 lg:col-span-2">
-          <div className="grid grid-cols-7 gap-1 text-center text-[10px] sm:text-[11px] uppercase tracking-wider text-[#A99B90] mb-2">
+          <div className="grid grid-cols-7 gap-1 text-center text-[10px] sm:text-[11px] uppercase tracking-wider text-life-muted mb-2">
             {weekdays.map((d) => (
               <div key={d} className="py-1">
                 {d}
@@ -5423,7 +5424,7 @@ const CalendarView = ({ data, t, lang, onOpenEventModal, onDeleteEvent }) => {
           <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
             {calendarCells.map((cell, idx) => {
               if (!cell)
-                return <div key={`empty-${idx}`} className="h-14 sm:h-24 rounded-xl bg-[#171412]/30" />;
+                return <div key={`empty-${idx}`} className="h-14 sm:h-24 rounded-xl bg-life-bg/30" />;
               const dayEvents = data.events.filter((e) => e.date === cell.dateStr);
               const dayTasks = data.tasks.filter((tk) => tk.dueDate === cell.dateStr);
               const dayBdays = (data.contacts || []).filter(
@@ -5438,35 +5439,35 @@ const CalendarView = ({ data, t, lang, onOpenEventModal, onDeleteEvent }) => {
                   onClick={() => setSelectedDay(cell.dateStr)}
                   className={`h-14 sm:h-24 p-1.5 sm:p-2 rounded-xl border text-left flex flex-col justify-between transition-all ${
                     isSelected
-                      ? 'bg-[#30231D] border-[#B68B61]'
-                      : 'bg-[#171412]/70 border-[#624332]/30 hover:border-[#624332]'
+                      ? 'bg-life-surface2 border-life-accent'
+                      : 'bg-life-bg/70 border-life-border/30 hover:border-life-border'
                   }`}
                 >
                   <div className="flex items-center justify-between w-full">
                     <span
                       className={`text-xs font-semibold w-6 h-6 rounded-full flex items-center justify-center ${
-                        isToday ? 'bg-[#B68B61] text-[#171412]' : 'text-[#F4E9DC]'
+                        isToday ? 'bg-life-accent text-life-bg' : 'text-life-text'
                       }`}
                     >
                       {cell.day}
                     </span>
-                    {dayBdays.length > 0 && <Cake className="w-3 h-3 text-[#E4C8A6]" />}
+                    {dayBdays.length > 0 && <Cake className="w-3 h-3 text-life-soft" />}
                   </div>
                   <div className="flex sm:hidden gap-1">
-                    {dayEvents.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-[#E4C8A6]" />}
-                    {dayTasks.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-[#B68B61]" />}
+                    {dayEvents.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-life-soft" />}
+                    {dayTasks.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-life-accent" />}
                   </div>
                   <div className="hidden sm:block space-y-1 w-full overflow-hidden">
                     {dayEvents.slice(0, 1).map((ev) => (
                       <div
                         key={ev.id}
-                        className="text-[10px] truncate px-1.5 py-0.5 rounded bg-[#B68B61]/25 text-[#E4C8A6]"
+                        className="text-[10px] truncate px-1.5 py-0.5 rounded bg-life-accent/25 text-life-soft"
                       >
                         {ev.startTime} {ev.title}
                       </div>
                     ))}
                     {dayTasks.length > 0 && (
-                      <div className="text-[10px] truncate px-1.5 py-0.5 rounded bg-[#624332]/40 text-[#F4E9DC]">
+                      <div className="text-[10px] truncate px-1.5 py-0.5 rounded bg-life-border/40 text-life-text">
                         {dayTasks.length} {lang === 'id' ? 'tugas' : 'due'}
                       </div>
                     )}
@@ -5478,10 +5479,10 @@ const CalendarView = ({ data, t, lang, onOpenEventModal, onDeleteEvent }) => {
         </GlassCard>
 
         <GlassCard className="p-5 space-y-5">
-          <div className="flex items-center justify-between border-b border-[#624332]/35 pb-3">
+          <div className="flex items-center justify-between border-b border-life-border/35 pb-3">
             <div>
-              <h2 className="text-base font-semibold text-[#F4E9DC]">{t('daily_agenda')}</h2>
-              <p className="text-xs text-[#B68B61]">{formatDateReadable(selectedDay, lang)}</p>
+              <h2 className="text-base font-semibold text-life-text">{t('daily_agenda')}</h2>
+              <p className="text-xs text-life-accent">{formatDateReadable(selectedDay, lang)}</p>
             </div>
             <Button size="sm" variant="secondary" onClick={() => onOpenEventModal(null, selectedDay)}>
               <Plus className="w-3.5 h-3.5" />
@@ -5489,12 +5490,12 @@ const CalendarView = ({ data, t, lang, onOpenEventModal, onDeleteEvent }) => {
           </div>
 
           {selectedBirthdays.length > 0 && (
-            <div className="p-3 rounded-xl bg-[#30231D]/80 border border-[#B68B61]/50 space-y-1">
-              <div className="text-[11px] uppercase tracking-wider text-[#E4C8A6] font-semibold flex items-center gap-1.5">
-                <Cake className="w-3.5 h-3.5 text-[#B68B61]" /> {t('birthday')}
+            <div className="p-3 rounded-xl bg-life-surface2/80 border border-life-accent/50 space-y-1">
+              <div className="text-[11px] uppercase tracking-wider text-life-soft font-semibold flex items-center gap-1.5">
+                <Cake className="w-3.5 h-3.5 text-life-accent" /> {t('birthday')}
               </div>
               {selectedBirthdays.map((b) => (
-                <p key={b.id} className="text-xs text-[#F4E9DC]">
+                <p key={b.id} className="text-xs text-life-text">
                   {b.name} ({b.category})
                 </p>
               ))}
@@ -5502,38 +5503,38 @@ const CalendarView = ({ data, t, lang, onOpenEventModal, onDeleteEvent }) => {
           )}
 
           <div className="space-y-3">
-            <h3 className="text-xs uppercase tracking-wider text-[#A99B90]">{t('daily_agenda')}</h3>
+            <h3 className="text-xs uppercase tracking-wider text-life-muted">{t('daily_agenda')}</h3>
             {selectedEvents.length === 0 ? (
-              <p className="text-xs text-[#A99B90]/70">{t('no_events_today')}</p>
+              <p className="text-xs text-life-muted/70">{t('no_events_today')}</p>
             ) : (
               selectedEvents.map((ev) => (
                 <div
                   key={ev.id}
-                  className="p-3 rounded-xl bg-[#171412]/85 border border-[#624332]/45 space-y-1.5"
+                  className="p-3 rounded-xl bg-life-bg/85 border border-life-border/45 space-y-1.5"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <span className="text-sm font-medium text-[#F4E9DC]">{ev.title}</span>
+                    <span className="text-sm font-medium text-life-text">{ev.title}</span>
                     <div className="flex items-center gap-1 shrink-0">
                       <button
                         onClick={() => onOpenEventModal(ev)}
-                        className="p-1 text-[#A99B90] hover:text-[#E4C8A6]"
+                        className="p-1 text-life-muted hover:text-life-soft"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => onDeleteEvent(ev)}
-                        className="p-1 text-[#A99B90] hover:text-[#D96B52]"
+                        className="p-1 text-life-muted hover:text-[#D96B52]"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
-                  <p className="text-xs text-[#E4C8A6] tabular-nums">
+                  <p className="text-xs text-life-soft tabular-nums">
                     {ev.startTime} – {ev.endTime} • {ev.location || ev.category}
                   </p>
                   {ev.reminder && ev.reminder !== 'None' && (
-                    <p className="text-[11px] text-[#A99B90] flex items-center gap-1">
-                      <Bell className="w-3 h-3 text-[#B68B61]" /> {ev.reminder}
+                    <p className="text-[11px] text-life-muted flex items-center gap-1">
+                      <Bell className="w-3 h-3 text-life-accent" /> {ev.reminder}
                     </p>
                   )}
                 </div>
@@ -5541,20 +5542,20 @@ const CalendarView = ({ data, t, lang, onOpenEventModal, onDeleteEvent }) => {
             )}
           </div>
 
-          <div className="space-y-2.5 pt-2 border-t border-[#624332]/30">
-            <h3 className="text-xs uppercase tracking-wider text-[#A99B90]">{t('task_deadlines')}</h3>
+          <div className="space-y-2.5 pt-2 border-t border-life-border/30">
+            <h3 className="text-xs uppercase tracking-wider text-life-muted">{t('task_deadlines')}</h3>
             {selectedDeadlines.length === 0 ? (
-              <p className="text-xs text-[#A99B90]/70">
+              <p className="text-xs text-life-muted/70">
                 {lang === 'id' ? 'Tidak ada tenggat tugas.' : 'No task deadlines on this day.'}
               </p>
             ) : (
               selectedDeadlines.map((tk) => (
                 <div
                   key={tk.id}
-                  className="p-2.5 rounded-xl bg-[#30231D]/60 border border-[#624332]/40 flex items-center justify-between text-xs gap-2"
+                  className="p-2.5 rounded-xl bg-life-surface2/60 border border-life-border/40 flex items-center justify-between text-xs gap-2"
                 >
-                  <span className="text-[#F4E9DC] truncate">{tk.title}</span>
-                  <span className="text-[#B68B61] shrink-0">{tk.priority}</span>
+                  <span className="text-life-text truncate">{tk.title}</span>
+                  <span className="text-life-accent shrink-0">{tk.priority}</span>
                 </div>
               ))
             )}
@@ -5597,8 +5598,8 @@ const HabitsView = ({ data, t, lang, onToggleHabitDate, onCreateHabit, onDeleteH
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('habits_title')}</h1>
-          <p className="text-xs text-[#A99B90] mt-1">{t('habits_subtitle')}</p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-life-text">{t('habits_title')}</h1>
+          <p className="text-xs text-life-muted mt-1">{t('habits_subtitle')}</p>
         </div>
         <Button size="sm" onClick={() => setShowModal(true)}>
           <Plus className="w-4 h-4" /> {t('new_habit')}
@@ -5606,22 +5607,22 @@ const HabitsView = ({ data, t, lang, onToggleHabitDate, onCreateHabit, onDeleteH
       </div>
 
       <GlassCard className="p-5">
-        <h2 className="text-base font-semibold text-[#F4E9DC] mb-4">{t('consistency_chart_title')}</h2>
+        <h2 className="text-base font-semibold text-life-text mb-4">{t('consistency_chart_title')}</h2>
         <div className="h-52 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={weeklyChartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#624332" strokeOpacity={0.25} vertical={false} />
-              <XAxis dataKey="day" stroke="#A99B90" fontSize={11} />
-              <YAxis stroke="#A99B90" fontSize={11} domain={[0, 100]} />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--life-border))" strokeOpacity={0.25} vertical={false} />
+              <XAxis dataKey="day" stroke="rgb(var(--life-muted))" fontSize={11} />
+              <YAxis stroke="rgb(var(--life-muted))" fontSize={11} domain={[0, 100]} />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: '#241B17',
-                  borderColor: '#624332',
+                  backgroundColor: 'rgb(var(--life-surface))',
+                  borderColor: 'rgb(var(--life-border))',
                   borderRadius: '12px',
-                  color: '#F4E9DC',
+                  color: 'rgb(var(--life-text))',
                 }}
               />
-              <Bar dataKey="consistency" name="%" fill="#B68B61" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="consistency" name="%" fill="rgb(var(--life-accent))" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -5643,26 +5644,26 @@ const HabitsView = ({ data, t, lang, onToggleHabitDate, onCreateHabit, onDeleteH
         <GlassCard className="p-4 sm:p-5 overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[600px]">
             <thead>
-              <tr className="border-b border-[#624332]/40 text-[11px] uppercase tracking-wider text-[#A99B90]">
+              <tr className="border-b border-life-border/40 text-[11px] uppercase tracking-wider text-life-muted">
                 <th className="py-3 px-2">{t('habit_ritual')}</th>
                 {last7Days.map((d) => (
                   <th key={d.dateStr} className="py-3 px-2 text-center">
                     <div>{d.dayShort}</div>
-                    <div className="text-[#F4E9DC] font-semibold">{d.dayNum}</div>
+                    <div className="text-life-text font-semibold">{d.dayNum}</div>
                   </th>
                 ))}
                 <th className="py-3 px-2 text-center">{t('streak')}</th>
                 <th className="py-3 px-2 text-right">{t('actions')}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#624332]/25">
+            <tbody className="divide-y divide-life-border/25">
               {data.habits.map((habit) => {
                 const streak = calculateHabitStreak(habit.completedDates);
                 return (
-                  <tr key={habit.id} className="hover:bg-[#30231D]/30">
+                  <tr key={habit.id} className="hover:bg-life-surface2/30">
                     <td className="py-3.5 px-2">
-                      <div className="text-sm font-medium text-[#F4E9DC]">{habit.name}</div>
-                      <div className="text-xs text-[#A99B90]">
+                      <div className="text-sm font-medium text-life-text">{habit.name}</div>
+                      <div className="text-xs text-life-muted">
                         {habit.category} • {habit.timeOfDay}
                       </div>
                     </td>
@@ -5674,8 +5675,8 @@ const HabitsView = ({ data, t, lang, onToggleHabitDate, onCreateHabit, onDeleteH
                             onClick={() => onToggleHabitDate(habit.id, d.dateStr)}
                             className={`w-9 h-9 rounded-xl inline-flex items-center justify-center transition-all ${
                               checked
-                                ? 'bg-gradient-to-br from-[#B68B61] to-[#8C6440] text-[#171412] shadow'
-                                : 'bg-[#171412] border border-[#624332]/50 text-[#A99B90] hover:border-[#B68B61]'
+                                ? 'bg-gradient-to-br from-life-accent to-life-accent-dark text-life-bg shadow'
+                                : 'bg-life-bg border border-life-border/50 text-life-muted hover:border-life-accent'
                             }`}
                           >
                             {checked && <Check className="w-4 h-4 stroke-[2.5]" />}
@@ -5684,14 +5685,14 @@ const HabitsView = ({ data, t, lang, onToggleHabitDate, onCreateHabit, onDeleteH
                       );
                     })}
                     <td className="py-3.5 px-2 text-center">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#30231D] text-xs font-semibold text-[#E4C8A6]">
-                        <Flame className="w-3.5 h-3.5 text-[#B68B61]" /> {streak}d
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-life-surface2 text-xs font-semibold text-life-soft">
+                        <Flame className="w-3.5 h-3.5 text-life-accent" /> {streak}d
                       </span>
                     </td>
                     <td className="py-3.5 px-2 text-right">
                       <button
                         onClick={() => onDeleteHabit(habit)}
-                        className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#D96B52]"
+                        className="p-1.5 rounded-lg text-life-muted hover:text-[#D96B52]"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -5780,17 +5781,17 @@ const GoalsView = ({ data, t, lang, onCreateGoal, onToggleMilestone, onAddMilest
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('goals_title')}</h1>
-          <p className="text-xs text-[#A99B90] mt-1">{t('goals_subtitle')}</p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-life-text">{t('goals_title')}</h1>
+          <p className="text-xs text-life-muted mt-1">{t('goals_subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex rounded-xl bg-[#241B17] p-1 border border-[#624332]/50">
+          <div className="inline-flex rounded-xl bg-life-surface p-1 border border-life-border/50">
             {['all', 'Short-Term', 'Long-Term'].map((h) => (
               <button
                 key={h}
                 onClick={() => setHorizonFilter(h)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize ${
-                  horizonFilter === h ? 'bg-[#B68B61] text-[#171412]' : 'text-[#A99B90]'
+                  horizonFilter === h ? 'bg-life-accent text-life-bg' : 'text-life-muted'
                 }`}
               >
                 {h === 'all' ? (lang === 'id' ? 'Semua' : 'All') : h}
@@ -5827,21 +5828,21 @@ const GoalsView = ({ data, t, lang, onCreateGoal, onToggleMilestone, onAddMilest
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-[#30231D] text-[#E4C8A6]">
+                      <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-life-surface2 text-life-soft">
                         {goal.horizon}
                       </span>
-                      <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-[#171412] text-[#A99B90]">
+                      <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-life-bg text-life-muted">
                         {goal.category}
                       </span>
                     </div>
-                    <h3 className="text-base font-semibold text-[#F4E9DC]">{goal.title}</h3>
-                    <p className="text-xs text-[#A99B90] mt-0.5">
+                    <h3 className="text-base font-semibold text-life-text">{goal.title}</h3>
+                    <p className="text-xs text-life-muted mt-0.5">
                       Deadline: {formatDateReadable(goal.deadline, lang)}
                     </p>
                   </div>
                   <button
                     onClick={() => onDeleteGoal(goal)}
-                    className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#D96B52] shrink-0"
+                    className="p-1.5 rounded-lg text-life-muted hover:text-[#D96B52] shrink-0"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -5849,10 +5850,10 @@ const GoalsView = ({ data, t, lang, onCreateGoal, onToggleMilestone, onAddMilest
 
                 <div>
                   <div className="flex justify-between text-xs mb-1.5">
-                    <span className="text-[#A99B90]">
+                    <span className="text-life-muted">
                       {t('milestone_progress')} ({doneMs}/{totalMs})
                     </span>
-                    <span className="text-[#E4C8A6] font-semibold tabular-nums">{pct}%</span>
+                    <span className="text-life-soft font-semibold tabular-nums">{pct}%</span>
                   </div>
                   <ProgressBar value={pct} max={100} tone={pct === 100 ? 'success' : 'bronze'} />
                 </div>
@@ -5862,16 +5863,16 @@ const GoalsView = ({ data, t, lang, onCreateGoal, onToggleMilestone, onAddMilest
                     <button
                       key={ms.id}
                       onClick={() => onToggleMilestone(goal.id, ms.id)}
-                      className="w-full flex items-center gap-2.5 p-2.5 rounded-xl bg-[#171412]/75 border border-[#624332]/35 hover:border-[#B68B61]/50 text-left"
+                      className="w-full flex items-center gap-2.5 p-2.5 rounded-xl bg-life-bg/75 border border-life-border/35 hover:border-life-accent/50 text-left"
                     >
                       {ms.completed ? (
-                        <CheckCircle2 className="w-4 h-4 text-[#B68B61] shrink-0" />
+                        <CheckCircle2 className="w-4 h-4 text-life-accent shrink-0" />
                       ) : (
-                        <Circle className="w-4 h-4 text-[#A99B90] shrink-0" />
+                        <Circle className="w-4 h-4 text-life-muted shrink-0" />
                       )}
                       <span
                         className={`text-xs ${
-                          ms.completed ? 'line-through text-[#A99B90]' : 'text-[#F4E9DC]'
+                          ms.completed ? 'line-through text-life-muted' : 'text-life-text'
                         }`}
                       >
                         {ms.title}
@@ -5895,7 +5896,7 @@ const GoalsView = ({ data, t, lang, onCreateGoal, onToggleMilestone, onAddMilest
                         setNewMilestoneInputs((prev) => ({ ...prev, [goal.id]: e.target.value }))
                       }
                       placeholder={lang === 'id' ? 'Tambah langkah milestone...' : 'Add next milestone...'}
-                      className="flex-1 min-w-0 rounded-xl bg-[#171412] border border-[#624332]/45 px-3 py-1.5 text-xs text-[#F4E9DC]"
+                      className="flex-1 min-w-0 rounded-xl bg-life-bg border border-life-border/45 px-3 py-1.5 text-xs text-life-text"
                     />
                     <Button type="submit" size="sm" variant="secondary">
                       {t('add')}
@@ -6027,8 +6028,8 @@ const PersonalCrmView = ({ data, t, lang, onAddContact, onLogContactToday, onDel
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('crm_title')}</h1>
-          <p className="text-xs text-[#A99B90] mt-1">{t('crm_sub')}</p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-life-text">{t('crm_title')}</h1>
+          <p className="text-xs text-life-muted mt-1">{t('crm_sub')}</p>
         </div>
         <Button size="sm" onClick={() => setShowModal(true)}>
           <Plus className="w-4 h-4" /> {t('add_contact')}
@@ -6037,15 +6038,15 @@ const PersonalCrmView = ({ data, t, lang, onAddContact, onLogContactToday, onDel
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <GlassCard className="p-5">
-          <span className="text-xs uppercase tracking-wider text-[#A99B90]">
+          <span className="text-xs uppercase tracking-wider text-life-muted">
             {lang === 'id' ? 'Total Relasi Terdaftar' : 'Total Contacts'}
           </span>
-          <div className="mt-2 text-xl sm:text-2xl font-semibold text-[#F4E9DC] tabular-nums">
+          <div className="mt-2 text-xl sm:text-2xl font-semibold text-life-text tabular-nums">
             {metrics.total}
           </div>
         </GlassCard>
         <GlassCard className="p-5">
-          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('due_followups')}</span>
+          <span className="text-xs uppercase tracking-wider text-life-muted">{t('due_followups')}</span>
           <div
             className={`mt-2 text-xl sm:text-2xl font-semibold tabular-nums ${
               metrics.overdueCount > 0 ? 'text-[#D96B52]' : 'text-[#87B082]'
@@ -6055,8 +6056,8 @@ const PersonalCrmView = ({ data, t, lang, onAddContact, onLogContactToday, onDel
           </div>
         </GlassCard>
         <GlassCard className="p-5">
-          <span className="text-xs uppercase tracking-wider text-[#A99B90]">{t('upcoming_birthdays')}</span>
-          <div className="mt-2 text-xl sm:text-2xl font-semibold text-[#E4C8A6] tabular-nums">
+          <span className="text-xs uppercase tracking-wider text-life-muted">{t('upcoming_birthdays')}</span>
+          <div className="mt-2 text-xl sm:text-2xl font-semibold text-life-soft tabular-nums">
             {metrics.decBirthdays}
           </div>
         </GlassCard>
@@ -6064,12 +6065,12 @@ const PersonalCrmView = ({ data, t, lang, onAddContact, onLogContactToday, onDel
 
       <GlassCard className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="relative flex-1 max-w-md">
-          <Search className="w-4 h-4 text-[#A99B90] absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-life-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('search_placeholder')}
-            className="w-full rounded-xl bg-[#171412] border border-[#624332]/55 pl-10 pr-4 py-2 text-sm text-[#F4E9DC]"
+            className="w-full rounded-xl bg-life-bg border border-life-border/55 pl-10 pr-4 py-2 text-sm text-life-text"
           />
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -6078,7 +6079,7 @@ const PersonalCrmView = ({ data, t, lang, onAddContact, onLogContactToday, onDel
               key={cat}
               onClick={() => setCatFilter(cat)}
               className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
-                catFilter === cat ? 'bg-[#B68B61] text-[#171412]' : 'bg-[#171412] text-[#A99B90]'
+                catFilter === cat ? 'bg-life-accent text-life-bg' : 'bg-life-bg text-life-muted'
               }`}
             >
               {cat === 'all' ? (lang === 'id' ? 'Semua' : 'All') : cat}
@@ -6113,7 +6114,7 @@ const PersonalCrmView = ({ data, t, lang, onAddContact, onLogContactToday, onDel
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[10px] uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#30231D] text-[#E4C8A6] border border-[#624332]/50">
+                        <span className="text-[10px] uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-life-surface2 text-life-soft border border-life-border/50">
                           {contact.category}
                         </span>
                         <span
@@ -6128,33 +6129,33 @@ const PersonalCrmView = ({ data, t, lang, onAddContact, onLogContactToday, onDel
                             : `${t('on_track')} • ${remainingDays}d`}
                         </span>
                       </div>
-                      <h3 className="text-base font-semibold text-[#F4E9DC] mt-2">{contact.name}</h3>
-                      <p className="text-xs text-[#A99B90] mt-0.5">
+                      <h3 className="text-base font-semibold text-life-text mt-2">{contact.name}</h3>
+                      <p className="text-xs text-life-muted mt-0.5">
                         {contact.handle || '—'} • {t('birthday')}: {contact.birthday?.slice(5) || '—'}
                       </p>
                     </div>
                     <button
                       onClick={() => onDeleteContact(contact)}
-                      className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#D96B52]"
+                      className="p-1.5 rounded-lg text-life-muted hover:text-[#D96B52]"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
 
                   {contact.lastTopic && (
-                    <div className="mt-3 p-3 rounded-xl bg-[#171412]/80 border border-[#624332]/35 text-xs text-[#E4C8A6] flex items-start gap-2">
-                      <MessageSquare className="w-3.5 h-3.5 text-[#B68B61] shrink-0 mt-0.5" />
+                    <div className="mt-3 p-3 rounded-xl bg-life-bg/80 border border-life-border/35 text-xs text-life-soft flex items-start gap-2">
+                      <MessageSquare className="w-3.5 h-3.5 text-life-accent shrink-0 mt-0.5" />
                       <span>{contact.lastTopic}</span>
                     </div>
                   )}
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[#624332]/35">
-                  <span className="text-[11px] text-[#A99B90]">
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-life-border/35">
+                  <span className="text-[11px] text-life-muted">
                     {t('last_contacted')}: {formatDateReadable(contact.lastContacted, lang)}
                   </span>
                   <Button size="sm" variant="secondary" onClick={() => onLogContactToday(contact.id)}>
-                    <PhoneCall className="w-3.5 h-3.5 text-[#B68B61]" /> {t('log_contact_today')}
+                    <PhoneCall className="w-3.5 h-3.5 text-life-accent" /> {t('log_contact_today')}
                   </Button>
                 </div>
               </GlassCard>
@@ -6284,8 +6285,8 @@ const NotesView = ({ data, t, lang, onSaveNote, onDeleteNote, onTogglePinNote })
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('notes_title')}</h1>
-          <p className="text-xs text-[#A99B90] mt-1">{t('notes_subtitle')}</p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-life-text">{t('notes_title')}</h1>
+          <p className="text-xs text-life-muted mt-1">{t('notes_subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="secondary" onClick={() => handleCreateEntry('Journal')}>
@@ -6300,12 +6301,12 @@ const NotesView = ({ data, t, lang, onSaveNote, onDeleteNote, onTogglePinNote })
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <GlassCard className="p-4 space-y-3">
           <div className="relative">
-            <Search className="w-4 h-4 text-[#A99B90] absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-life-muted absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t('search_placeholder')}
-              className="w-full rounded-xl bg-[#171412] border border-[#624332]/55 pl-9 pr-3 py-2 text-xs text-[#F4E9DC]"
+              className="w-full rounded-xl bg-life-bg border border-life-border/55 pl-9 pr-3 py-2 text-xs text-life-text"
             />
           </div>
           <div className="flex gap-1.5">
@@ -6314,7 +6315,7 @@ const NotesView = ({ data, t, lang, onSaveNote, onDeleteNote, onTogglePinNote })
                 key={tp}
                 onClick={() => setTypeFilter(tp)}
                 className={`flex-1 py-1.5 rounded-lg text-xs font-medium ${
-                  typeFilter === tp ? 'bg-[#B68B61] text-[#171412]' : 'bg-[#171412] text-[#A99B90]'
+                  typeFilter === tp ? 'bg-life-accent text-life-bg' : 'bg-life-bg text-life-muted'
                 }`}
               >
                 {tp === 'all' ? (lang === 'id' ? 'Semua' : 'All') : tp === 'Note' ? 'Notes' : 'Jurnal'}
@@ -6324,7 +6325,7 @@ const NotesView = ({ data, t, lang, onSaveNote, onDeleteNote, onTogglePinNote })
 
           <div className="space-y-2 max-h-[360px] lg:max-h-[480px] overflow-y-auto pr-1">
             {filteredNotes.length === 0 ? (
-              <p className="text-xs text-[#A99B90] text-center py-8">
+              <p className="text-xs text-life-muted text-center py-8">
                 {lang === 'id' ? 'Belum ada catatan.' : 'No notes found.'}
               </p>
             ) : (
@@ -6336,16 +6337,16 @@ const NotesView = ({ data, t, lang, onSaveNote, onDeleteNote, onTogglePinNote })
                     onClick={() => setSelectedNoteId(note.id)}
                     className={`cursor-pointer p-3 rounded-xl border transition-all ${
                       isSelected
-                        ? 'bg-[#30231D] border-[#B68B61]'
-                        : 'bg-[#171412]/70 border-[#624332]/35 hover:border-[#624332]'
+                        ? 'bg-life-surface2 border-life-accent'
+                        : 'bg-life-bg/70 border-life-border/35 hover:border-life-border'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="text-sm font-medium text-[#F4E9DC] truncate">{note.title}</h3>
-                      {note.pinned && <Pin className="w-3.5 h-3.5 text-[#B68B61] shrink-0" />}
+                      <h3 className="text-sm font-medium text-life-text truncate">{note.title}</h3>
+                      {note.pinned && <Pin className="w-3.5 h-3.5 text-life-accent shrink-0" />}
                     </div>
-                    <p className="text-xs text-[#A99B90] line-clamp-2 mt-1">{note.content || '...'}</p>
-                    <div className="flex items-center justify-between text-[10px] text-[#E4C8A6] mt-2">
+                    <p className="text-xs text-life-muted line-clamp-2 mt-1">{note.content || '...'}</p>
+                    <div className="flex items-center justify-between text-[10px] text-life-soft mt-2">
                       <span>{note.type} • {note.category}</span>
                       <span>{note.updatedAt.slice(0, 10)}</span>
                     </div>
@@ -6371,26 +6372,26 @@ const NotesView = ({ data, t, lang, onSaveNote, onDeleteNote, onTogglePinNote })
             />
           ) : (
             <div className="space-y-4 flex-1 flex flex-col">
-              <div className="flex items-center justify-between gap-2 border-b border-[#624332]/40 pb-3">
+              <div className="flex items-center justify-between gap-2 border-b border-life-border/40 pb-3">
                 <input
                   value={activeNote.title}
                   onChange={(e) => onSaveNote({ ...activeNote, title: e.target.value })}
-                  className="bg-transparent text-base sm:text-lg font-semibold text-[#F4E9DC] focus:outline-none flex-1 min-w-0"
+                  className="bg-transparent text-base sm:text-lg font-semibold text-life-text focus:outline-none flex-1 min-w-0"
                 />
                 <div className="flex items-center gap-2 shrink-0">
                   <button
                     onClick={() => onTogglePinNote(activeNote.id)}
                     className={`p-2 rounded-xl border transition-colors ${
                       activeNote.pinned
-                        ? 'bg-[#30231D] border-[#B68B61] text-[#B68B61]'
-                        : 'bg-[#171412] border-[#624332]/50 text-[#A99B90]'
+                        ? 'bg-life-surface2 border-life-accent text-life-accent'
+                        : 'bg-life-bg border-life-border/50 text-life-muted'
                     }`}
                   >
                     <Pin className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => onDeleteNote(activeNote)}
-                    className="p-2 rounded-xl bg-[#171412] border border-[#624332]/50 text-[#A99B90] hover:text-[#D96B52]"
+                    className="p-2 rounded-xl bg-life-bg border border-life-border/50 text-life-muted hover:text-[#D96B52]"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -6401,7 +6402,7 @@ const NotesView = ({ data, t, lang, onSaveNote, onDeleteNote, onTogglePinNote })
                 <select
                   value={activeNote.type}
                   onChange={(e) => onSaveNote({ ...activeNote, type: e.target.value })}
-                  className="rounded-xl bg-[#171412] border border-[#624332]/50 px-3 py-1.5 text-xs text-[#E4C8A6]"
+                  className="rounded-xl bg-life-bg border border-life-border/50 px-3 py-1.5 text-xs text-life-soft"
                 >
                   <option value="Note">Note</option>
                   <option value="Journal">Daily Journal</option>
@@ -6409,14 +6410,14 @@ const NotesView = ({ data, t, lang, onSaveNote, onDeleteNote, onTogglePinNote })
                 <input
                   value={activeNote.category}
                   onChange={(e) => onSaveNote({ ...activeNote, category: e.target.value })}
-                  className="rounded-xl bg-[#171412] border border-[#624332]/50 px-3 py-1.5 text-xs text-[#F4E9DC]"
+                  className="rounded-xl bg-life-bg border border-life-border/50 px-3 py-1.5 text-xs text-life-text"
                 />
                 {activeNote.type === 'Journal' && (
                   <input
                     value={activeNote.mood || ''}
                     onChange={(e) => onSaveNote({ ...activeNote, mood: e.target.value })}
                     placeholder="Mood..."
-                    className="rounded-xl bg-[#171412] border border-[#624332]/50 px-3 py-1.5 text-xs text-[#E4C8A6]"
+                    className="rounded-xl bg-life-bg border border-life-border/50 px-3 py-1.5 text-xs text-life-soft"
                   />
                 )}
               </div>
@@ -6424,10 +6425,10 @@ const NotesView = ({ data, t, lang, onSaveNote, onDeleteNote, onTogglePinNote })
               <textarea
                 value={activeNote.content}
                 onChange={(e) => onSaveNote({ ...activeNote, content: e.target.value })}
-                className="w-full flex-1 min-h-[240px] rounded-xl bg-[#171412]/70 border border-[#624332]/40 p-4 text-sm text-[#F4E9DC] leading-relaxed focus:outline-none focus:border-[#B68B61] resize-none"
+                className="w-full flex-1 min-h-[240px] rounded-xl bg-life-bg/70 border border-life-border/40 p-4 text-sm text-life-text leading-relaxed focus:outline-none focus:border-life-accent resize-none"
               />
 
-              <div className="flex items-center justify-between text-[11px] text-[#A99B90]">
+              <div className="flex items-center justify-between text-[11px] text-life-muted">
                 <span>
                   {activeNote.content.trim()
                     ? `${activeNote.content.trim().split(/\s+/).length} ${t('words')}`
@@ -6509,8 +6510,8 @@ const ShoppingView = ({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('shopping_title')}</h1>
-          <p className="text-xs text-[#A99B90] mt-1">{t('shopping_subtitle')}</p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-life-text">{t('shopping_title')}</h1>
+          <p className="text-xs text-life-muted mt-1">{t('shopping_subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="secondary" onClick={() => setShowNewListModal(true)}>
@@ -6535,8 +6536,8 @@ const ShoppingView = ({
             onClick={() => setSelectedListId(list.id)}
             className={`px-4 py-2 rounded-xl text-xs font-medium border transition-all ${
               activeList?.id === list.id
-                ? 'bg-[#B68B61] text-[#171412] border-[#B68B61]'
-                : 'bg-[#241B17] text-[#F4E9DC] border-[#624332]/50 hover:border-[#B68B61]/60'
+                ? 'bg-life-accent text-life-bg border-life-accent'
+                : 'bg-life-surface text-life-text border-life-border/50 hover:border-life-accent/60'
             }`}
           >
             {list.name} ({list.items.length})
@@ -6548,20 +6549,20 @@ const ShoppingView = ({
         <>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <GlassCard className="p-4">
-              <span className="text-xs text-[#A99B90] uppercase tracking-wider">{t('est_basket')}</span>
-              <div className="mt-1.5 text-xl font-semibold text-[#F4E9DC] tabular-nums">
+              <span className="text-xs text-life-muted uppercase tracking-wider">{t('est_basket')}</span>
+              <div className="mt-1.5 text-xl font-semibold text-life-text tabular-nums">
                 {formatMoney(totals.estimated, currency, maskBalances)}
               </div>
             </GlassCard>
             <GlassCard className="p-4">
-              <span className="text-xs text-[#A99B90] uppercase tracking-wider">{t('purchased_cart')}</span>
-              <div className="mt-1.5 text-xl font-semibold text-[#E4C8A6] tabular-nums">
+              <span className="text-xs text-life-muted uppercase tracking-wider">{t('purchased_cart')}</span>
+              <div className="mt-1.5 text-xl font-semibold text-life-soft tabular-nums">
                 {formatMoney(totals.purchased, currency, maskBalances)}
               </div>
             </GlassCard>
             <GlassCard className="p-4">
-              <span className="text-xs text-[#A99B90] uppercase tracking-wider">{t('remaining_buy')}</span>
-              <div className="mt-1.5 text-xl font-semibold text-[#B68B61] tabular-nums">
+              <span className="text-xs text-life-muted uppercase tracking-wider">{t('remaining_buy')}</span>
+              <div className="mt-1.5 text-xl font-semibold text-life-accent tabular-nums">
                 {formatMoney(totals.remaining, currency, maskBalances)}
               </div>
             </GlassCard>
@@ -6638,8 +6639,8 @@ const ShoppingView = ({
                     key={item.id}
                     className={`flex items-center justify-between gap-3 p-3 rounded-xl border transition-all ${
                       item.purchased
-                        ? 'bg-[#171412]/50 border-[#624332]/25 opacity-70'
-                        : 'bg-[#171412]/85 border-[#624332]/45'
+                        ? 'bg-life-bg/50 border-life-border/25 opacity-70'
+                        : 'bg-life-bg/85 border-life-border/45'
                     }`}
                   >
                     <button
@@ -6648,32 +6649,32 @@ const ShoppingView = ({
                       className="flex items-center gap-3 text-left min-w-0 flex-1"
                     >
                       {item.purchased ? (
-                        <CheckCircle2 className="w-5 h-5 text-[#B68B61] shrink-0" />
+                        <CheckCircle2 className="w-5 h-5 text-life-accent shrink-0" />
                       ) : (
-                        <Circle className="w-5 h-5 text-[#A99B90] shrink-0" />
+                        <Circle className="w-5 h-5 text-life-muted shrink-0" />
                       )}
                       <div className="min-w-0">
                         <p
                           className={`text-sm font-medium truncate ${
-                            item.purchased ? 'line-through text-[#A99B90]' : 'text-[#F4E9DC]'
+                            item.purchased ? 'line-through text-life-muted' : 'text-life-text'
                           }`}
                         >
                           {item.name}
                         </p>
-                        <p className="text-xs text-[#A99B90]">
+                        <p className="text-xs text-life-muted">
                           {item.qty}x • {item.category}
                         </p>
                       </div>
                     </button>
 
                     <div className="flex items-center gap-3 shrink-0">
-                      <span className="text-xs sm:text-sm font-semibold text-[#E4C8A6] tabular-nums">
+                      <span className="text-xs sm:text-sm font-semibold text-life-soft tabular-nums">
                         {formatMoney(lineTotal, currency, maskBalances)}
                       </span>
                       <button
                         type="button"
                         onClick={() => onDeleteShoppingItem(activeList.id, item.id)}
-                        className="p-1.5 rounded-lg text-[#A99B90] hover:text-[#D96B52]"
+                        className="p-1.5 rounded-lg text-life-muted hover:text-[#D96B52]"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -6864,8 +6865,8 @@ const ReportsView = ({ data, derived, maskBalances, t, lang, onExportCsv }) => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold text-[#F4E9DC]">{t('reports_title')}</h1>
-          <p className="text-xs text-[#A99B90] mt-1">{t('reports_subtitle')}</p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-life-text">{t('reports_title')}</h1>
+          <p className="text-xs text-life-muted mt-1">{t('reports_subtitle')}</p>
         </div>
         <Button size="sm" variant="secondary" onClick={onExportCsv}>
           <Download className="w-4 h-4" /> {t('export_csv')}
@@ -6873,15 +6874,15 @@ const ReportsView = ({ data, derived, maskBalances, t, lang, onExportCsv }) => {
       </div>
 
       {/* AI FINANCIAL & PRODUCTIVITY ADVISOR CARD */}
-      <GlassCard className="p-5 sm:p-6 bg-gradient-to-br from-[#30231D]/90 via-[#241B17] to-[#171412] border-[#B68B61]/45 space-y-4">
+      <GlassCard className="p-5 sm:p-6 bg-gradient-to-br from-life-surface2/90 via-life-surface to-life-bg border-life-accent/45 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#B68B61]/20 border border-[#B68B61]/50 flex items-center justify-center text-[#E4C8A6] shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-life-accent/20 border border-life-accent/50 flex items-center justify-center text-life-soft shrink-0">
               <BrainCircuit className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-[#F4E9DC]">{t('ai_advisor_title')}</h2>
-              <p className="text-xs text-[#A99B90] mt-0.5">{t('ai_advisor_sub')}</p>
+              <h2 className="text-base font-semibold text-life-text">{t('ai_advisor_title')}</h2>
+              <p className="text-xs text-life-muted mt-0.5">{t('ai_advisor_sub')}</p>
             </div>
           </div>
           <Button size="sm" onClick={runAiAdvisorAudit} disabled={aiLoading}>
@@ -6898,17 +6899,17 @@ const ReportsView = ({ data, derived, maskBalances, t, lang, onExportCsv }) => {
         </div>
 
         {aiInsights && (
-          <div className="pt-3 border-t border-[#624332]/40 space-y-3">
-            <p className="text-xs sm:text-sm font-medium text-[#E4C8A6] leading-relaxed">
+          <div className="pt-3 border-t border-life-border/40 space-y-3">
+            <p className="text-xs sm:text-sm font-medium text-life-soft leading-relaxed">
               {aiInsights.summary}
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {aiInsights.recommendations.map((rec, idx) => (
                 <div
                   key={idx}
-                  className="p-3.5 rounded-xl bg-[#171412]/80 border border-[#624332]/45 text-xs text-[#F4E9DC] leading-relaxed flex items-start gap-2.5"
+                  className="p-3.5 rounded-xl bg-life-bg/80 border border-life-border/45 text-xs text-life-text leading-relaxed flex items-start gap-2.5"
                 >
-                  <span className="w-5 h-5 rounded-md bg-[#B68B61] text-[#171412] font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="w-5 h-5 rounded-md bg-life-accent text-life-bg font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">
                     {idx + 1}
                   </span>
                   <span>{rec}</span>
@@ -6921,26 +6922,26 @@ const ReportsView = ({ data, derived, maskBalances, t, lang, onExportCsv }) => {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <GlassCard className="p-4">
-          <span className="text-xs text-[#A99B90] uppercase">{t('nav_savings')}</span>
-          <div className="mt-1.5 text-xl font-semibold text-[#E4C8A6] tabular-nums">
+          <span className="text-xs text-life-muted uppercase">{t('nav_savings')}</span>
+          <div className="mt-1.5 text-xl font-semibold text-life-soft tabular-nums">
             {formatMoney(totalSavingsVaults, currency, maskBalances)}
           </div>
         </GlassCard>
         <GlassCard className="p-4">
-          <span className="text-xs text-[#A99B90] uppercase">{t('avg_sleep')}</span>
-          <div className="mt-1.5 text-xl font-semibold text-[#F4E9DC] tabular-nums">
+          <span className="text-xs text-life-muted uppercase">{t('avg_sleep')}</span>
+          <div className="mt-1.5 text-xl font-semibold text-life-text tabular-nums">
             {wellnessAverages.avgSleep}h
           </div>
         </GlassCard>
         <GlassCard className="p-4">
-          <span className="text-xs text-[#A99B90] uppercase">{t('avg_energy')}</span>
-          <div className="mt-1.5 text-xl font-semibold text-[#B68B61] tabular-nums">
+          <span className="text-xs text-life-muted uppercase">{t('avg_energy')}</span>
+          <div className="mt-1.5 text-xl font-semibold text-life-accent tabular-nums">
             {wellnessAverages.avgEnergy} / 10
           </div>
         </GlassCard>
         <GlassCard className="p-4">
-          <span className="text-xs text-[#A99B90] uppercase">{t('active_goals_completion')}</span>
-          <div className="mt-1.5 text-xl font-semibold text-[#E4C8A6] tabular-nums">
+          <span className="text-xs text-life-muted uppercase">{t('active_goals_completion')}</span>
+          <div className="mt-1.5 text-xl font-semibold text-life-soft tabular-nums">
             {derived.overallGoalPct.toFixed(0)}%
           </div>
         </GlassCard>
@@ -6949,35 +6950,35 @@ const ReportsView = ({ data, derived, maskBalances, t, lang, onExportCsv }) => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Sleep Duration vs Energy & Habits Correlation Chart */}
         <GlassCard className="p-5">
-          <h2 className="text-base font-semibold text-[#F4E9DC] mb-1">{t('wellness_corr_title')}</h2>
-          <p className="text-xs text-[#A99B90] mb-4">{t('wellness_corr_sub')}</p>
+          <h2 className="text-base font-semibold text-life-text mb-1">{t('wellness_corr_title')}</h2>
+          <p className="text-xs text-life-muted mb-4">{t('wellness_corr_sub')}</p>
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={wellnessCorrelationData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#624332" strokeOpacity={0.25} vertical={false} />
-                <XAxis dataKey="day" stroke="#A99B90" fontSize={11} />
-                <YAxis stroke="#A99B90" fontSize={11} domain={[0, 10]} width={35} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--life-border))" strokeOpacity={0.25} vertical={false} />
+                <XAxis dataKey="day" stroke="rgb(var(--life-muted))" fontSize={11} />
+                <YAxis stroke="rgb(var(--life-muted))" fontSize={11} domain={[0, 10]} width={35} />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#241B17',
-                    borderColor: '#624332',
+                    backgroundColor: 'rgb(var(--life-surface))',
+                    borderColor: 'rgb(var(--life-border))',
                     borderRadius: '12px',
-                    color: '#F4E9DC',
+                    color: 'rgb(var(--life-text))',
                   }}
                 />
                 <Bar
                   dataKey="sleep"
                   name={t('sleep_hours')}
-                  fill="#B68B61"
+                  fill="rgb(var(--life-accent))"
                   radius={[6, 6, 0, 0]}
                 />
                 <Line
                   type="monotone"
                   dataKey="energy"
                   name={t('energy_score')}
-                  stroke="#E4C8A6"
+                  stroke="rgb(var(--life-soft))"
                   strokeWidth={2.5}
-                  dot={{ r: 4, fill: '#E4C8A6' }}
+                  dot={{ r: 4, fill: 'rgb(var(--life-soft))' }}
                 />
               </ComposedChart>
             </ResponsiveContainer>
@@ -6985,55 +6986,55 @@ const ReportsView = ({ data, derived, maskBalances, t, lang, onExportCsv }) => {
         </GlassCard>
 
         <GlassCard className="p-5">
-          <h2 className="text-base font-semibold text-[#F4E9DC] mb-4">{t('chart_cashflow_title')}</h2>
+          <h2 className="text-base font-semibold text-life-text mb-4">{t('chart_cashflow_title')}</h2>
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={derived.monthlySeries}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#624332" strokeOpacity={0.25} vertical={false} />
-                <XAxis dataKey="label" stroke="#A99B90" fontSize={11} />
-                <YAxis stroke="#A99B90" fontSize={11} width={45} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--life-border))" strokeOpacity={0.25} vertical={false} />
+                <XAxis dataKey="label" stroke="rgb(var(--life-muted))" fontSize={11} />
+                <YAxis stroke="rgb(var(--life-muted))" fontSize={11} width={45} />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#241B17',
-                    borderColor: '#624332',
+                    backgroundColor: 'rgb(var(--life-surface))',
+                    borderColor: 'rgb(var(--life-border))',
                     borderRadius: '12px',
-                    color: '#F4E9DC',
+                    color: 'rgb(var(--life-text))',
                   }}
                 />
-                <Bar dataKey="income" name={lang === 'id' ? 'Pemasukan' : 'Income'} fill="#E4C8A6" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="expenses" name={lang === 'id' ? 'Pengeluaran' : 'Expenses'} fill="#B68B61" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="income" name={lang === 'id' ? 'Pemasukan' : 'Income'} fill="rgb(var(--life-soft))" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="expenses" name={lang === 'id' ? 'Pengeluaran' : 'Expenses'} fill="rgb(var(--life-accent))" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </GlassCard>
 
         <GlassCard className="p-5">
-          <h2 className="text-base font-semibold text-[#F4E9DC] mb-4">
+          <h2 className="text-base font-semibold text-life-text mb-4">
             {t('nav_budgets')} ({CURRENT_MONTH})
           </h2>
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={budgetComparisonData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#624332" strokeOpacity={0.25} vertical={false} />
-                <XAxis dataKey="category" stroke="#A99B90" fontSize={11} />
-                <YAxis stroke="#A99B90" fontSize={11} width={45} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--life-border))" strokeOpacity={0.25} vertical={false} />
+                <XAxis dataKey="category" stroke="rgb(var(--life-muted))" fontSize={11} />
+                <YAxis stroke="rgb(var(--life-muted))" fontSize={11} width={45} />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#241B17',
-                    borderColor: '#624332',
+                    backgroundColor: 'rgb(var(--life-surface))',
+                    borderColor: 'rgb(var(--life-border))',
                     borderRadius: '12px',
-                    color: '#F4E9DC',
+                    color: 'rgb(var(--life-text))',
                   }}
                 />
-                <Bar dataKey="Planned" fill="#624332" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="Actual" fill="#B68B61" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="Planned" fill="rgb(var(--life-border))" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="Actual" fill="rgb(var(--life-accent))" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </GlassCard>
 
         <GlassCard className="p-5">
-          <h2 className="text-base font-semibold text-[#F4E9DC] mb-4">{t('spending_by_cat')}</h2>
+          <h2 className="text-base font-semibold text-life-text mb-4">{t('spending_by_cat')}</h2>
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <RePieChart>
@@ -7053,10 +7054,10 @@ const ReportsView = ({ data, derived, maskBalances, t, lang, onExportCsv }) => {
                 </Pie>
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#241B17',
-                    borderColor: '#624332',
+                    backgroundColor: 'rgb(var(--life-surface))',
+                    borderColor: 'rgb(var(--life-border))',
                     borderRadius: '12px',
-                    color: '#F4E9DC',
+                    color: 'rgb(var(--life-text))',
                   }}
                 />
               </RePieChart>
@@ -7254,15 +7255,15 @@ const SmartCommandBar = ({ t, lang, data, onExecuteBatch }) => {
   return (
     <form
       onSubmit={handleRunCommand}
-      className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-2 rounded-2xl bg-[#241B17]/90 border border-[#624332]/55 shadow-lg"
+      className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-2 rounded-2xl bg-life-surface/90 border border-life-border/55 shadow-lg"
     >
       <div className="flex items-center gap-2.5 flex-1 px-2 min-w-0">
-        <Wand2 className="w-4 h-4 text-[#B68B61] shrink-0" />
+        <Wand2 className="w-4 h-4 text-life-accent shrink-0" />
         <input
           value={command}
           onChange={(e) => setCommand(e.target.value)}
           placeholder={t('smart_cmd_placeholder')}
-          className="w-full bg-transparent text-xs sm:text-sm text-[#F4E9DC] placeholder-[#A99B90]/65 focus:outline-none py-1.5"
+          className="w-full bg-transparent text-xs sm:text-sm text-life-text placeholder-life-muted/65 focus:outline-none py-1.5"
         />
       </div>
       <Button type="submit" size="sm" disabled={busy || !command.trim()} className="shrink-0">
@@ -7370,7 +7371,7 @@ const SplitBillModal = ({ open, onClose, data, t, lang, onExecuteSplitBill }) =>
           </Select>
         </div>
 
-        <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-[#171412] border border-[#624332]/50">
+        <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-life-bg border border-life-border/50">
           {[
             { id: 'equal', label: t('split_equal') },
             { id: 'custom', label: t('split_custom') },
@@ -7380,7 +7381,7 @@ const SplitBillModal = ({ open, onClose, data, t, lang, onExecuteSplitBill }) =>
               type="button"
               onClick={() => setSplitMode(m.id)}
               className={`py-2 rounded-lg text-xs font-semibold ${
-                splitMode === m.id ? 'bg-[#B68B61] text-[#171412]' : 'text-[#A99B90]'
+                splitMode === m.id ? 'bg-life-accent text-life-bg' : 'text-life-muted'
               }`}
             >
               {m.label}
@@ -7390,13 +7391,13 @@ const SplitBillModal = ({ open, onClose, data, t, lang, onExecuteSplitBill }) =>
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs uppercase tracking-wider text-[#A99B90]">
+            <span className="text-xs uppercase tracking-wider text-life-muted">
               {lang === 'id' ? 'Daftar Peserta Patungan' : 'Participants'}
             </span>
             <button
               type="button"
               onClick={handleAddFriend}
-              className="text-xs font-semibold text-[#E4C8A6] hover:text-[#B68B61] inline-flex items-center gap-1"
+              className="text-xs font-semibold text-life-soft hover:text-life-accent inline-flex items-center gap-1"
             >
               <Plus className="w-3.5 h-3.5" /> {t('add_participant')}
             </button>
@@ -7412,11 +7413,11 @@ const SplitBillModal = ({ open, onClose, data, t, lang, onExecuteSplitBill }) =>
                   )
                 }
                 placeholder={lang === 'id' ? 'Nama teman...' : 'Friend name...'}
-                className="flex-1 min-w-0 rounded-xl bg-[#171412] border border-[#624332]/55 px-3 py-2 text-xs text-[#F4E9DC]"
+                className="flex-1 min-w-0 rounded-xl bg-life-bg border border-life-border/55 px-3 py-2 text-xs text-life-text"
                 required
               />
               {splitMode === 'equal' ? (
-                <span className="px-3 py-2 rounded-xl bg-[#30231D] text-xs font-semibold text-[#E4C8A6] tabular-nums shrink-0">
+                <span className="px-3 py-2 rounded-xl bg-life-surface2 text-xs font-semibold text-life-soft tabular-nums shrink-0">
                   {formatMoney(f.owedAmount, currency)}
                 </span>
               ) : (
@@ -7433,7 +7434,7 @@ const SplitBillModal = ({ open, onClose, data, t, lang, onExecuteSplitBill }) =>
                       )
                     )
                   }
-                  className="w-28 rounded-xl bg-[#171412] border border-[#624332]/55 px-3 py-2 text-xs text-[#F4E9DC] text-right"
+                  className="w-28 rounded-xl bg-life-bg border border-life-border/55 px-3 py-2 text-xs text-life-text text-right"
                   required
                 />
               )}
@@ -7441,7 +7442,7 @@ const SplitBillModal = ({ open, onClose, data, t, lang, onExecuteSplitBill }) =>
                 <button
                   type="button"
                   onClick={() => handleRemoveFriend(f.id)}
-                  className="p-2 text-[#A99B90] hover:text-[#D96B52]"
+                  className="p-2 text-life-muted hover:text-[#D96B52]"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -7450,19 +7451,19 @@ const SplitBillModal = ({ open, onClose, data, t, lang, onExecuteSplitBill }) =>
           ))}
         </div>
 
-        <div className="p-3 rounded-xl bg-[#171412]/80 border border-[#624332]/40 flex items-center justify-between text-xs">
-          <span className="text-[#A99B90]">{t('your_share')}</span>
-          <span className="font-semibold text-[#F4E9DC] tabular-nums">
+        <div className="p-3 rounded-xl bg-life-bg/80 border border-life-border/40 flex items-center justify-between text-xs">
+          <span className="text-life-muted">{t('your_share')}</span>
+          <span className="font-semibold text-life-text tabular-nums">
             {formatMoney(yourOwnShare, currency)}
           </span>
         </div>
 
-        <label className="flex items-center gap-2.5 text-xs text-[#E4C8A6] cursor-pointer">
+        <label className="flex items-center gap-2.5 text-xs text-life-soft cursor-pointer">
           <input
             type="checkbox"
             checked={logTotalExpense}
             onChange={(e) => setLogTotalExpense(e.target.checked)}
-            className="rounded accent-[#B68B61]"
+            className="rounded accent-life-accent"
           />
           {t('log_total_wallet')}
         </label>
@@ -7540,11 +7541,11 @@ const PaydaySplitterModal = ({ open, onClose, data, t, lang, onExecuteSplit }) =
             return (
               <div
                 key={al.accountId}
-                className="p-3 rounded-xl bg-[#171412]/80 border border-[#624332]/40 flex items-center justify-between gap-3"
+                className="p-3 rounded-xl bg-life-bg/80 border border-life-border/40 flex items-center justify-between gap-3"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-[#F4E9DC] truncate">{al.accountName}</p>
-                  <p className="text-xs text-[#E4C8A6] tabular-nums">
+                  <p className="text-sm font-medium text-life-text truncate">{al.accountName}</p>
+                  <p className="text-xs text-life-soft tabular-nums">
                     {formatMoney(share, currency)}
                   </p>
                 </div>
@@ -7555,9 +7556,9 @@ const PaydaySplitterModal = ({ open, onClose, data, t, lang, onExecuteSplit }) =
                     max="100"
                     value={al.pct}
                     onChange={(e) => handlePctChange(al.accountId, e.target.value)}
-                    className="w-16 rounded-lg bg-[#241B17] border border-[#624332]/60 px-2 py-1.5 text-right text-sm text-[#F4E9DC]"
+                    className="w-16 rounded-lg bg-life-surface border border-life-border/60 px-2 py-1.5 text-right text-sm text-life-text"
                   />
-                  <span className="text-xs text-[#A99B90]">%</span>
+                  <span className="text-xs text-life-muted">%</span>
                 </div>
               </div>
             );
@@ -7565,7 +7566,7 @@ const PaydaySplitterModal = ({ open, onClose, data, t, lang, onExecuteSplit }) =
         </div>
 
         <div className="flex items-center justify-between text-xs pt-1">
-          <span className="text-[#A99B90]">Total Allocation</span>
+          <span className="text-life-muted">Total Allocation</span>
           <span className={totalPct === 100 ? 'text-[#87B082] font-semibold' : 'text-[#D96B52] font-semibold'}>
             {totalPct}% {totalPct !== 100 && (lang === 'id' ? '(Harus 100%)' : '(Must equal 100%)')}
           </span>
@@ -7819,7 +7820,7 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
   return (
     <Modal open={open} onClose={onClose} title={t('scan_receipt')} subtitle={t('scan_receipt_sub')}>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-[#171412] border border-[#624332]/50">
+        <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-life-bg border border-life-border/50">
           {[
             { id: 'camera', icon: Camera, label: t('mode_camera') },
             { id: 'upload', icon: ImageIcon, label: t('mode_upload') },
@@ -7833,8 +7834,8 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
                 onClick={() => setScanMode(tab.id)}
                 className={`py-2 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
                   scanMode === tab.id
-                    ? 'bg-[#B68B61] text-[#171412]'
-                    : 'text-[#A99B90] hover:text-[#F4E9DC]'
+                    ? 'bg-life-accent text-life-bg'
+                    : 'text-life-muted hover:text-life-text'
                 }`}
               >
                 <Icon className="w-3.5 h-3.5 shrink-0" />
@@ -7857,18 +7858,18 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
                 </Button>
               </div>
             ) : (
-              <div className="relative rounded-2xl overflow-hidden bg-black border border-[#B68B61]/50 aspect-video flex items-center justify-center">
+              <div className="relative rounded-2xl overflow-hidden bg-black border border-life-accent/50 aspect-video flex items-center justify-center">
                 <video ref={videoRef} playsInline muted className="w-full h-full object-cover" />
                 <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                  <div className="w-56 h-36 sm:w-64 sm:h-40 border-2 border-[#B68B61]/80 rounded-2xl shadow-[0_0_0_9999px_rgba(23,20,18,0.45)] flex items-end justify-center pb-2">
-                    <span className="text-[10px] uppercase tracking-widest px-2 py-0.5 rounded bg-[#171412]/80 text-[#E4C8A6]">
+                  <div className="w-56 h-36 sm:w-64 sm:h-40 border-2 border-life-accent/80 rounded-2xl shadow-[0_0_0_9999px_rgba(23,20,18,0.45)] flex items-end justify-center pb-2">
+                    <span className="text-[10px] uppercase tracking-widest px-2 py-0.5 rounded bg-life-bg/80 text-life-soft">
                       QRIS • Barcode • Struk
                     </span>
                   </div>
                 </div>
                 {!cameraReady && (
-                  <div className="absolute inset-0 bg-[#171412]/85 flex items-center justify-center gap-2 text-xs text-[#E4C8A6]">
-                    <Loader2 className="w-4 h-4 animate-spin text-[#B68B61]" />
+                  <div className="absolute inset-0 bg-life-bg/85 flex items-center justify-center gap-2 text-xs text-life-soft">
+                    <Loader2 className="w-4 h-4 animate-spin text-life-accent" />
                     <span>{lang === 'id' ? 'Membuka kamera...' : 'Starting camera...'}</span>
                   </div>
                 )}
@@ -7897,7 +7898,7 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
                   </>
                 ) : (
                   <>
-                    <Camera className="w-4 h-4 text-[#B68B61]" /> {t('capture_scan')}
+                    <Camera className="w-4 h-4 text-life-accent" /> {t('capture_scan')}
                   </>
                 )}
               </Button>
@@ -7907,9 +7908,9 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
 
         {scanMode === 'upload' && (
           <div className="space-y-2.5">
-            <label className="flex flex-col items-center justify-center p-5 rounded-2xl border-2 border-dashed border-[#624332]/70 bg-[#171412]/70 hover:border-[#B68B61] cursor-pointer text-center transition-colors">
-              <Camera className="w-6 h-6 text-[#B68B61] mb-1.5" />
-              <span className="text-xs font-medium text-[#F4E9DC]">
+            <label className="flex flex-col items-center justify-center p-5 rounded-2xl border-2 border-dashed border-life-border/70 bg-life-bg/70 hover:border-life-accent cursor-pointer text-center transition-colors">
+              <Camera className="w-6 h-6 text-life-accent mb-1.5" />
+              <span className="text-xs font-medium text-life-text">
                 {lang === 'id'
                   ? 'Ketuk untuk ambil foto kamera HP atau pilih gambar struk/barcode'
                   : 'Tap to take a photo or choose receipt/barcode image'}
@@ -7923,8 +7924,8 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
               />
             </label>
             {isAnalyzing && (
-              <div className="flex items-center justify-center gap-2 text-xs text-[#E4C8A6] py-1">
-                <Loader2 className="w-4 h-4 animate-spin text-[#B68B61]" />
+              <div className="flex items-center justify-center gap-2 text-xs text-life-soft py-1">
+                <Loader2 className="w-4 h-4 animate-spin text-life-accent" />
                 <span>{t('scanning_ai')}</span>
               </div>
             )}
@@ -7933,7 +7934,7 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
 
         {scanMode === 'text' && (
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium uppercase tracking-wider text-[#A99B90]">
+            <label className="block text-xs font-medium uppercase tracking-wider text-life-muted">
               {lang === 'id' ? 'Tempel Teks Struk / Invoice' : 'Paste Receipt Text'}
             </label>
             <textarea
@@ -7945,19 +7946,19 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
                   ? 'Contoh:\nKopi Kenangan Bandung\n2x Kopi Susu Gula Aren\nTOTAL: 48.000'
                   : 'Example:\nArtisan Coffee Roasters\n2x Flat White\nTOTAL: 14.50'
               }
-              className="w-full rounded-xl bg-[#171412]/90 border border-[#624332]/55 p-3 text-xs text-[#F4E9DC] focus:outline-none focus:border-[#B68B61]"
+              className="w-full rounded-xl bg-life-bg/90 border border-life-border/55 p-3 text-xs text-life-text focus:outline-none focus:border-life-accent"
             />
           </div>
         )}
 
         {capturedPreview && scanMode !== 'text' && (
-          <div className="flex items-center gap-3 p-2 rounded-xl bg-[#171412]/80 border border-[#624332]/40">
+          <div className="flex items-center gap-3 p-2 rounded-xl bg-life-bg/80 border border-life-border/40">
             <img
               src={capturedPreview}
               alt="Scanned preview"
               className="w-14 h-14 rounded-lg object-cover shrink-0"
             />
-            <span className="text-xs text-[#A99B90]">
+            <span className="text-xs text-life-muted">
               {lang === 'id'
                 ? 'Gambar berhasil ditangkap. Periksa hasil deteksi di bawah sebelum menyimpan.'
                 : 'Image captured. Review extracted details below before saving.'}
@@ -8098,7 +8099,7 @@ const DailyBriefingModal = ({ open, onClose, data, derived, t, lang, onCopied })
           readOnly
           rows={12}
           value={briefingText}
-          className="w-full rounded-xl bg-[#171412] border border-[#624332]/55 p-3.5 text-xs text-[#F4E9DC] font-mono leading-relaxed focus:outline-none"
+          className="w-full rounded-xl bg-life-bg border border-life-border/55 p-3.5 text-xs text-life-text font-mono leading-relaxed focus:outline-none"
         />
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose}>
@@ -8195,7 +8196,7 @@ const TransactionModal = ({ open, onClose, editingTx, data, t, lang, onSave }) =
       title={editingTx ? `${t('edit')} ${t('btn_transaction')}` : t('new_transaction')}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-3 gap-2 p-1 rounded-xl bg-[#171412] border border-[#624332]/50">
+        <div className="grid grid-cols-3 gap-2 p-1 rounded-xl bg-life-bg border border-life-border/50">
           {[
             { id: 'expense', label: lang === 'id' ? 'Pengeluaran' : 'Expense' },
             { id: 'income', label: lang === 'id' ? 'Pemasukan' : 'Income' },
@@ -8206,7 +8207,7 @@ const TransactionModal = ({ open, onClose, editingTx, data, t, lang, onSave }) =
               type="button"
               onClick={() => handleTypeSwitch(tp.id)}
               className={`py-2 rounded-lg text-xs font-semibold transition-colors ${
-                type === tp.id ? 'bg-[#B68B61] text-[#171412]' : 'text-[#A99B90] hover:text-[#F4E9DC]'
+                type === tp.id ? 'bg-life-accent text-life-bg' : 'text-life-muted hover:text-life-text'
               }`}
             >
               {tp.label}
@@ -8376,12 +8377,12 @@ const TaskModal = ({ open, onClose, editingTask, defaultDate, t, lang, onSave })
             <option value="completed">{t('completed')}</option>
           </Select>
         </div>
-        <label className="flex items-center gap-2.5 text-xs text-[#E4C8A6] cursor-pointer pt-1">
+        <label className="flex items-center gap-2.5 text-xs text-life-soft cursor-pointer pt-1">
           <input
             type="checkbox"
             checked={isTopPriority}
             onChange={(e) => setIsTopPriority(e.target.checked)}
-            className="rounded accent-[#B68B61]"
+            className="rounded accent-life-accent"
           />
           {t('top_3_priorities')}
         </label>
@@ -8543,11 +8544,12 @@ const SettingsModal = ({
       maxWidth="max-w-xl"
     >
       <div className="space-y-5">
+        <ThemeSettings lang={data?.profile?.language || 'id'} />
         {currentUser && (
-          <div className="p-3.5 rounded-xl bg-[#171412]/90 border border-[#624332]/50 flex flex-wrap items-center justify-between gap-3">
+          <div className="p-3.5 rounded-xl bg-life-bg/90 border border-life-border/50 flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-[#F4E9DC] truncate">{currentUser.email}</p>
-              <p className="text-[11px] text-[#B68B61] font-mono truncate">
+              <p className="text-xs font-semibold text-life-text truncate">{currentUser.email}</p>
+              <p className="text-[11px] text-life-accent font-mono truncate">
                 Vault ID: {currentUser.workspaceKey}
               </p>
             </div>
@@ -8569,12 +8571,12 @@ const SettingsModal = ({
           }}
           className="space-y-4"
         >
-          <h4 className="text-xs uppercase tracking-wider text-[#B68B61] font-semibold">
+          <h4 className="text-xs uppercase tracking-wider text-life-accent font-semibold">
             {t('profile_display')}
           </h4>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium uppercase tracking-wider text-[#A99B90]">
+            <label className="block text-xs font-medium uppercase tracking-wider text-life-muted">
               {t('language_label')}
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -8588,15 +8590,15 @@ const SettingsModal = ({
                   onClick={() => setLanguage(opt.code)}
                   className={`p-3 rounded-xl border text-left transition-all ${
                     language === opt.code
-                      ? 'bg-[#30231D] border-[#B68B61] text-[#F4E9DC]'
-                      : 'bg-[#171412]/80 border-[#624332]/45 text-[#A99B90]'
+                      ? 'bg-life-surface2 border-life-accent text-life-text'
+                      : 'bg-life-bg/80 border-life-border/45 text-life-muted'
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-[#F4E9DC]">{opt.title}</span>
-                    {language === opt.code && <CheckCircle2 className="w-4 h-4 text-[#B68B61]" />}
+                    <span className="text-sm font-semibold text-life-text">{opt.title}</span>
+                    {language === opt.code && <CheckCircle2 className="w-4 h-4 text-life-accent" />}
                   </div>
-                  <p className="text-[11px] text-[#A99B90] mt-0.5">{opt.desc}</p>
+                  <p className="text-[11px] text-life-muted mt-0.5">{opt.desc}</p>
                 </button>
               ))}
             </div>
@@ -8627,22 +8629,22 @@ const SettingsModal = ({
           </Button>
         </form>
 
-        <div className="pt-4 border-t border-[#624332]/40 space-y-3">
-          <h4 className="text-xs uppercase tracking-wider text-[#E4C8A6] font-semibold">
+        <div className="pt-4 border-t border-life-border/40 space-y-3">
+          <h4 className="text-xs uppercase tracking-wider text-life-soft font-semibold">
             {t('data_portability')}
           </h4>
           <div className="flex flex-wrap gap-2.5">
             <Button size="sm" variant="secondary" onClick={onExportJson}>
               <Download className="w-4 h-4" /> {t('export_json')}
             </Button>
-            <label className="inline-flex items-center justify-center gap-2 px-3 py-1.5 text-xs rounded-xl min-h-[38px] bg-[#30231D] text-[#F4E9DC] border border-[#624332]/60 hover:border-[#B68B61]/70 cursor-pointer">
+            <label className="inline-flex items-center justify-center gap-2 px-3 py-1.5 text-xs rounded-xl min-h-[38px] bg-life-surface2 text-life-text border border-life-border/60 hover:border-life-accent/70 cursor-pointer">
               <Upload className="w-4 h-4" /> {t('import_json')}
               <input type="file" accept=".json" onChange={handleFileUpload} className="hidden" />
             </label>
           </div>
         </div>
 
-        <div className="pt-4 border-t border-[#624332]/40 space-y-3">
+        <div className="pt-4 border-t border-life-border/40 space-y-3">
           <h4 className="text-xs uppercase tracking-wider text-[#D96B52] font-semibold">
             {t('workspace_reset')}
           </h4>
@@ -9917,7 +9919,7 @@ function LifeOsWorkspace() {
   const allNavItems = NAV_GROUPS.flatMap((g) => g.items);
 
   return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-[#171412] text-[#F4E9DC] flex flex-col lg:flex-row selection:bg-[#B68B61] selection:text-[#171412] relative">
+    <div className="min-h-screen w-full overflow-x-hidden bg-life-bg text-life-text flex flex-col lg:flex-row selection:bg-life-accent selection:text-life-bg relative">
       <style>{MOTION_STYLES}</style>
 
       {/* Ambient Multi-Layer Parallax Background Orbs */}
@@ -9926,26 +9928,26 @@ function LifeOsWorkspace() {
         pointerFactor={20}
         className="fixed top-20 left-1/3 pointer-events-none z-0"
       >
-        <div className="w-[460px] h-[460px] rounded-full bg-[#B68B61]/[0.06] blur-[110px]" />
+        <div className="w-[460px] h-[460px] rounded-full bg-life-accent/[0.06] blur-[110px]" />
       </ParallaxLayer>
       <ParallaxLayer
         speed={0.12}
         pointerFactor={-16}
         className="fixed bottom-10 right-10 pointer-events-none z-0"
       >
-        <div className="w-[380px] h-[380px] rounded-full bg-[#624332]/[0.14] blur-[100px]" />
+        <div className="w-[380px] h-[380px] rounded-full bg-life-border/[0.14] blur-[100px]" />
       </ParallaxLayer>
 
       {/* DESKTOP FIXED SIDEBAR */}
-      <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 bg-[#241B17]/95 backdrop-blur-xl border-r border-[#624332]/40 z-30">
-        <div className="p-6 border-b border-[#624332]/35 flex items-center justify-between">
+      <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 bg-life-surface/95 backdrop-blur-xl border-r border-life-border/40 z-30">
+        <div className="p-6 border-b border-life-border/35 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#B68B61] to-[#624332] flex items-center justify-center text-[#171412] font-bold shadow-lg">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-life-accent to-life-border flex items-center justify-center text-life-bg font-bold shadow-lg">
               L
             </div>
             <div>
-              <span className="text-base font-bold tracking-wider text-[#F4E9DC] block">LIFE OS</span>
-              <span className="text-[10px] uppercase tracking-widest text-[#B68B61]">
+              <span className="text-base font-bold tracking-wider text-life-text block">LIFE OS</span>
+              <span className="text-[10px] uppercase tracking-widest text-life-accent">
                 Private Edition
               </span>
             </div>
@@ -9955,7 +9957,7 @@ function LifeOsWorkspace() {
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
           {NAV_GROUPS.map((group) => (
             <div key={group.labelKey} className="space-y-1">
-              <div className="px-3 text-[10px] font-semibold uppercase tracking-widest text-[#A99B90]/75">
+              <div className="px-3 text-[10px] font-semibold uppercase tracking-widest text-life-muted/75">
                 {t(group.labelKey)}
               </div>
               {group.items.map((item) => {
@@ -9967,16 +9969,16 @@ function LifeOsWorkspace() {
                     onClick={() => navigateTab(item.id)}
                     className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                       active
-                        ? 'bg-gradient-to-r from-[#30231D] to-[#241B17] text-[#E4C8A6] border border-[#B68B61]/50 shadow translate-x-0.5'
-                        : 'text-[#A99B90] hover:text-[#F4E9DC] hover:bg-[#30231D]/45'
+                        ? 'bg-gradient-to-r from-life-surface2 to-life-surface text-life-soft border border-life-accent/50 shadow translate-x-0.5'
+                        : 'text-life-muted hover:text-life-text hover:bg-life-surface2/45'
                     }`}
                   >
                     <span className="flex items-center gap-3 truncate">
-                      <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-[#B68B61]' : ''}`} />
+                      <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-life-accent' : ''}`} />
                       <span className="truncate">{t(item.labelKey)}</span>
                     </span>
                     {item.id === 'tasks' && (
-                      <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-[#171412] text-[#E4C8A6] shrink-0">
+                      <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-life-bg text-life-soft shrink-0">
                         {data.tasks.filter((tk) => tk.status !== 'completed').length}
                       </span>
                     )}
@@ -9987,18 +9989,18 @@ function LifeOsWorkspace() {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-[#624332]/35 space-y-2">
+        <div className="p-4 border-t border-life-border/35 space-y-2">
           <button
             onClick={() => setSettingsOpen(true)}
-            className="w-full flex items-center justify-between p-3 rounded-xl bg-[#171412]/80 border border-[#624332]/40 hover:border-[#B68B61]/60 transition-colors"
+            className="w-full flex items-center justify-between p-3 rounded-xl bg-life-bg/80 border border-life-border/40 hover:border-life-accent/60 transition-colors"
           >
             <div className="text-left min-w-0">
-              <p className="text-xs font-semibold text-[#F4E9DC] truncate">{data.profile.name}</p>
-              <p className="text-[11px] text-[#A99B90] truncate">
+              <p className="text-xs font-semibold text-life-text truncate">{data.profile.name}</p>
+              <p className="text-[11px] text-life-muted truncate">
                 {lang === 'id' ? 'Bahasa Indonesia' : 'English'} • {data.profile.currency}
               </p>
             </div>
-            <Settings className="w-4 h-4 text-[#B68B61] shrink-0" />
+            <Settings className="w-4 h-4 text-life-accent shrink-0" />
           </button>
         </div>
       </aside>
@@ -10006,18 +10008,18 @@ function LifeOsWorkspace() {
       {/* MAIN WORKSPACE COLUMN */}
       <div className="flex-1 lg:pl-64 flex flex-col min-h-screen min-w-0 pb-24 lg:pb-0 relative z-10">
         {/* STICKY RESPONSIVE HEADER */}
-        <header className="sticky top-0 z-20 bg-[#171412]/90 backdrop-blur-md border-b border-[#624332]/35 px-3 sm:px-8 h-16 flex items-center justify-between gap-2">
+        <header className="sticky top-0 z-20 bg-life-bg/90 backdrop-blur-md border-b border-life-border/35 px-3 sm:px-8 h-16 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="lg:hidden w-8 h-8 rounded-xl bg-gradient-to-br from-[#B68B61] to-[#624332] flex items-center justify-center text-[#171412] font-bold shrink-0">
+            <div className="lg:hidden w-8 h-8 rounded-xl bg-gradient-to-br from-life-accent to-life-border flex items-center justify-center text-life-bg font-bold shrink-0">
               L
             </div>
             <div className="min-w-0">
-              <span className="text-sm font-semibold text-[#F4E9DC] truncate block sm:inline">
+              <span className="text-sm font-semibold text-life-text truncate block sm:inline">
                 {t(allNavItems.find((i) => i.id === activeTab)?.labelKey || 'nav_dashboard')}
               </span>
-              <span className="hidden md:inline text-xs text-[#A99B90] ml-3">
+              <span className="hidden md:inline text-xs text-life-muted ml-3">
                 {t('net_worth')}:{' '}
-                <strong className="text-[#E4C8A6] tabular-nums">
+                <strong className="text-life-soft tabular-nums">
                   {formatMoney(derived.totalNetWorth, data.profile.currency, maskBalances)}
                 </strong>
               </span>
@@ -10025,14 +10027,14 @@ function LifeOsWorkspace() {
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            <span className="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#241B17] border border-[#624332]/40 text-[11px] text-[#A99B90]">
+            <span className="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-life-surface border border-life-border/40 text-[11px] text-life-muted">
               <Cloud className="w-3.5 h-3.5 text-[#87B082]" />
               {syncStatus === 'syncing' ? t('cloud_syncing') : t('cloud_synced')}
             </span>
 
             <button
               onClick={() => setBriefingModalOpen(true)}
-              className="p-2 sm:p-2.5 rounded-xl bg-[#241B17] border border-[#624332]/50 text-[#A99B90] hover:text-[#E4C8A6]"
+              className="p-2 sm:p-2.5 rounded-xl bg-life-surface border border-life-border/50 text-life-muted hover:text-life-soft"
               title={t('daily_briefing')}
             >
               <Send className="w-4 h-4" />
@@ -10040,16 +10042,16 @@ function LifeOsWorkspace() {
 
             <button
               onClick={toggleLanguageQuick}
-              className="inline-flex items-center gap-1 px-2.5 py-2 rounded-xl bg-[#241B17] border border-[#624332]/50 text-xs font-semibold text-[#E4C8A6] hover:border-[#B68B61]"
+              className="inline-flex items-center gap-1 px-2.5 py-2 rounded-xl bg-life-surface border border-life-border/50 text-xs font-semibold text-life-soft hover:border-life-accent"
               title={lang === 'id' ? 'Ganti ke English' : 'Switch to Bahasa Indonesia'}
             >
-              <Globe className="w-3.5 h-3.5 text-[#B68B61]" />
+              <Globe className="w-3.5 h-3.5 text-life-accent" />
               <span>{lang.toUpperCase()}</span>
             </button>
 
             <button
               onClick={() => setMaskBalances((prev) => !prev)}
-              className="p-2 sm:p-2.5 rounded-xl bg-[#241B17] border border-[#624332]/50 text-[#A99B90] hover:text-[#E4C8A6]"
+              className="p-2 sm:p-2.5 rounded-xl bg-life-surface border border-life-border/50 text-life-muted hover:text-life-soft"
               aria-label="Toggle balance privacy"
             >
               {maskBalances ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -10057,7 +10059,7 @@ function LifeOsWorkspace() {
 
             <button
               onClick={() => setSettingsOpen(true)}
-              className="p-2 sm:p-2.5 rounded-xl bg-[#241B17] border border-[#624332]/50 text-[#A99B90] hover:text-[#E4C8A6]"
+              className="p-2 sm:p-2.5 rounded-xl bg-life-surface border border-life-border/50 text-life-muted hover:text-life-soft"
               aria-label="Workspace settings"
             >
               <Settings className="w-4 h-4" />
@@ -10085,7 +10087,7 @@ function LifeOsWorkspace() {
       </div>
 
       {/* MOBILE BOTTOM NAVIGATION */}
-      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-[#241B17]/95 backdrop-blur-lg border-t border-[#624332]/50 px-1.5 py-1.5 flex items-center justify-around">
+      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-life-surface/95 backdrop-blur-lg border-t border-life-border/50 px-1.5 py-1.5 flex items-center justify-around">
         {mobilePrimaryTabs.map((tab) => {
           const Icon = tab.icon;
           const active = activeTab === tab.id;
@@ -10097,7 +10099,7 @@ function LifeOsWorkspace() {
                 setMobileMoreOpen(false);
               }}
               className={`flex flex-col items-center justify-center py-1.5 px-2 rounded-xl min-w-[58px] ${
-                active ? 'text-[#B68B61]' : 'text-[#A99B90]'
+                active ? 'text-life-accent' : 'text-life-muted'
               }`}
             >
               <Icon className="w-5 h-5" />
@@ -10110,7 +10112,7 @@ function LifeOsWorkspace() {
         <button
           onClick={() => setMobileMoreOpen((prev) => !prev)}
           className={`flex flex-col items-center justify-center py-1.5 px-2 rounded-xl min-w-[58px] ${
-            mobileMoreOpen ? 'text-[#B68B61]' : 'text-[#A99B90]'
+            mobileMoreOpen ? 'text-life-accent' : 'text-life-muted'
           }`}
         >
           <MoreHorizontal className="w-5 h-5" />
@@ -10137,11 +10139,11 @@ function LifeOsWorkspace() {
                 }}
                 className={`p-3.5 rounded-2xl border flex flex-col items-start gap-2 text-left ${
                   active
-                    ? 'bg-[#30231D] border-[#B68B61] text-[#E4C8A6]'
-                    : 'bg-[#171412]/80 border-[#624332]/40 text-[#F4E9DC]'
+                    ? 'bg-life-surface2 border-life-accent text-life-soft'
+                    : 'bg-life-bg/80 border-life-border/40 text-life-text'
                 }`}
               >
-                <Icon className="w-5 h-5 text-[#B68B61]" />
+                <Icon className="w-5 h-5 text-life-accent" />
                 <span className="text-xs font-medium">{t(item.labelKey)}</span>
               </button>
             );
@@ -10249,8 +10251,8 @@ function LifeOsWorkspace() {
 
       {/* TOAST NOTIFICATION */}
       {toast && (
-        <div className="fixed bottom-20 lg:bottom-6 right-4 sm:right-6 z-50 px-4 py-3 rounded-2xl bg-[#30231D] border border-[#B68B61]/70 text-xs font-medium text-[#F4E9DC] shadow-2xl flex items-center gap-2.5 max-w-[90vw] life-motion-enter">
-          <CheckCircle2 className="w-4 h-4 text-[#B68B61] shrink-0" />
+        <div className="fixed bottom-20 lg:bottom-6 right-4 sm:right-6 z-50 px-4 py-3 rounded-2xl bg-life-surface2 border border-life-accent/70 text-xs font-medium text-life-text shadow-2xl flex items-center gap-2.5 max-w-[90vw] life-motion-enter">
+          <CheckCircle2 className="w-4 h-4 text-life-accent shrink-0" />
           <span className="truncate">{toast}</span>
         </div>
       )}

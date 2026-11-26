@@ -2,5 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body, #root { min-height: 100%; background: #171412; }
+/* Warna bawaan (Cokelat Gelap). Diganti saat runtime oleh src/theme.js */
+:root {
+  --life-bg: 23 20 18;
+  --life-surface: 36 27 23;
+  --life-surface2: 48 35 29;
+  --life-border: 98 67 50;
+  --life-muted: 169 155 144;
+  --life-text: 244 233 220;
+  --life-soft: 228 200 166;
+  --life-accent: 182 139 97;
+  --life-accent-dark: 140 100 64;
+}
+
+html, body, #root { min-height: 100%; background: rgb(var(--life-bg)); }
 body { margin: 0; -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
