@@ -76,6 +76,7 @@ export const TxRow = ({ tx, data, lang, masked, onClick, compact = false }) => {
           {catName(tx.category, lang) || (lang === 'id' ? 'Transfer' : 'Transfer')}
           {!compact && acc ? ` • ${acc.name}` : ''}
           {qris ? ' • QRIS' : ''}
+          {tx.items?.length > 1 ? ` • ${tx.items.length} item` : ''}
         </span>
       </span>
       <span className={`text-sm font-semibold tabular-nums shrink-0 ${isIn ? 'text-[#87B082]' : 'text-life-text'}`}>
@@ -143,10 +144,10 @@ export const MenuSheet = ({ open, onClose, onNavigate, actions, lang }) => {
   ];
   const go = (fn) => () => { onClose(); fn(); };
   return (
-    <div className="lg:hidden fixed inset-0 z-40 flex items-end" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-40 flex items-end lg:items-center lg:justify-center" role="dialog" aria-modal="true">
       <button aria-label={L('Tutup', 'Close')} className="absolute inset-0 bg-black/60" onClick={onClose} />
       <div
-        className="relative w-full max-h-[85vh] overflow-y-auto rounded-t-3xl bg-life-surface border-t border-life-border/60 px-4 pt-3 pb-6 life-motion-enter"
+        className="relative w-full lg:max-w-lg max-h-[85vh] overflow-y-auto rounded-t-3xl lg:rounded-3xl bg-life-surface border-t border-life-border/60 px-4 pt-3 pb-6 life-motion-enter"
         style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
       >
         <div className="flex items-center justify-between mb-3">

@@ -48,5 +48,3 @@ export const SERVICE_GROUPS = [
 ];
 
 export const ALL_SERVICES = SERVICE_GROUPS.flatMap((g) => g.items);
-// 7 layanan paling sering dipakai tampil di Beranda, sisanya lewat tombol "Semua"
-export const PINNED_SERVICE_IDS = ['budgets', 'savings', 'tasks', 'habits', 'subscriptions', 'goals', 'reports'];

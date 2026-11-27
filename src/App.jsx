@@ -7652,12 +7652,14 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
 
   const handleImageFileUpload = (e) => {
     const file = e.target.files?.[0];
+    e.target.value = ''; // supaya file yang sama bisa dipilih lagi
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async (ev) => {
       const dataUrl = String(ev.target?.result || '');
       if (dataUrl) await scanStillImage(dataUrl, file.type || 'image/jpeg');
     };
+    reader.onerror = () => setQrMissed(true);
     reader.readAsDataURL(file);
   };
 
@@ -7852,21 +7854,20 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
         )}
 
         {scanMode === 'upload' && (
-          <div className="space-y-2.5">
+          <div className="grid grid-cols-2 gap-2.5">
+            <label className="flex flex-col items-center justify-center p-5 rounded-2xl border-2 border-dashed border-life-border/70 bg-life-bg/70 hover:border-life-accent cursor-pointer text-center transition-colors">
+              <ImageIcon className="w-6 h-6 text-life-accent mb-1.5" />
+              <span className="text-xs font-medium text-life-text">
+                {lang === 'id' ? 'Pilih dari galeri / file' : 'Choose from gallery / files'}
+              </span>
+              <input type="file" accept="image/*" onChange={handleImageFileUpload} className="hidden" />
+            </label>
             <label className="flex flex-col items-center justify-center p-5 rounded-2xl border-2 border-dashed border-life-border/70 bg-life-bg/70 hover:border-life-accent cursor-pointer text-center transition-colors">
               <Camera className="w-6 h-6 text-life-accent mb-1.5" />
               <span className="text-xs font-medium text-life-text">
-                {lang === 'id'
-                  ? 'Ketuk untuk ambil foto kamera HP atau pilih gambar struk/barcode'
-                  : 'Tap to take a photo or choose receipt/barcode image'}
+                {lang === 'id' ? 'Foto dengan kamera' : 'Take a photo'}
               </span>
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleImageFileUpload}
-                className="hidden"
-              />
+              <input type="file" accept="image/*" capture="environment" onChange={handleImageFileUpload} className="hidden" />
             </label>
           </div>
         )}
@@ -8169,6 +8170,8 @@ const DailyBriefingModal = ({ open, onClose, data, derived, t, lang, onCopied })
   );
 };
 
+const withItemIds = (list) => (list || []).map((it, i) => ({ ...it, id: it.id || `ti-${i}-${Math.random().toString(36).slice(2, 6)}` }));
+
 const TransactionModal = ({ open, onClose, editingTx, data, t, lang, onSave, accountBalances = {} }) => {
   const [fundVaultId, setFundVaultId] = useState('');
   const [type, setType] = useState(editingTx?.type || 'expense');
@@ -8182,10 +8185,12 @@ const TransactionModal = ({ open, onClose, editingTx, data, t, lang, onSave, acc
   );
   const [paymentMethod, setPaymentMethod] = useState(editingTx?.paymentMethod || 'Card / Digital');
   const [notes, setNotes] = useState(editingTx?.notes || '');
+  const [txItems, setTxItems] = useState(withItemIds(editingTx?.items));
 
   useEffect(() => {
     if (open) {
       const nextType = editingTx?.type || 'expense';
+      setTxItems(withItemIds(editingTx?.items));
       setType(nextType);
       setAmount(editingTx ? String(editingTx.amount) : '');
       setDate(editingTx?.date || TODAY_STR);
@@ -8231,20 +8236,38 @@ const TransactionModal = ({ open, onClose, editingTx, data, t, lang, onSave, acc
     .map((sg) => ({ sg, saved: sg.contributions.reduce((sum, c) => sum + (Number(c.amount) || 0), 0) }))
     .filter((v) => v.saved > 0);
 
+  const itemTotal = (it) => (Number(it.qty) || 1) * (Number(it.price) || 0);
+  const itemsSum = txItems.reduce((a, it) => a + itemTotal(it), 0);
+  const hasItems = type === 'expense' && txItems.length > 0;
+  const syncItems = (list) => {
+    setTxItems(list);
+    setAmount(String(list.reduce((a, it) => a + itemTotal(it), 0) || ''));
+  };
+  const addTxItem = () => syncItems([...txItems, { id: `ti-${Date.now()}-${txItems.length}`, name: '', qty: 1, price: '' }]);
+  const patchTxItem = (id, patch) => syncItems(txItems.map((it) => (it.id === id ? { ...it, ...patch } : it)));
+  const removeTxItem = (id) => syncItems(txItems.filter((it) => it.id !== id));
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    const numAmount = parseFloat(amount);
-    if (!numAmount || numAmount <= 0 || !description.trim()) return;
+    const cleanItems = hasItems
+      ? txItems
+          .filter((it) => it.name.trim() && Number(it.price) > 0)
+          .map((it) => ({ name: it.name.trim(), qty: Number(it.qty) || 1, price: Number(it.price) }))
+      : [];
+    const numAmount = hasItems ? cleanItems.reduce((a, it) => a + it.qty * it.price, 0) : parseFloat(amount);
+    const title = description.trim() || (cleanItems[0]?.name ? `${cleanItems[0].name}${cleanItems.length > 1 ? ` +${cleanItems.length - 1}` : ''}` : '');
+    if (!numAmount || numAmount <= 0 || !title) return;
     if (type === 'transfer' && accountId === toAccountId) return;
 
     onSave({
+      items: cleanItems.length ? cleanItems : undefined,
       fundFromVaultId: !editingTx && type === 'expense' && shortfall > 0 ? fundVaultId || undefined : undefined,
       id: editingTx?.id,
       type,
       amount: numAmount,
       date,
       category,
-      description: description.trim(),
+      description: title,
       accountId,
       toAccountId: type === 'transfer' ? toAccountId : undefined,
       paymentMethod: type === 'transfer' ? 'Internal Ledger Transfer' : paymentMethod,
@@ -8288,6 +8311,7 @@ const TransactionModal = ({ open, onClose, editingTx, data, t, lang, onSave, acc
             placeholder="0"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
+            readOnly={hasItems}
             required
           />
           <Input label={t('date')} type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
@@ -8295,11 +8319,87 @@ const TransactionModal = ({ open, onClose, editingTx, data, t, lang, onSave, acc
 
         <Input
           label={t('description')}
-          placeholder="e.g. Kopi & Meeting Klien"
+          placeholder={type === 'expense' ? (lang === 'id' ? 'mis. Makan di Kafe Kopi' : 'e.g. Lunch at Cafe') : 'e.g. Kopi & Meeting Klien'}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          required
+          required={!hasItems}
         />
+
+        {type === 'expense' && (
+          <div className="rounded-2xl border border-life-border/50 bg-life-bg/60 p-3 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-life-text">
+                {lang === 'id' ? 'Rincian menu / barang' : 'Items breakdown'}
+              </p>
+              {txItems.length === 0 && (
+                <button type="button" onClick={addTxItem} className="text-xs font-semibold text-life-accent">
+                  + {lang === 'id' ? 'Tambah banyak item' : 'Add multiple items'}
+                </button>
+              )}
+            </div>
+            {txItems.length === 0 ? (
+              <p className="text-[11px] text-life-muted">
+                {lang === 'id'
+                  ? 'Makan di kafe pesan banyak menu? Catat semua menu & harganya sekaligus dalam satu transaksi.'
+                  : 'Ordered several things? Log every item and price in a single transaction.'}
+              </p>
+            ) : (
+              <>
+                <div className="grid grid-cols-[1fr_3.2rem_5.5rem_1.5rem] gap-1.5 px-0.5 text-[10px] uppercase tracking-wider text-life-muted">
+                  <span>{lang === 'id' ? 'Menu' : 'Item'}</span>
+                  <span className="text-center">Qty</span>
+                  <span>{lang === 'id' ? 'Harga' : 'Price'}</span>
+                  <span />
+                </div>
+                {txItems.map((it, idx) => (
+                  <div key={it.id} className="grid grid-cols-[1fr_3.2rem_5.5rem_1.5rem] gap-1.5 items-center">
+                    <input
+                      value={it.name}
+                      onChange={(e) => patchTxItem(it.id, { name: e.target.value })}
+                      placeholder={lang === 'id' ? 'mis. Latte' : 'e.g. Latte'}
+                      autoFocus={idx === txItems.length - 1 && !it.name && txItems.length > 1}
+                      className="min-w-0 rounded-lg bg-life-surface border border-life-border/60 px-2.5 py-2 text-sm text-life-text outline-none focus:border-life-accent"
+                    />
+                    <input
+                      type="number"
+                      min="1"
+                      inputMode="numeric"
+                      value={it.qty}
+                      onChange={(e) => patchTxItem(it.id, { qty: e.target.value })}
+                      className="min-w-0 rounded-lg bg-life-surface border border-life-border/60 px-1 py-2 text-sm text-center text-life-text outline-none focus:border-life-accent"
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      inputMode="decimal"
+                      value={it.price}
+                      placeholder="0"
+                      onChange={(e) => patchTxItem(it.id, { price: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && idx === txItems.length - 1) {
+                          e.preventDefault();
+                          addTxItem();
+                        }
+                      }}
+                      className="min-w-0 rounded-lg bg-life-surface border border-life-border/60 px-2 py-2 text-sm text-life-text outline-none focus:border-life-accent"
+                    />
+                    <button type="button" onClick={() => removeTxItem(it.id)} className="text-life-muted hover:text-[#F29B87]" aria-label="Hapus">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between pt-1">
+                  <button type="button" onClick={addTxItem} className="text-xs font-semibold text-life-accent">
+                    + {lang === 'id' ? 'Tambah item' : 'Add item'}
+                  </button>
+                  <span className="text-xs text-life-soft">
+                    Total <b className="text-life-text tabular-nums">{formatMoney(itemsSum, data.profile.currency)}</b>
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Select label={t('category')} value={category} onChange={(e) => setCategory(e.target.value)}>
@@ -9920,6 +10020,7 @@ function LifeOsWorkspace() {
             onOpenSplit={() => setSplitBillModalOpen(true)}
             onOpenPayday={() => setPaydayModalOpen(true)}
             onOpenBriefing={() => setBriefingModalOpen(true)}
+            onOpenMenu={() => setMenuOpen(true)}
           />
         );
       case 'activity':

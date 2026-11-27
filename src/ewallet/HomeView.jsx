@@ -1,22 +1,54 @@
-import React, { useState } from 'react';
+import React, { useMemo } from 'react';
 import {
-  Eye, EyeOff, Plus, ScanLine, Split, Banknote, Send, ChevronRight, LayoutGrid, CheckCircle2, Circle,
-  ArrowDownLeft, ArrowUpRight, ListTodo, Flame, CalendarDays,
+  Eye, EyeOff, Plus, ScanLine, Split, Banknote, Send, LayoutGrid, CheckCircle2, Circle,
+  ArrowDownLeft, ArrowUpRight, ListTodo, Flame, CalendarDays, TrendingDown, PiggyBank,
 } from 'lucide-react';
 import { Avatar, SectionTitle, TxRow } from './parts.jsx';
-import { fmt, todayStr } from './helpers.js';
-import { SERVICE_GROUPS, ALL_SERVICES, PINNED_SERVICE_IDS } from './services.js';
+import { fmt, todayStr, catName } from './helpers.js';
+import { ALL_SERVICES } from './services.js';
+
+// Hanya 4 pintasan di Beranda; sisanya lewat tombol Menu
+const PINNED_SERVICE_IDS = ['budgets', 'savings', 'tasks', 'habits'];
 
 export default function HomeView({
   data, derived, lang, maskBalances, onToggleMask, onNavigate,
-  onOpenTx, onOpenReceipt, onOpenSplit, onOpenPayday, onOpenBriefing,
+  onOpenTx, onOpenReceipt, onOpenSplit, onOpenPayday, onOpenBriefing, onOpenMenu,
 }) {
   const L = (idText, enText) => (lang === 'id' ? idText : enText);
-  const [allServices, setAllServices] = useState(false);
   const { profile } = data;
   const currency = profile.currency;
   const sec = { balance: true, shortcuts: true, today: true, services: true, activity: true, ...(profile.homeSections || {}) };
   const today = todayStr();
+
+  // Pengeluaran 7 hari terakhir + kategori teratas bulan ini
+  const { week, weekTotal, weekMax, topCats, monthSpent } = useMemo(() => {
+    const days = [];
+    for (let i = 6; i >= 0; i -= 1) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      days.push({ key, label: d.toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-US', { weekday: 'narrow' }), value: 0 });
+    }
+    const cats = {};
+    let spent = 0;
+    data.transactions.forEach((tx) => {
+      if (tx.type !== 'expense') return;
+      const slot = days.find((d) => d.key === tx.date);
+      if (slot) slot.value += Number(tx.amount) || 0;
+      if (String(tx.date).startsWith(today.slice(0, 7))) {
+        cats[tx.category] = (cats[tx.category] || 0) + (Number(tx.amount) || 0);
+        spent += Number(tx.amount) || 0;
+      }
+    });
+    return {
+      week: days,
+      weekTotal: days.reduce((a, d) => a + d.value, 0),
+      weekMax: Math.max(1, ...days.map((d) => d.value)),
+      topCats: Object.entries(cats).sort((a, b) => b[1] - a[1]).slice(0, 4),
+      monthSpent: spent,
+    };
+  }, [data.transactions, today, lang]);
+  const saved = derived.monthlyIncome - derived.monthlyExpenses;
 
   const recent = [...data.transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
   const openTasks = data.tasks.filter((tk) => tk.status !== 'completed').length;
@@ -109,7 +141,7 @@ export default function HomeView({
       {sec.shortcuts && (
         <div className="grid grid-cols-4 gap-2">
           {shortcuts.map((s) => (
-            <button key={s.label} onClick={s.onClick} className="flex flex-col items-center gap-1.5 py-3 rounded-2xl bg-life-surface border border-life-border/40 active:scale-95 transition-transform">
+            <button key={s.label} onClick={s.onClick} className="flex flex-col items-center gap-1.5 py-3 rounded-2xl bg-life-surface border border-life-border/40 shadow-sm active:scale-95 transition-transform">
               <span className="w-11 h-11 rounded-2xl bg-life-accent/15 text-life-accent flex items-center justify-center">
                 <s.icon className="w-5 h-5" />
               </span>
@@ -135,6 +167,61 @@ export default function HomeView({
         </div>
       )}
 
+      {/* Grafik 7 hari */}
+      {sec.balance && (
+        <div className="rounded-3xl bg-life-surface border border-life-border/40 p-4">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[11px] text-life-muted flex items-center gap-1"><TrendingDown className="w-3.5 h-3.5 text-life-accent" />{L('Pengeluaran 7 hari terakhir', 'Spending, last 7 days')}</p>
+              <p className="text-xl font-bold text-life-text tabular-nums mt-0.5">{fmt(weekTotal, currency, maskBalances)}</p>
+            </div>
+            <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 ${saved >= 0 ? 'bg-[#87B082]/15 text-[#87B082]' : 'bg-[#D96B52]/15 text-[#F29B87]'}`}>
+              <PiggyBank className="w-3.5 h-3.5" />
+              {maskBalances ? '••••' : `${saved >= 0 ? '+' : '-'}${fmt(Math.abs(saved), currency)}`}
+            </span>
+          </div>
+          <div className="mt-4 flex items-end justify-between gap-2 h-24">
+            {week.map((d, i) => {
+              const h = d.value > 0 ? Math.max(8, Math.round((d.value / weekMax) * 100)) : 4;
+              const isToday = i === week.length - 1;
+              return (
+                <div key={d.key} className="flex-1 flex flex-col items-center justify-end gap-1.5 h-full">
+                  <div
+                    className={`w-full rounded-lg transition-all ${isToday ? 'bg-gradient-to-t from-life-accent-dark to-life-accent' : d.value > 0 ? 'bg-life-accent/40' : 'bg-life-border/30'}`}
+                    style={{ height: `${h}%` }}
+                    title={maskBalances ? '' : fmt(d.value, currency)}
+                  />
+                  <span className={`text-[10px] uppercase ${isToday ? 'text-life-accent font-bold' : 'text-life-muted'}`}>{d.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Kategori teratas bulan ini */}
+      {sec.balance && topCats.length > 0 && (
+        <div className="rounded-3xl bg-life-surface border border-life-border/40 p-4">
+          <p className="text-sm font-semibold text-life-text mb-3">{L('Terbanyak bulan ini', 'Top spending this month')}</p>
+          <div className="space-y-3">
+            {topCats.map(([cat, val]) => {
+              const pct = monthSpent > 0 ? Math.round((val / monthSpent) * 100) : 0;
+              return (
+                <div key={cat}>
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-life-text truncate pr-2">{catName(cat, lang)}</span>
+                    <span className="text-life-muted tabular-nums shrink-0">{fmt(val, currency, maskBalances)} • {pct}%</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-life-bg overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-life-accent-dark to-life-accent" style={{ width: `${Math.max(3, pct)}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Hari ini */}
       {sec.today && (
         <div className="grid grid-cols-3 gap-2">
@@ -152,48 +239,20 @@ export default function HomeView({
         </div>
       )}
 
-      {/* Layanan LIFE OS */}
+      {/* Pintasan modul (ringkas; selebihnya di tombol Menu) */}
       {sec.services && (
         <div>
-          <SectionTitle action={allServices ? L('Tutup', 'Close') : L('Semua', 'All')} onAction={() => setAllServices((v) => !v)}>
-            {L('Layanan LIFE OS', 'LIFE OS Services')}
+          <SectionTitle action={L('Semua menu', 'All menu')} onAction={onOpenMenu}>
+            {L('Pintasan', 'Shortcuts')}
           </SectionTitle>
-          {!allServices ? (
-            <div className="grid grid-cols-4 gap-y-4 gap-x-1">
-              {pinned.map((s) => (
-                <button key={s.id} onClick={() => onNavigate(s.id)} className="flex flex-col items-center gap-1.5 active:scale-95 transition-transform">
-                  <span className="w-12 h-12 rounded-2xl bg-life-surface border border-life-border/40 text-life-accent flex items-center justify-center">
-                    <s.icon className="w-5 h-5" />
-                  </span>
-                  <span className="text-[11px] text-life-text text-center leading-tight">{s.label[lang]}</span>
-                </button>
-              ))}
-              <button onClick={() => setAllServices(true)} className="flex flex-col items-center gap-1.5">
-                <span className="w-12 h-12 rounded-2xl bg-life-accent/15 text-life-accent flex items-center justify-center">
-                  <LayoutGrid className="w-5 h-5" />
-                </span>
-                <span className="text-[11px] text-life-text">{L('Lainnya', 'More')}</span>
+          <div className="grid grid-cols-4 gap-2">
+            {pinned.map((s) => (
+              <button key={s.id} onClick={() => onNavigate(s.id)} className="flex flex-col items-center gap-1.5 py-2.5 rounded-2xl bg-life-surface border border-life-border/40 active:scale-95 transition-transform">
+                <s.icon className="w-5 h-5 text-life-accent" />
+                <span className="text-[11px] text-life-text text-center leading-tight">{s.label[lang]}</span>
               </button>
-            </div>
-          ) : (
-            <div className="space-y-4 rounded-2xl bg-life-surface border border-life-border/40 p-4">
-              {SERVICE_GROUPS.map((g) => (
-                <div key={g.id}>
-                  <p className="text-[10px] uppercase tracking-widest text-life-muted mb-2">{g.label[lang]}</p>
-                  <div className="grid grid-cols-4 gap-y-3 gap-x-1">
-                    {g.items.map((s) => (
-                      <button key={s.id} onClick={() => onNavigate(s.id)} className="flex flex-col items-center gap-1.5">
-                        <span className="w-11 h-11 rounded-2xl bg-life-bg border border-life-border/40 text-life-accent flex items-center justify-center">
-                          <s.icon className="w-5 h-5" />
-                        </span>
-                        <span className="text-[11px] text-life-text text-center leading-tight">{s.label[lang]}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+            ))}
+          </div>
         </div>
       )}
 
