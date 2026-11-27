@@ -151,6 +151,17 @@ function loadSavedWorkspace() {
   }
 }
 
+// Akun lokal (per perangkat): data tiap akun disimpan terpisah agar tidak saling menimpa
+const acctStoreKey = (k) => `lifeos:acct:${k}`;
+const wsStoreKey = (k) => `lifeos:ws:${k}`;
+function readStoredJson(k) {
+  try {
+    return JSON.parse(localStorage.getItem(k) || 'null');
+  } catch {
+    return null;
+  }
+}
+
 function deriveWorkspaceKey(email) {
   const normalized = String(email || 'guest').trim().toLowerCase();
   let hash = 0;
@@ -1977,7 +1988,7 @@ const EmptyState = ({ icon: Icon, title, description, actionLabel, onAction }) =
 // ============================================================================
 
 const AuthPortalScreen = ({ lang, onToggleLang, t, onAuthenticateSuccess }) => {
-  const [mode, setMode] = useState('login');
+  const [mode, setMode] = useState('register');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -2078,13 +2089,52 @@ const AuthPortalScreen = ({ lang, onToggleLang, t, onAuthenticateSuccess }) => {
       console.error('Cloud auth fallback notice:', err);
     }
 
-    const ownerName = fullName.trim() || cleanEmail.split('@')[0];
-    const initialWorkspace =
-      mode === 'register'
-        ? seedMode === 'demo'
+    // Mode lokal (tanpa cloud): akun disimpan di perangkat ini
+    const stored = readStoredJson(acctStoreKey(workspaceKey));
+    let ownerName;
+    let initialWorkspace;
+    if (mode === 'register') {
+      if (stored) {
+        setErrorMsg(
+          lang === 'id'
+            ? 'Email sudah terdaftar di perangkat ini. Silakan masuk pada tab Masuk Akun.'
+            : 'Email already registered on this device. Please sign in instead.'
+        );
+        setSubmitting(false);
+        return;
+      }
+      ownerName = fullName.trim() || cleanEmail.split('@')[0];
+      initialWorkspace =
+        seedMode === 'demo'
           ? { ...createInitialState(), profile: { ...createInitialState().profile, name: ownerName, language: lang } }
-          : createEmptyState(lang, ownerName)
-        : { ...createInitialState(), profile: { ...createInitialState().profile, name: ownerName, language: lang } };
+          : createEmptyState(lang, ownerName);
+      try {
+        localStorage.setItem(
+          acctStoreKey(workspaceKey),
+          JSON.stringify({ email: cleanEmail, name: ownerName, passwordHash: pwHash })
+        );
+        localStorage.setItem(wsStoreKey(workspaceKey), JSON.stringify(initialWorkspace));
+      } catch (err) {
+        console.error('Local account save failed:', err);
+      }
+    } else {
+      if (!stored) {
+        setErrorMsg(
+          lang === 'id'
+            ? 'Akun tidak ditemukan di perangkat ini. Silakan buat akun baru terlebih dahulu.'
+            : 'Account not found on this device. Please create an account first.'
+        );
+        setSubmitting(false);
+        return;
+      }
+      if (stored.passwordHash && stored.passwordHash !== pwHash) {
+        setErrorMsg(lang === 'id' ? 'Kata sandi tidak sesuai.' : 'Incorrect password.');
+        setSubmitting(false);
+        return;
+      }
+      ownerName = stored.name || cleanEmail.split('@')[0];
+      initialWorkspace = readStoredJson(wsStoreKey(workspaceKey)) || createEmptyState(lang, ownerName);
+    }
 
     onAuthenticateSuccess({
       email: cleanEmail,
@@ -8800,15 +8850,9 @@ function LifeOsWorkspace() {
 
   const savedRef = useRef(undefined);
   if (savedRef.current === undefined) savedRef.current = loadSavedWorkspace();
+  // Pengguna baru langsung melihat layar daftar/masuk (bukan akun demo)
   const [currentUser, setCurrentUser] = useState(() =>
-    savedRef.current && savedRef.current.user !== undefined
-      ? savedRef.current.user
-      : {
-          email: 'alexander@lifeos.app',
-          name: 'Alexander Vance',
-          workspaceKey: deriveWorkspaceKey('alexander@lifeos.app'),
-          isCloud: Boolean(firebaseDb),
-        }
+    savedRef.current && savedRef.current.user ? savedRef.current.user : null
   );
   const [data, setData] = useState(() =>
     savedRef.current && savedRef.current.data ? savedRef.current.data : createInitialState()
@@ -8818,6 +8862,9 @@ function LifeOsWorkspace() {
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ user: currentUser, data }));
+      if (currentUser?.workspaceKey) {
+        localStorage.setItem(wsStoreKey(currentUser.workspaceKey), JSON.stringify(data));
+      }
     } catch (err) {
       console.error('Local save failed:', err);
     }
