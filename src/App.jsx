@@ -103,7 +103,7 @@ import Stepper from './ewallet/Stepper.jsx';
 import { BottomNav } from './ewallet/parts.jsx';
 import { parseQris, guessCategory } from './ewallet/helpers.js';
 import { decodeCode, loadImage } from './ewallet/qrScan.js';
-import { ocrReceiptImage, parseReceiptOcr } from './ewallet/receiptOcr.js';
+import { ocrReceiptImage, parseReceipt } from './ewallet/receiptOcr.js';
 import { licenseEnabled } from './LicenseGate.jsx';
 import { initializeApp, getApps } from 'firebase/app';
 import {
@@ -7436,8 +7436,21 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
   const [capturedPreview, setCapturedPreview] = useState('');
   const [qrMissed, setQrMissed] = useState(false);
   const [ocrBusy, setOcrBusy] = useState(false);
+  const [items, setItems] = useState([]);
+  const [saveMode, setSaveMode] = useState('items');
   const [ocrFailed, setOcrFailed] = useState(false);
   const ocrRunRef = useRef(0);
+  const sumItems = (list) => list.reduce((a, b) => a + (Number(b.price) || 0), 0);
+  const applyItems = (list) => {
+    setItems(list);
+    setAmount(String(sumItems(list)));
+  };
+  const updateItem = (id, patch) => applyItems(items.map((it) => (it.id === id ? { ...it, ...patch } : it)));
+  const removeItem = (id) => applyItems(items.filter((it) => it.id !== id));
+  const addItem = () =>
+    setItems([...items, { id: `it-${Date.now()}-${items.length}`, name: '', qty: 1, price: '' }]);
+  const hasNegative = items.some((it) => Number(it.price) < 0);
+  const effectiveMode = items.length >= 2 && !hasNegative ? saveMode : 'single';
   const [scanKey, setScanKey] = useState(0);
   const scannedRef = useRef('');
   const applyCodeRef = useRef(() => {});
@@ -7475,6 +7488,7 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
     setCapturedPreview('');
     setQrMissed(false);
     setOcrBusy(false);
+    setItems([]);
     ocrRunRef.current += 1;
     setScanKey((k) => k + 1);
   };
@@ -7499,6 +7513,7 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
       setCameraError('');
       setQrMissed(false);
       setOcrBusy(false);
+      setItems([]);
       ocrRunRef.current += 1;
       return undefined;
     }
@@ -7559,6 +7574,7 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
     setCapturedPreview(dataUrl);
     setQrMissed(false);
     setOcrFailed(false);
+    setItems([]);
     try {
       const img = await loadImage(dataUrl);
       const codeVal = await decodeCode(img);
@@ -7573,15 +7589,24 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
       try {
         const text = await ocrReceiptImage(img);
         if (runId !== ocrRunRef.current) return;
-        const parsed = parseReceiptOcr(text);
+        const parsed = parseReceipt(text);
         setRawText(text);
+        const list = parsed.items.map((it, i) => ({
+          id: `it-${Date.now()}-${i}`,
+          name: it.name,
+          qty: it.qty,
+          price: String(it.price),
+          adjust: !!it.adjust,
+        }));
+        setItems(list);
         if (parsed.merchant) {
           setMerchant(parsed.merchant);
           const guess = guessCategory(parsed.merchant);
           if (guess) setCategory(guess);
         }
-        if (parsed.amount > 0) setAmount(String(parsed.amount));
-        if (!parsed.merchant && !(parsed.amount > 0)) setQrMissed(true);
+        if (parsed.total > 0) setAmount(String(parsed.total));
+        else if (list.length) setAmount(String(sumItems(list)));
+        if (!parsed.merchant && !(parsed.total > 0) && !list.length) setQrMissed(true);
       } catch {
         if (runId === ocrRunRef.current) {
           setOcrFailed(true);
@@ -7643,19 +7668,43 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
     const numAmt = parseFloat(amount);
     if (!numAmt || numAmt <= 0) return;
     stopCameraStream();
-    onSaveExtractedTx({
+    const base = {
       type: 'expense',
-      amount: numAmt,
       date: TODAY_STR,
-      category,
-      description: merchant.trim() || (lang === 'id' ? 'Belanja Scan Struk' : 'Scanned Receipt'),
       accountId: accountId || data.accounts[0]?.id,
       paymentMethod: detectedCode ? 'QRIS / Barcode Scan' : 'Camera / Receipt Scan',
-      notes: detectedCode ? `Code: ${detectedCode}` : rawText.slice(0, 80),
-    });
+    };
+    const shop = merchant.trim() || (lang === 'id' ? 'Belanja Scan Struk' : 'Scanned Receipt');
+    const valid = items.filter((it) => it.name.trim() && Number(it.price) > 0);
+    if (!detectedCode && effectiveMode === 'items' && valid.length >= 2) {
+      // Satu transaksi per barang
+      valid.forEach((it) => {
+        const qty = Number(it.qty) || 1;
+        onSaveExtractedTx({
+          ...base,
+          amount: Number(it.price),
+          category: (!it.adjust && guessCategory(it.name)) || category,
+          description: `${it.name.trim()}${qty > 1 ? ` ×${qty}` : ''} (${shop})`,
+          notes: `${lang === 'id' ? 'Struk' : 'Receipt'}: ${shop}`,
+        });
+      });
+    } else {
+      const lines = items
+        .filter((it) => it.name.trim())
+        .map((it) => `${it.name.trim()}${Number(it.qty) > 1 ? ` ×${it.qty}` : ''} ${formatMoney(Number(it.price) || 0, data.profile.currency)}`)
+        .join('; ');
+      onSaveExtractedTx({
+        ...base,
+        amount: numAmt,
+        category,
+        description: shop,
+        notes: detectedCode ? `Code: ${detectedCode}` : (lines || rawText).slice(0, 400),
+      });
+    }
     setRawText('');
     setMerchant('');
     setAmount('');
+    setItems([]);
     setDetectedCode('');
     scannedRef.current = '';
     setCapturedPreview('');
@@ -7843,6 +7892,92 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
           required
         />
 
+        {items.length > 0 && !detectedCode && (
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium uppercase tracking-wider text-life-muted">
+                {lang === 'id' ? `Daftar Barang (${items.length})` : `Items (${items.length})`}
+              </p>
+              <button type="button" onClick={addItem} className="inline-flex items-center gap-1 text-xs font-semibold text-life-accent">
+                <Plus className="w-3.5 h-3.5" /> {lang === 'id' ? 'Tambah' : 'Add'}
+              </button>
+            </div>
+            {items.map((it) => (
+              <div key={it.id} className="rounded-xl bg-life-bg/80 border border-life-border/50 p-2.5 space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    value={it.name}
+                    onChange={(e) => updateItem(it.id, { name: e.target.value })}
+                    placeholder={lang === 'id' ? 'Nama barang' : 'Item name'}
+                    className="flex-1 min-w-0 rounded-lg bg-life-bg/90 border border-life-border/55 px-3 py-2 text-sm text-life-text focus:outline-none focus:border-life-accent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeItem(it.id)}
+                    aria-label={lang === 'id' ? 'Hapus barang' : 'Remove item'}
+                    className="p-2 rounded-lg text-life-muted hover:text-life-text shrink-0"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-life-muted">
+                  <span>{lang === 'id' ? 'Jml' : 'Qty'}</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min="1"
+                    value={it.qty}
+                    onChange={(e) => updateItem(it.id, { qty: e.target.value })}
+                    className="w-14 rounded-lg bg-life-bg/90 border border-life-border/55 px-2 py-2 text-sm text-life-text text-center focus:outline-none focus:border-life-accent"
+                  />
+                  <span className="ml-1">{data.profile.currency}</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    value={it.price}
+                    onChange={(e) => updateItem(it.id, { price: e.target.value })}
+                    className="flex-1 min-w-0 rounded-lg bg-life-bg/90 border border-life-border/55 px-3 py-2 text-sm text-life-text text-right focus:outline-none focus:border-life-accent"
+                  />
+                </div>
+              </div>
+            ))}
+            {items.length >= 2 && (
+              <div className="space-y-1.5">
+                <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-life-bg border border-life-border/50">
+                  {[
+                    { id: 'items', label: lang === 'id' ? 'Per barang' : 'Per item' },
+                    { id: 'single', label: lang === 'id' ? '1 transaksi' : 'Single' },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setSaveMode(m.id)}
+                      className={`py-2 rounded-lg text-xs font-semibold transition-colors ${
+                        effectiveMode === m.id ? 'bg-life-accent text-life-bg' : 'text-life-muted'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-life-muted">
+                  {hasNegative
+                    ? lang === 'id'
+                      ? 'Ada diskon, jadi disimpan sebagai 1 transaksi (total setelah diskon).'
+                      : 'There is a discount, so it is saved as one transaction (total after discount).'
+                    : effectiveMode === 'items'
+                      ? lang === 'id'
+                        ? 'Setiap barang dicatat sebagai transaksi sendiri.'
+                        : 'Each item is saved as its own transaction.'
+                      : lang === 'id'
+                        ? 'Semua barang digabung jadi 1 transaksi; rinciannya masuk catatan.'
+                        : 'All items are combined into one transaction; details go in the notes.'}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input
             id="scan-amount-input"
@@ -7853,6 +7988,7 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
             min="0.01"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
+            readOnly={items.length > 0 && !detectedCode}
             required
           />
           <Select label={t('category')} value={category} onChange={(e) => setCategory(e.target.value)}>
@@ -8848,7 +8984,7 @@ function LifeOsWorkspace() {
         };
       }
       const { fundFromVaultId, ...cleanPayload } = txPayload;
-      const newTx = { ...cleanPayload, id: `tx-${Date.now()}` };
+      const newTx = { ...cleanPayload, id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` };
       const goal = fundFromVaultId ? prev.savingsGoals.find((sg) => sg.id === fundFromVaultId) : null;
       if (goal && newTx.type === 'expense') {
         // Hitung saldo akun saat ini, lalu tarik dari tabungan sebesar kekurangannya (maks. isi brankas)
