@@ -94,6 +94,7 @@ import {
   Pie,
 } from 'recharts';
 import ThemeSettings from './ThemeSettings.jsx';
+import DriveBackup from './DriveBackup.jsx';
 import { initializeApp, getApps } from 'firebase/app';
 import {
   getAuth,
@@ -8672,6 +8673,7 @@ const SettingsModal = ({
     >
       <div className="space-y-5">
         <ThemeSettings lang={data?.profile?.language || 'id'} />
+        <DriveBackup lang={data?.profile?.language || 'id'} data={data} onRestore={onImportJson} />
         {currentUser && (
           <div className="p-3.5 rounded-xl bg-life-bg/90 border border-life-border/50 flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">

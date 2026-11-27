@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
+import LicenseGate from './LicenseGate.jsx';
 import './index.css';
 import { applyTheme, loadTheme } from './theme.js';
 
@@ -9,7 +10,9 @@ applyTheme(loadTheme());
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <App />
+    <LicenseGate>
+      <App />
+    </LicenseGate>
   </React.StrictMode>
 );
 

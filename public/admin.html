@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex"><title>Admin Lisensi</title>
+<style>body{font-family:system-ui;background:#171412;color:#F4E9DC;padding:16px;max-width:560px;margin:auto}
+input,textarea{width:100%;box-sizing:border-box;background:#241B17;color:#F4E9DC;border:1px solid #624332;border-radius:8px;padding:10px;font-size:14px;margin:4px 0}
+button{background:#B68B61;color:#171412;border:0;border-radius:10px;padding:11px 14px;font-weight:600;margin:4px 4px 4px 0}
+h2{font-size:14px;margin:20px 0 4px}p{font-size:12px;color:#A99B90}pre{white-space:pre-wrap;background:#241B17;padding:10px;border-radius:8px;font-size:13px}</style></head><body>
+<h1 style="font-size:18px">Admin Lisensi LIFE OS</h1>
+<p>Token disimpan hanya di tab ini (tidak dikirim ke mana pun selain Worker kamu).</p>
+<input id="url" placeholder="URL Worker, mis. https://license.xxx.workers.dev">
+<input id="tok" type="password" placeholder="ADMIN_TOKEN">
+<h2>Buat kode baru</h2>
+<input id="cnt" type="number" value="1" min="1" max="100">
+<input id="max" type="number" value="3" min="1" max="20" title="maks perangkat">
+<input id="cdays" type="number" min="0" placeholder="durasi hari (kosongkan = seumur hidup)">
+<button id="gen">Buat kode (jumlah / maks perangkat)</button>
+<h2>Beri akses gratis (hadiah / benefit)</h2>
+<input id="gmail" placeholder="email penerima">
+<input id="gdays" type="number" min="0" placeholder="durasi hari (kosongkan = seumur hidup)">
+<button id="grant">Beri akses</button>
+<p>Durasi dihitung sejak penerima mengaktifkan pertama kali. Kode gratis untuk dibagikan: pakai "Buat kode" di atas dengan durasi yang sama.</p>
+<h2>Pembeli & penerima akses</h2>
+<button id="buyers">Daftar pembeli (100 terbaru)</button>
+<h2>Cek / kelola satu pembeli atau kode</h2>
+<input id="code" placeholder="email pembeli atau ABCD-EFGH-JKMN">
+<button data-a="info">Cek</button><button data-a="reset">Reset perangkat</button><button data-a="revoke">Cabut</button><button data-a="unrevoke">Aktifkan lagi</button>
+<pre id="out"></pre>
+<script>
+const $=id=>document.getElementById(id);
+async function call(path,body){
+ const r=await fetch($('url').value.replace(/\/$/,'')+path,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+$('tok').value},body:JSON.stringify(body)});
+ return r.json().catch(()=>({error:'respons tidak valid'}));
+}
+$('gen').onclick=async()=>{const d=await call('/admin/generate',{count:+$('cnt').value,max:+$('max').value,days:+$('cdays').value||0});$('out').textContent=d.codes?d.codes.join('\n'):JSON.stringify(d)};
+$('grant').onclick=async()=>{const d=await call('/admin/grant',{email:$('gmail').value,days:+$('gdays').value||0});$('out').textContent=JSON.stringify(d,null,2)};
+$('buyers').onclick=async()=>{const d=await call('/admin/buyers',{});$('out').textContent=d.buyers?d.buyers.map(b=>`${b.email} (${b.name||'-'}) ${b.devices}/${b.max} ${b.source==='grant'?'[GRATIS]':b.source==='code'?'[KODE]':''}${b.expires?' s/d '+new Date(b.expires).toLocaleDateString('id-ID'):b.days?' ('+b.days+' hari, belum diaktifkan)':''}${b.revoked?' DICABUT':''}`).join('\n')||'Belum ada pembeli':JSON.stringify(d)};
+document.querySelectorAll('[data-a]').forEach(b=>b.onclick=async()=>{
+ const a=b.dataset.a;const d=await call('/admin/'+(a==='unrevoke'?'revoke':a),{code:$('code').value,revoked:a!=='unrevoke'});$('out').textContent=JSON.stringify(d,null,2)});
+</script></body></html>
