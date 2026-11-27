@@ -2,7 +2,6 @@
 // belum diatur / gagal, supaya pemanggil jatuh ke OCR + parser lokal.
 const API = (import.meta.env.VITE_AI_API || '').replace(/\/$/, '');
 export const aiEnabled = Boolean(API);
-const LICENSE_KEY = 'lifeos:license:v1';
 
 // image: data URL JPEG (opsional), text: teks struk (opsional)
 export async function aiParseReceipt({ image, text, categories }) {
@@ -10,11 +9,9 @@ export async function aiParseReceipt({ image, text, categories }) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 30000);
   try {
-    let token = '';
-    try { token = localStorage.getItem(LICENSE_KEY) || ''; } catch { /* abaikan */ }
     const res = await fetch(`${API}/receipt`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-License-Token': token },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image, text, categories }),
       signal: ctrl.signal,
     });

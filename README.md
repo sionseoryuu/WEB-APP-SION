@@ -1,33 +1,22 @@
-# LIFE OS — Personal Life & Wealth Platform
+# LIFE OS — Personal Life & Wealth (All-in-One)
 
-Web app (PWA) yang bisa di-install di HP / desktop. Data tersimpan otomatis di perangkat (localStorage).
+Satu aplikasi untuk semua kebutuhan: keuangan (dompet, anggaran, tabungan, investasi, langganan, utang), waktu (planner, tugas, kalender), pengembangan diri (kebiasaan, tujuan, relasi, catatan, belanja) dan laporan. Data tersimpan di perangkat; cadangan opsional ke Google Drive / Firebase.
 
-## Alur pengguna (setelah beli produk digital)
-1. **Lisensi** — masukkan email pembelian / kode lisensi (`LicenseGate.jsx`). Aktif hanya bila `VITE_LICENSE_API` & `VITE_LICENSE_PUBLIC_KEY` diisi.
-2. **Buat akun** — daftar nama, email, kata sandi (atau masuk bila sudah punya).
-3. **Dashboard** — Beranda gaya e-wallet.
+## Navigasi
+Bawah: **Beranda · Aktivitas · [MENU] · Dompet · Profil**. Tombol **Menu** di tengah membuka lembar berisi aksi cepat (Catat, Scan QRIS/Struk, Split Bill, Bagi Gaji, Briefing) dan semua modul.
 
-## Tampilan e-wallet
-Navigasi bawah: **Beranda · Aktivitas · [QRIS] · Dompet · Profil**. Tombol QRIS di tengah langsung membuka scan struk/QRIS.
-Kode tampilan baru ada di `src/ewallet/` (HomeView, ActivityView, ProfileView, parts, Stepper). Dashboard lama tetap ada di Beranda → Layanan → Ringkasan.
+## Jadi APK (Android)
+1. Buat repo GitHub, push semua isi folder ini ke branch `main`.
+2. Tab **Actions → Build APK** jalan otomatis (atau *Run workflow*).
+3. Unduh `life-os-apk` dari hasil run → ekstrak → `app-debug.apk` → pasang di HP (izinkan "sumber tidak dikenal").
 
-## Jalankan lokal
-```bash
-npm install
-npm run dev
-```
+Atau lokal (butuh Node 20, JDK 17, Android SDK): `npm install && npm run build && bash scripts/prepare-android.sh && cd android && ./gradlew assembleDebug`.
 
-## Deploy ke GitHub Pages
-1. Buat repo baru di GitHub, lalu push semua file ini ke branch `main`.
-2. Di repo: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-3. Setiap push ke `main` otomatis build & deploy. URL: `https://<username>.github.io/<nama-repo>/`
+## Jalankan sebagai web
+`npm install && npm run dev`
 
-## Install
-Buka URL di Chrome/Edge (Android/desktop) → menu → **Install app**.
-Di iPhone (Safari): Share → **Add to Home Screen**.
-
-## Lisensi
-Untuk menjual app sebagai lisensi seumur hidup, ikuti `LICENSE_SETUP.md`.
-
-## Opsional
-- **Sinkron cloud Firebase:** tambahkan secret repo `VITE_FIREBASE_CONFIG` (JSON config Firebase satu baris). Tanpa ini app berjalan penuh secara lokal.
+## Opsional (variabel build)
+- `VITE_FIREBASE_CONFIG` — sinkron cloud Firebase.
+- `VITE_GOOGLE_CLIENT_ID` — cadangan Google Drive.
+- `VITE_AI_API` — scan struk dengan AI, lihat `AI_SETUP.md`.
+Tanpa ini semuanya tetap jalan penuh secara lokal.

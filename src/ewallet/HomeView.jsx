@@ -35,7 +35,7 @@ export default function HomeView({
   const pinned = PINNED_SERVICE_IDS.map((id) => ALL_SERVICES.find((s) => s.id === id)).filter(Boolean);
 
   const checklist = [
-    { done: data.transactions.length > 0, label: L('Catat transaksi pertama lewat tombol QRIS', 'Log your first transaction with the QRIS button'), onClick: onOpenReceipt },
+    { done: data.transactions.length > 0, label: L('Catat transaksi pertama (Menu → Scan QRIS/Struk)', 'Log your first transaction (Menu → Scan QRIS/Receipt)'), onClick: onOpenReceipt },
     { done: data.accounts.length > 1, label: L('Tambah dompet / rekening lain', 'Add another wallet / account'), onClick: () => onNavigate('wallet') },
     { done: (data.budgets || []).length > 0, label: L('Atur anggaran bulanan', 'Set a monthly budget'), onClick: () => onNavigate('budgets') },
     { done: Boolean(profile.avatar), label: L('Pasang foto profil', 'Add a profile photo'), onClick: () => onNavigate('profile') },
@@ -207,7 +207,7 @@ export default function HomeView({
             {recent.length === 0 ? (
               <button onClick={onOpenReceipt} className="w-full py-6 text-center text-xs text-life-muted flex flex-col items-center gap-1.5">
                 <ScanLine className="w-6 h-6 text-life-accent" />
-                {L('Belum ada transaksi. Ketuk tombol QRIS untuk mencatat dari struk.', 'No transactions yet. Tap the QRIS button to log from a receipt.')}
+                {L('Belum ada transaksi. Ketuk tombol Menu lalu Catat atau Scan Struk.', 'No transactions yet. Tap Menu, then Add or Scan.')}
               </button>
             ) : (
               recent.map((tx) => (

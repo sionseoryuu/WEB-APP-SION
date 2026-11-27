@@ -1,6 +1,7 @@
 import React from 'react';
-import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, QrCode, Home, History, Wallet, User } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, QrCode, Home, History, Wallet, User, LayoutGrid, X, Plus, ScanLine, Split, Banknote, Send } from 'lucide-react';
 import { fmt, catName, isQrisTx } from './helpers.js';
+import { SERVICE_GROUPS } from './services.js';
 
 export const Avatar = ({ profile, size = 44, className = '' }) => {
   const initials = String(profile?.name || '?')
@@ -84,8 +85,8 @@ export const TxRow = ({ tx, data, lang, masked, onClick, compact = false }) => {
   );
 };
 
-// Navigasi bawah gaya e-wallet: tombol QRIS besar di tengah = langsung catat transaksi dari struk
-export const BottomNav = ({ active, onNavigate, onScan, lang }) => {
+// Navigasi bawah gaya e-wallet: tombol Menu besar di tengah = membuka semua fitur
+export const BottomNav = ({ active, onNavigate, onMenu, menuOpen, lang }) => {
   const id = lang === 'id';
   const items = [
     { id: 'dashboard', label: id ? 'Beranda' : 'Home', icon: Home },
@@ -111,19 +112,83 @@ export const BottomNav = ({ active, onNavigate, onScan, lang }) => {
               <span className="text-[10px] font-medium mt-1">{it.label}</span>
             </button>
           ) : (
-            <div key="qris" className="flex flex-col items-center">
+            <div key="menu" className="flex flex-col items-center">
               <button
-                onClick={onScan}
-                aria-label={id ? 'Scan QRIS atau struk' : 'Scan QRIS or receipt'}
+                onClick={onMenu}
+                aria-label={id ? 'Buka menu' : 'Open menu'}
+                aria-expanded={!!menuOpen}
                 className="-mt-8 w-16 h-16 rounded-full bg-gradient-to-br from-life-accent to-life-accent-dark text-life-bg flex items-center justify-center shadow-[0_8px_24px_rgba(0,0,0,0.45)] ring-4 ring-life-bg active:scale-95 transition-transform"
               >
-                <QrCode className="w-7 h-7" />
+                <LayoutGrid className="w-7 h-7" />
               </button>
-              <span className="text-[10px] font-bold mt-1 text-life-accent tracking-wide">QRIS</span>
+              <span className="text-[10px] font-bold mt-1 text-life-accent tracking-wide">{id ? 'MENU' : 'MENU'}</span>
             </div>
           )
         )}
       </div>
     </nav>
+  );
+};
+
+// Lembar menu (bottom sheet): aksi cepat + semua modul aplikasi
+export const MenuSheet = ({ open, onClose, onNavigate, actions, lang }) => {
+  if (!open) return null;
+  const L = (a, b) => (lang === 'id' ? a : b);
+  const quick = [
+    { icon: Plus, label: L('Catat', 'Add'), run: actions.addTx },
+    { icon: ScanLine, label: L('Scan QRIS/Struk', 'Scan QRIS/Receipt'), run: actions.scan },
+    { icon: Split, label: L('Split Bill', 'Split Bill'), run: actions.split },
+    { icon: Banknote, label: L('Bagi Gaji', 'Payday'), run: actions.payday },
+    { icon: Send, label: L('Briefing', 'Briefing'), run: actions.briefing },
+  ];
+  const go = (fn) => () => { onClose(); fn(); };
+  return (
+    <div className="lg:hidden fixed inset-0 z-40 flex items-end" role="dialog" aria-modal="true">
+      <button aria-label={L('Tutup', 'Close')} className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div
+        className="relative w-full max-h-[85vh] overflow-y-auto rounded-t-3xl bg-life-surface border-t border-life-border/60 px-4 pt-3 pb-6 life-motion-enter"
+        style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <div className="mx-auto w-10 h-1 rounded-full bg-life-border absolute left-1/2 -translate-x-1/2 top-2" />
+          <h2 className="text-base font-bold text-life-text pt-2">{L('Semua Menu', 'All Menu')}</h2>
+          <button onClick={onClose} className="p-2 rounded-xl bg-life-bg text-life-muted" aria-label={L('Tutup', 'Close')}>
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-life-muted/75 mb-2">{L('Aksi Cepat', 'Quick Actions')}</p>
+        <div className="grid grid-cols-5 gap-2 mb-5">
+          {quick.map((q) => (
+            <button key={q.label} onClick={go(q.run)} className="flex flex-col items-center gap-1.5 active:scale-95 transition-transform">
+              <span className="w-12 h-12 rounded-2xl bg-life-accent/15 border border-life-accent/40 text-life-accent flex items-center justify-center">
+                <q.icon className="w-5 h-5" />
+              </span>
+              <span className="text-[10px] text-center leading-tight text-life-soft">{q.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {SERVICE_GROUPS.map((g) => (
+          <div key={g.id} className="mb-4">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-life-muted/75 mb-2">{g.label[lang === 'id' ? 'id' : 'en']}</p>
+            <div className="grid grid-cols-4 gap-2">
+              {g.items.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={go(() => onNavigate(s.id))}
+                  className="flex flex-col items-center gap-1.5 py-2 rounded-2xl active:bg-life-bg/70"
+                >
+                  <span className="w-11 h-11 rounded-2xl bg-life-bg border border-life-border/50 text-life-accent flex items-center justify-center">
+                    <s.icon className="w-5 h-5" />
+                  </span>
+                  <span className="text-[10px] text-center leading-tight text-life-soft">{s.label[lang === 'id' ? 'id' : 'en']}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 };

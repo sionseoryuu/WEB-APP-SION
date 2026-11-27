@@ -99,13 +99,11 @@ import DriveBackup from './DriveBackup.jsx';
 import HomeView from './ewallet/HomeView.jsx';
 import ActivityView from './ewallet/ActivityView.jsx';
 import ProfileView from './ewallet/ProfileView.jsx';
-import Stepper from './ewallet/Stepper.jsx';
-import { BottomNav } from './ewallet/parts.jsx';
+import { BottomNav, MenuSheet } from './ewallet/parts.jsx';
 import { parseQris, guessCategory } from './ewallet/helpers.js';
 import { decodeCode, loadImage } from './ewallet/qrScan.js';
 import { ocrReceiptImage, parseReceipt, reconcileRows, receiptToJpeg, OCR_BUILD } from './ewallet/receiptOcr.js';
 import { aiParseReceipt, aiEnabled } from './ewallet/receiptAi.js';
-import { licenseEnabled } from './LicenseGate.jsx';
 import { initializeApp, getApps } from 'firebase/app';
 import {
   getAuth,
@@ -2202,7 +2200,6 @@ const AuthPortalScreen = ({ lang, onToggleLang, t, onAuthenticateSuccess }) => {
       </div>
 
       <div className="max-w-md w-full mx-auto my-8 relative z-10 life-motion-enter">
-        <Stepper current="account" withLicense={licenseEnabled} lang={lang} />
         <GlassCard className="p-6 sm:p-8 space-y-6 border-life-accent/35">
           <div className="text-center space-y-2">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-life-bg border border-life-border/60 text-[11px] text-life-soft">
@@ -8796,6 +8793,7 @@ function LifeOsWorkspace() {
   const [eventModal, setEventModal] = useState({ open: false, event: null, defaultDate: TODAY_STR });
   const [paydayModalOpen, setPaydayModalOpen] = useState(false);
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [splitBillModalOpen, setSplitBillModalOpen] = useState(false);
   const [briefingModalOpen, setBriefingModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -10348,12 +10346,26 @@ function LifeOsWorkspace() {
         </main>
       </div>
 
-      {/* MOBILE BOTTOM NAVIGATION: tombol QRIS di tengah = langsung scan / catat struk */}
+      {/* MOBILE BOTTOM NAVIGATION: tombol Menu di tengah = semua fitur */}
       <BottomNav
         active={navActive}
         onNavigate={navigateTab}
-        onScan={() => setReceiptModalOpen(true)}
+        onMenu={() => setMenuOpen(true)}
+        menuOpen={menuOpen}
         lang={lang}
+      />
+      <MenuSheet
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        onNavigate={navigateTab}
+        lang={lang}
+        actions={{
+          addTx: () => setTxModal({ open: true, tx: null }),
+          scan: () => setReceiptModalOpen(true),
+          split: () => setSplitBillModalOpen(true),
+          payday: () => setPaydayModalOpen(true),
+          briefing: () => setBriefingModalOpen(true),
+        }}
       />
 
       {/* GLOBAL MODALS */}

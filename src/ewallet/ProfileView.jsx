@@ -15,21 +15,7 @@ const DEFAULT_EXPENSE = [
 ];
 const DEFAULT_INCOME = ['Primary Salary', 'Consulting & Advisory', 'Dividends & Yield', 'Client Retainer', 'Other Income'];
 
-const CS_WA = '6283177143578'; // wa.me/6283177143578
-const LICENSE_KEY = 'lifeos:license:v1';
-const DEVICE_KEY = 'lifeos:device:v1';
 
-function readLicense() {
-  try {
-    const token = localStorage.getItem(LICENSE_KEY);
-    if (!token) return null;
-    const b64 = token.split('.')[0].replace(/-/g, '+').replace(/_/g, '/');
-    const payload = JSON.parse(atob(b64.padEnd(Math.ceil(b64.length / 4) * 4, '=')));
-    return payload || {};
-  } catch {
-    return {};
-  }
-}
 
 // ---------- komponen kecil ----------
 const Group = ({ title, children }) => (
@@ -224,29 +210,6 @@ function LayoutPage({ data, lang, onUpdateProfile, onBack }) {
   );
 }
 
-// ---------- halaman: lisensi ----------
-function LicensePage({ lang, onBack }) {
-  const L = (a, b) => (lang === 'id' ? a : b);
-  const lic = readLicense();
-  let device = '-';
-  try { device = localStorage.getItem(DEVICE_KEY) || '-'; } catch { /* abaikan */ }
-  const status = lic === null ? L('Mode pengembangan (tanpa gerbang lisensi)', 'Development mode (no license gate)') : lic.exp ? `${L('Aktif sampai', 'Active until')} ${new Date(lic.exp).toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' })}` : L('Aktif • Seumur hidup', 'Active • Lifetime');
-  return (
-    <div>
-      <SubHeader title={L('Lisensi LIFE OS', 'LIFE OS License')} onBack={onBack} />
-      <div className="rounded-2xl bg-gradient-to-br from-life-accent to-life-accent-dark text-life-bg p-5 mb-4">
-        <BadgeCheck className="w-8 h-8" />
-        <p className="text-lg font-bold mt-2">LIFE OS</p>
-        <p className="text-sm opacity-90">{status}</p>
-      </div>
-      <Group>
-        <Row icon={Smartphone} label={L('ID perangkat ini', 'This device ID')} hint={device} chevron={false} />
-        <Row icon={Info} label={L('Aktivasi', 'Activation')} hint={L('Cukup sekali per perangkat. Butuh bantuan? Hubungi penjual.', 'Once per device. Need help? Contact the seller.')} chevron={false} />
-      </Group>
-    </div>
-  );
-}
-
 function BackupPage({ data, lang, onImportJson, onBack }) {
   const L = (a, b) => (lang === 'id' ? a : b);
   return (
@@ -311,12 +274,9 @@ export default function ProfileView(props) {
   if (page === 'edit') return shell(<EditPage data={data} lang={lang} onUpdateProfile={onUpdateProfile} onBack={back} />);
   if (page === 'categories') return shell(<CategoryPage data={data} derived={derived} lang={lang} onAddCategory={onAddCategory} onDeleteCategory={onDeleteCategory} onRenameCategory={onRenameCategory} onBack={back} />);
   if (page === 'layout') return shell(<LayoutPage data={data} lang={lang} onUpdateProfile={onUpdateProfile} onBack={back} />);
-  if (page === 'license') return shell(<LicensePage lang={lang} onBack={back} />);
   if (page === 'backup') return shell(<BackupPage data={data} lang={lang} onImportJson={onImportJson} onBack={back} />);
   if (page === 'theme') return shell(<ThemePage lang={lang} onBack={back} />);
 
-  const lic = readLicense();
-  const licenseHint = lic === null ? L('Mode pengembangan', 'Development mode') : lic.exp ? L('Akses berdurasi', 'Timed access') : L('Seumur hidup', 'Lifetime');
   const customCount = (data.customExpenseCategories || []).length + (data.customIncomeCategories || []).length;
 
   return shell(
@@ -341,7 +301,7 @@ export default function ProfileView(props) {
         <p className="text-xs text-life-muted">{profile.role || 'Personal Life OS'}</p>
         {currentUser?.email && <p className="text-[11px] text-life-muted/80 mt-0.5 truncate">{currentUser.email}</p>}
         <span className="inline-flex items-center gap-1.5 mt-3 px-3 py-1 rounded-full bg-life-accent/15 text-life-accent text-[11px] font-semibold">
-          <BadgeCheck className="w-3.5 h-3.5" /> LIFE OS • {licenseHint}
+          <BadgeCheck className="w-3.5 h-3.5" /> LIFE OS
         </span>
         {profile.avatar && (
           <button onClick={() => onUpdateProfile({ avatar: '' })} className="block mx-auto mt-2 text-[11px] text-life-muted underline">{L('Hapus foto', 'Remove photo')}</button>
@@ -390,20 +350,7 @@ export default function ProfileView(props) {
         <Row icon={RotateCcw} label={L('Kosongkan semua data', 'Clear all data')} danger onClick={onResetEmpty} />
       </Group>
 
-      <Group title={L('Lisensi & Bantuan', 'License & Help')}>
-        <Row
-          icon={MessageCircle}
-          label={L('Customer Service (WhatsApp)', 'Customer Service (WhatsApp)')}
-          hint={L('Chat langsung dengan tim LIFE OS', 'Chat with the LIFE OS team')}
-          onClick={() => {
-            const text = L(
-              `Halo CS LIFE OS, saya ${profile.name}${currentUser?.email ? ` (${currentUser.email})` : ''} butuh bantuan.`,
-              `Hello LIFE OS support, I'm ${profile.name}${currentUser?.email ? ` (${currentUser.email})` : ''} and I need help.`
-            );
-            window.open(`https://wa.me/${CS_WA}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
-          }}
-        />
-        <Row icon={KeyRound} label={L('Lisensi LIFE OS', 'LIFE OS license')} hint={licenseHint} onClick={() => setPage('license')} />
+      <Group title={L('Tentang', 'About')}>
         <Row icon={Info} label={L('Tentang LIFE OS', 'About LIFE OS')} hint="v1.0 • Personal Life & Wealth" chevron={false} />
       </Group>
 

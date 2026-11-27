@@ -3,31 +3,10 @@
 //
 // Variabel di Cloudflare:
 //   Secret  ANTHROPIC_API_KEY
-//   Var     ALLOWED_ORIGIN       contoh: https://sionseoryuu.github.io
+//   Var     ALLOWED_ORIGIN       contoh: https://localhost (origin APK Android) atau https://<user>.github.io
 //   Var     AI_MODEL             (opsional) default claude-haiku-5-5
-//   Var     LICENSE_PUBLIC_KEY   (opsional, JWK publik yang sama dengan VITE_LICENSE_PUBLIC_KEY)
-//                                bila diisi, hanya pemilik lisensi valid yang bisa memakai AI
 //
 // Endpoint: POST /receipt   body: { image?: "data:image/jpeg;base64,...", text?: "...", categories?: [..], lang?: "id" }
-
-const b64uToBytes = (str) => {
-  const b64 = str.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(str.length / 4) * 4, '=');
-  return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-};
-
-async function licenseOk(token, publicJwk) {
-  try {
-    const [p, sig] = String(token || '').split('.');
-    if (!p || !sig) return false;
-    const key = await crypto.subtle.importKey('jwk', JSON.parse(publicJwk), { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
-    const ok = await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, b64uToBytes(sig), b64uToBytes(p));
-    if (!ok) return false;
-    const payload = JSON.parse(new TextDecoder().decode(b64uToBytes(p)));
-    return !payload.exp || payload.exp > Date.now();
-  } catch {
-    return false;
-  }
-}
 
 const SYSTEM = `You extract structured data from Indonesian (or English) shopping receipts for a personal finance app.
 Return ONLY one JSON object, no prose, no markdown fences:
@@ -78,7 +57,7 @@ export default {
     const cors = {
       'Access-Control-Allow-Origin': origin,
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, X-License-Token',
+      'Access-Control-Allow-Headers': 'Content-Type',
       Vary: 'Origin',
     };
     const reply = (obj, status = 200) =>
@@ -89,9 +68,6 @@ export default {
     if (req.method !== 'POST' || url.pathname !== '/receipt') return reply({ ok: false, error: 'not_found' }, 404);
     if (env.ALLOWED_ORIGIN && req.headers.get('Origin') !== env.ALLOWED_ORIGIN) return reply({ ok: false, error: 'forbidden' }, 403);
     if (!env.ANTHROPIC_API_KEY) return reply({ ok: false, error: 'not_configured' }, 500);
-    if (env.LICENSE_PUBLIC_KEY && !(await licenseOk(req.headers.get('X-License-Token'), env.LICENSE_PUBLIC_KEY))) {
-      return reply({ ok: false, error: 'license' }, 401);
-    }
     if (Number(req.headers.get('Content-Length') || 0) > 2_500_000) return reply({ ok: false, error: 'too_large' }, 413);
 
     let body;

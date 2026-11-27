@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, PieChart, PiggyBank, TrendingUp, Repeat, HandCoins, CalendarDays, CheckSquare,
+  LayoutDashboard, Wallet, PieChart, PiggyBank, TrendingUp, Repeat, HandCoins, CalendarDays, CheckSquare,
   Calendar, Flame, Target, HeartHandshake, FileText, ShoppingCart, BarChart3,
 } from 'lucide-react';
 
@@ -9,6 +9,7 @@ export const SERVICE_GROUPS = [
     id: 'money',
     label: { id: 'Keuangan', en: 'Money' },
     items: [
+      { id: 'wallet', icon: Wallet, label: { id: 'Dompet', en: 'Wallets' } },
       { id: 'budgets', icon: PieChart, label: { id: 'Anggaran', en: 'Budgets' } },
       { id: 'savings', icon: PiggyBank, label: { id: 'Tabungan', en: 'Savings' } },
       { id: 'investments', icon: TrendingUp, label: { id: 'Investasi', en: 'Invest' } },
