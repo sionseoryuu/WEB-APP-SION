@@ -8292,7 +8292,8 @@ const DailyBriefingModal = ({ open, onClose, data, derived, t, lang, onCopied })
   );
 };
 
-const TransactionModal = ({ open, onClose, editingTx, data, t, lang, onSave }) => {
+const TransactionModal = ({ open, onClose, editingTx, data, t, lang, onSave, accountBalances = {} }) => {
+  const [fundVaultId, setFundVaultId] = useState('');
   const [type, setType] = useState(editingTx?.type || 'expense');
   const [amount, setAmount] = useState(editingTx ? String(editingTx.amount) : '');
   const [date, setDate] = useState(editingTx?.date || TODAY_STR);
@@ -8326,6 +8327,7 @@ const TransactionModal = ({ open, onClose, editingTx, data, t, lang, onSave }) =
       );
       setPaymentMethod(editingTx?.paymentMethod || 'Card / Digital');
       setNotes(editingTx?.notes || '');
+      setFundVaultId('');
     }
   }, [open, editingTx, data.accounts]);
 
@@ -8346,6 +8348,12 @@ const TransactionModal = ({ open, onClose, editingTx, data, t, lang, onSave }) =
     else setCategory(DEFAULT_EXPENSE_CATEGORIES[1]);
   };
 
+  const accBalance = Number(accountBalances[accountId] ?? data.accounts.find((a) => a.id === accountId)?.initialBalance) || 0;
+  const shortfall = !editingTx && type === 'expense' ? Math.max(0, (parseFloat(amount) || 0) - accBalance) : 0;
+  const vaultsWithFunds = (data.savingsGoals || [])
+    .map((sg) => ({ sg, saved: sg.contributions.reduce((sum, c) => sum + (Number(c.amount) || 0), 0) }))
+    .filter((v) => v.saved > 0);
+
   const handleSubmit = (e) => {
     e.preventDefault();
     const numAmount = parseFloat(amount);
@@ -8353,6 +8361,7 @@ const TransactionModal = ({ open, onClose, editingTx, data, t, lang, onSave }) =
     if (type === 'transfer' && accountId === toAccountId) return;
 
     onSave({
+      fundFromVaultId: !editingTx && type === 'expense' && shortfall > 0 ? fundVaultId || undefined : undefined,
       id: editingTx?.id,
       type,
       amount: numAmount,
@@ -8466,6 +8475,34 @@ const TransactionModal = ({ open, onClose, editingTx, data, t, lang, onSave }) =
             value={paymentMethod}
             onChange={(e) => setPaymentMethod(e.target.value)}
           />
+        )}
+
+        {shortfall > 0 && (
+          <div className="p-3 rounded-xl border border-[#D96B52]/60 bg-[#D96B52]/10 space-y-2">
+            <p className="text-xs text-life-text">
+              {lang === 'id'
+                ? `Saldo akun ini ${formatMoney(accBalance, data.profile.currency)}, kurang ${formatMoney(shortfall, data.profile.currency)} untuk pengeluaran ini.`
+                : `This account holds ${formatMoney(accBalance, data.profile.currency)}, short by ${formatMoney(shortfall, data.profile.currency)} for this expense.`}
+            </p>
+            {vaultsWithFunds.length > 0 ? (
+              <Select
+                label={lang === 'id' ? 'Tarik kekurangan dari tabungan' : 'Cover the shortfall from savings'}
+                value={fundVaultId}
+                onChange={(e) => setFundVaultId(e.target.value)}
+              >
+                <option value="">{lang === 'id' ? 'Jangan tarik (saldo jadi minus)' : "Don't withdraw (balance goes negative)"}</option>
+                {vaultsWithFunds.map(({ sg, saved }) => (
+                  <option key={sg.id} value={sg.id}>
+                    {sg.name} — {formatMoney(saved, data.profile.currency)}
+                  </option>
+                ))}
+              </Select>
+            ) : (
+              <p className="text-[11px] text-life-muted">
+                {lang === 'id' ? 'Tidak ada dana tabungan yang bisa ditarik.' : 'No savings available to withdraw.'}
+              </p>
+            )}
+          </div>
         )}
 
         <Input label={t('notes')} value={notes} onChange={(e) => setNotes(e.target.value)} />
@@ -9116,9 +9153,39 @@ function LifeOsWorkspace() {
           transactions: prev.transactions.map((tx) => (tx.id === txPayload.id ? txPayload : tx)),
         };
       }
+      const { fundFromVaultId, ...cleanPayload } = txPayload;
+      const newTx = { ...cleanPayload, id: `tx-${Date.now()}` };
+      const goal = fundFromVaultId ? prev.savingsGoals.find((sg) => sg.id === fundFromVaultId) : null;
+      if (goal && newTx.type === 'expense') {
+        // Hitung saldo akun saat ini, lalu tarik dari tabungan sebesar kekurangannya (maks. isi brankas)
+        let bal = Number(prev.accounts.find((a) => a.id === newTx.accountId)?.initialBalance) || 0;
+        prev.transactions.forEach((tx) => {
+          if (tx.accountId === newTx.accountId) bal += tx.type === 'income' ? tx.amount : -tx.amount;
+          if (tx.type === 'transfer' && tx.toAccountId === newTx.accountId) bal += tx.amount;
+        });
+        const saved = goal.contributions.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+        const draw = Math.min(Math.max(0, newTx.amount - bal), saved);
+        if (draw > 0) {
+          const contribId = `sc-${Date.now()}-w`;
+          const note = lang === 'id' ? 'Penarikan untuk pengeluaran' : 'Withdrawal for an expense';
+          const withdrawTx = {
+            ...buildVaultTx(goal.name, goal.id, contribId, -draw, note, newTx.accountId),
+            description: `${lang === 'id' ? 'Tarik tabungan' : 'Savings withdrawal'}: ${goal.name}`,
+          };
+          return {
+            ...prev,
+            savingsGoals: prev.savingsGoals.map((sg) =>
+              sg.id === goal.id
+                ? { ...sg, contributions: [...sg.contributions, { id: contribId, amount: -draw, date: TODAY_STR, note, accountId: newTx.accountId }] }
+                : sg
+            ),
+            transactions: [newTx, withdrawTx, ...prev.transactions],
+          };
+        }
+      }
       return {
         ...prev,
-        transactions: [{ ...txPayload, id: `tx-${Date.now()}` }, ...prev.transactions],
+        transactions: [newTx, ...prev.transactions],
       };
     });
     notify(lang === 'id' ? 'Transaksi berhasil dicatat' : 'Transaction saved');
@@ -10436,6 +10503,7 @@ function LifeOsWorkspace() {
         t={t}
         lang={lang}
         onSave={handleSaveTx}
+        accountBalances={derived.accountBalances}
       />
 
       <PaydaySplitterModal
