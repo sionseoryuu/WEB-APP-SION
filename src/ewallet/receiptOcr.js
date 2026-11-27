@@ -231,6 +231,23 @@ async function recognizeOnce(worker, img, box) {
   }
 }
 
+// Foto struk (dipotong dari latarnya, warna asli) sebagai JPEG kecil untuk dikirim ke AI.
+export function receiptToJpeg(img, maxSide = 1400, quality = 0.82) {
+  const box = detectReceiptBox(img);
+  const W = img.naturalWidth || img.width;
+  const H = img.naturalHeight || img.height;
+  const sx = box ? box.x : 0;
+  const sy = box ? box.y : 0;
+  const sw = box ? box.w : W;
+  const sh = box ? box.h : H;
+  const scale = Math.min(1, maxSide / Math.max(sw, sh));
+  const canvas = makeCanvas(sw * scale, sh * scale);
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', quality);
+}
+
 // img: elemen <img>. Mengembalikan teks hasil OCR (sudah dirapikan).
 export async function ocrReceiptImage(img) {
   const worker = await getWorker();
@@ -385,6 +402,25 @@ function parseItemLine(line, pendingName) {
   return { name, qty, price: total };
 }
 
+// Selisih antara jumlah semua barang dan total struk (pajak/biaya/diskon/pembulatan) dijadikan baris sendiri
+// supaya total di aplikasi sama dengan total di struk.
+export function reconcileRows(items, total) {
+  const rows = items.slice(0, 40).map((it) => ({ ...it }));
+  const sum = rows.reduce((a, b) => a + b.price, 0);
+  if (rows.length && total > 0) {
+    const rest = total - sum;
+    if (rest !== 0 && Math.abs(rest) <= Math.max(total, sum)) {
+      rows.push({
+        name: Math.abs(rest) < 1000 ? 'Pembulatan' : rest > 0 ? 'Pajak & Biaya' : 'Diskon',
+        qty: 1,
+        price: rest,
+        adjust: true,
+      });
+    }
+  }
+  return rows;
+}
+
 export function parseReceipt(rawText) {
   const lines = String(rawText || '')
     .split('\n')
@@ -452,19 +488,7 @@ export function parseReceipt(rawText) {
   else if (weak.length) total = Math.max(...weak);
   else if (sum > 0) total = sum;
 
-  // Selisih (pajak/biaya/diskon/pembulatan) dijadikan baris sendiri supaya totalnya cocok
-  const rows = items.slice(0, 40);
-  if (rows.length && total > 0) {
-    const rest = total - rows.reduce((a, b) => a + b.price, 0);
-    if (rest !== 0 && Math.abs(rest) <= Math.max(total, sum)) {
-      rows.push({
-        name: Math.abs(rest) < 1000 ? 'Pembulatan' : rest > 0 ? 'Pajak & Biaya' : 'Diskon',
-        qty: 1,
-        price: rest,
-        adjust: true,
-      });
-    }
-  }
+  const rows = reconcileRows(items, total);
   if (!total && !rows.length) {
     // tidak ada pola apa pun: pakai angka terbesar sebagai nominal
     const all = lines.flatMap((l) => (HEADER_LINE.test(fold(l)) ? [] : moneyTokens(l).map((t) => t.value)));

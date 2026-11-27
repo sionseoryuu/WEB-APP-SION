@@ -103,7 +103,8 @@ import Stepper from './ewallet/Stepper.jsx';
 import { BottomNav } from './ewallet/parts.jsx';
 import { parseQris, guessCategory } from './ewallet/helpers.js';
 import { decodeCode, loadImage } from './ewallet/qrScan.js';
-import { ocrReceiptImage, parseReceipt, OCR_BUILD } from './ewallet/receiptOcr.js';
+import { ocrReceiptImage, parseReceipt, reconcileRows, receiptToJpeg, OCR_BUILD } from './ewallet/receiptOcr.js';
+import { aiParseReceipt, aiEnabled } from './ewallet/receiptAi.js';
 import { licenseEnabled } from './LicenseGate.jsx';
 import { initializeApp, getApps } from 'firebase/app';
 import {
@@ -7437,6 +7438,7 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
   const [qrMissed, setQrMissed] = useState(false);
   const [ocrBusy, setOcrBusy] = useState(false);
   const [items, setItems] = useState([]);
+  const [readBy, setReadBy] = useState('');
   const [saveMode, setSaveMode] = useState('items');
   const [ocrFailed, setOcrFailed] = useState(false);
   const ocrRunRef = useRef(0);
@@ -7451,6 +7453,32 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
     setItems([...items, { id: `it-${Date.now()}-${items.length}`, name: '', qty: 1, price: '' }]);
   const hasNegative = items.some((it) => Number(it.price) < 0);
   const effectiveMode = items.length >= 2 && !hasNegative ? saveMode : 'single';
+  const expenseCats = [...new Set([...DEFAULT_EXPENSE_CATEGORIES, ...(data.customExpenseCategories || [])])];
+  // Isi form dari hasil baca (AI atau OCR): merchant, daftar barang, total, kategori
+  const applyParsed = (parsed, by) => {
+    const list = parsed.items.map((it, i) => ({
+      id: `it-${Date.now()}-${i}`,
+      name: it.name,
+      qty: it.qty,
+      price: String(it.price),
+      adjust: !!it.adjust,
+      category: it.category || '',
+    }));
+    setItems(list);
+    setReadBy(by);
+    if (parsed.merchant) setMerchant(parsed.merchant);
+    const cat = parsed.category || guessCategory(parsed.merchant);
+    if (cat && expenseCats.includes(cat)) setCategory(cat);
+    if (parsed.total > 0) setAmount(String(parsed.total));
+    else if (list.length) setAmount(String(sumItems(list)));
+    return Boolean(parsed.merchant || parsed.total > 0 || list.length);
+  };
+  const aiParsedToRows = (d) => ({
+    merchant: d.merchant,
+    category: d.category,
+    total: d.total,
+    items: reconcileRows(d.items, d.total || d.items.reduce((a, b) => a + b.price, 0)),
+  });
   const [scanKey, setScanKey] = useState(0);
   const scannedRef = useRef('');
   const applyCodeRef = useRef(() => {});
@@ -7575,6 +7603,7 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
     setQrMissed(false);
     setOcrFailed(false);
     setItems([]);
+    setReadBy('');
     try {
       const img = await loadImage(dataUrl);
       const codeVal = await decodeCode(img);
@@ -7582,31 +7611,23 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
         applyCodeRef.current(codeVal);
         return;
       }
-      // Bukan QR → baca teks struk (OCR) lalu isi merchant & total otomatis
+      // Bukan QR → baca struk: AI (bila sudah diatur) → kalau gagal, OCR + parser lokal
       const runId = ++ocrRunRef.current;
       setOcrBusy(true);
       setOcrFailed(false);
       try {
+        if (aiEnabled) {
+          const d = await aiParseReceipt({ image: receiptToJpeg(img), categories: expenseCats });
+          if (runId !== ocrRunRef.current) return;
+          if (d) {
+            setRawText(JSON.stringify(d, null, 1));
+            if (applyParsed(aiParsedToRows(d), 'ai')) return;
+          }
+        }
         const text = await ocrReceiptImage(img);
         if (runId !== ocrRunRef.current) return;
-        const parsed = parseReceipt(text);
         setRawText(text);
-        const list = parsed.items.map((it, i) => ({
-          id: `it-${Date.now()}-${i}`,
-          name: it.name,
-          qty: it.qty,
-          price: String(it.price),
-          adjust: !!it.adjust,
-        }));
-        setItems(list);
-        if (parsed.merchant) {
-          setMerchant(parsed.merchant);
-          const guess = guessCategory(parsed.merchant);
-          if (guess) setCategory(guess);
-        }
-        if (parsed.total > 0) setAmount(String(parsed.total));
-        else if (list.length) setAmount(String(sumItems(list)));
-        if (!parsed.merchant && !(parsed.total > 0) && !list.length) setQrMissed(true);
+        if (!applyParsed(parseReceipt(text), 'ocr')) setQrMissed(true);
       } catch {
         if (runId === ocrRunRef.current) {
           setOcrFailed(true);
@@ -7683,7 +7704,7 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
         onSaveExtractedTx({
           ...base,
           amount: Number(it.price),
-          category: (!it.adjust && guessCategory(it.name)) || category,
+          category: (!it.adjust && (expenseCats.includes(it.category) ? it.category : guessCategory(it.name))) || category,
           description: `${it.name.trim()}${qty > 1 ? ` ×${qty}` : ''} (${shop})`,
           notes: `${lang === 'id' ? 'Struk' : 'Receipt'}: ${shop}`,
         });
@@ -7742,7 +7763,9 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
         {ocrBusy && (
           <div className="p-3 rounded-xl bg-life-bg border border-life-border/50 text-xs text-life-muted flex items-center gap-2">
             <Loader2 className="w-4 h-4 animate-spin text-life-accent shrink-0" />
-            <span>{lang === 'id' ? 'Membaca teks struk... (pertama kali bisa beberapa detik)' : 'Reading receipt text... (may take a few seconds the first time)'}</span>
+            <span>{aiEnabled
+                ? (lang === 'id' ? 'AI sedang membaca & merapikan struk...' : 'AI is reading the receipt...')
+                : (lang === 'id' ? 'Membaca teks struk... (pertama kali bisa beberapa detik)' : 'Reading receipt text... (may take a few seconds the first time)')}</span>
           </div>
         )}
         {qrMissed && (
@@ -7867,6 +7890,22 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
               }
               className="w-full rounded-xl bg-life-bg/90 border border-life-border/55 p-3 text-xs text-life-text focus:outline-none focus:border-life-accent"
             />
+            {aiEnabled && rawText.trim().length > 10 && (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                disabled={ocrBusy}
+                onClick={async () => {
+                  setOcrBusy(true);
+                  const d = await aiParseReceipt({ text: rawText, categories: expenseCats });
+                  setOcrBusy(false);
+                  if (d) applyParsed(aiParsedToRows(d), 'ai');
+                }}
+              >
+                {ocrBusy ? (lang === 'id' ? 'AI membaca...' : 'AI reading...') : (lang === 'id' ? 'Rapikan dengan AI' : 'Clean up with AI')}
+              </Button>
+            )}
           </div>
         )}
 
@@ -7888,7 +7927,7 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
         {capturedPreview && scanMode !== 'text' && !detectedCode && !ocrBusy && (
           <details className="text-[11px] text-life-muted">
             <summary className="cursor-pointer select-none">
-              {lang === 'id' ? 'Teks hasil baca' : 'Raw text read'} · {OCR_BUILD}
+              {lang === 'id' ? 'Teks hasil baca' : 'Raw text read'} · {readBy === 'ai' ? 'AI ✓' : OCR_BUILD}
             </summary>
             <pre className="mt-1.5 p-2 rounded-lg bg-life-bg border border-life-border/40 whitespace-pre-wrap break-words max-h-48 overflow-auto">
               {rawText || (lang === 'id' ? '(tidak ada teks terbaca)' : '(no text read)')}
