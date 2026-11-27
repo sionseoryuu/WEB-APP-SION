@@ -103,6 +103,7 @@ import Stepper from './ewallet/Stepper.jsx';
 import { BottomNav } from './ewallet/parts.jsx';
 import { parseQris, guessCategory } from './ewallet/helpers.js';
 import { decodeCode, loadImage } from './ewallet/qrScan.js';
+import { ocrReceiptImage, parseReceiptOcr } from './ewallet/receiptOcr.js';
 import { licenseEnabled } from './LicenseGate.jsx';
 import { initializeApp, getApps } from 'firebase/app';
 import {
@@ -7434,6 +7435,9 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
   const [detectedCode, setDetectedCode] = useState('');
   const [capturedPreview, setCapturedPreview] = useState('');
   const [qrMissed, setQrMissed] = useState(false);
+  const [ocrBusy, setOcrBusy] = useState(false);
+  const [ocrFailed, setOcrFailed] = useState(false);
+  const ocrRunRef = useRef(0);
   const [scanKey, setScanKey] = useState(0);
   const scannedRef = useRef('');
   const applyCodeRef = useRef(() => {});
@@ -7470,6 +7474,8 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
     setAmount('');
     setCapturedPreview('');
     setQrMissed(false);
+    setOcrBusy(false);
+    ocrRunRef.current += 1;
     setScanKey((k) => k + 1);
   };
 
@@ -7492,6 +7498,8 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
       scannedRef.current = '';
       setCameraError('');
       setQrMissed(false);
+      setOcrBusy(false);
+      ocrRunRef.current += 1;
       return undefined;
     }
 
@@ -7550,11 +7558,38 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
   const scanStillImage = async (dataUrl, mimeType) => {
     setCapturedPreview(dataUrl);
     setQrMissed(false);
+    setOcrFailed(false);
     try {
       const img = await loadImage(dataUrl);
       const codeVal = await decodeCode(img);
-      if (codeVal) applyCodeRef.current(codeVal);
-      else setQrMissed(true);
+      if (codeVal) {
+        applyCodeRef.current(codeVal);
+        return;
+      }
+      // Bukan QR → baca teks struk (OCR) lalu isi merchant & total otomatis
+      const runId = ++ocrRunRef.current;
+      setOcrBusy(true);
+      setOcrFailed(false);
+      try {
+        const text = await ocrReceiptImage(img);
+        if (runId !== ocrRunRef.current) return;
+        const parsed = parseReceiptOcr(text);
+        setRawText(text);
+        if (parsed.merchant) {
+          setMerchant(parsed.merchant);
+          const guess = guessCategory(parsed.merchant);
+          if (guess) setCategory(guess);
+        }
+        if (parsed.amount > 0) setAmount(String(parsed.amount));
+        if (!parsed.merchant && !(parsed.amount > 0)) setQrMissed(true);
+      } catch {
+        if (runId === ocrRunRef.current) {
+          setOcrFailed(true);
+          setQrMissed(true);
+        }
+      } finally {
+        if (runId === ocrRunRef.current) setOcrBusy(false);
+      }
     } catch {
       setQrMissed(true);
     }
@@ -7655,12 +7690,22 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
           })}
         </div>
 
+        {ocrBusy && (
+          <div className="p-3 rounded-xl bg-life-bg border border-life-border/50 text-xs text-life-muted flex items-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin text-life-accent shrink-0" />
+            <span>{lang === 'id' ? 'Membaca teks struk... (pertama kali bisa beberapa detik)' : 'Reading receipt text... (may take a few seconds the first time)'}</span>
+          </div>
+        )}
         {qrMissed && (
           <div className="p-3 rounded-xl bg-life-bg border border-life-border/50 text-xs text-life-muted space-y-2">
             <p>
-              {lang === 'id'
-                ? 'QR tidak terbaca pada gambar ini. Arahkan lebih dekat/terang, atau isi nominal di bawah secara manual.'
-                : 'No QR found in this image. Move closer / add light, or enter the amount manually below.'}
+              {ocrFailed
+                ? lang === 'id'
+                  ? 'Teks struk belum bisa dibaca (butuh internet untuk memuat pembaca teks pertama kali). Isi nama & nominal manual, atau coba lagi.'
+                  : 'Could not read the receipt text (internet is needed the first time to load the reader). Enter details manually or try again.'
+                : lang === 'id'
+                  ? 'QR/teks tidak terbaca pada gambar ini. Arahkan lebih dekat/terang, atau isi nominal di bawah secara manual.'
+                  : 'No QR/text found in this image. Move closer / add light, or enter the amount manually below.'}
             </p>
           </div>
         )}
