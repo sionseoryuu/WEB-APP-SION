@@ -2,7 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import {
   Camera, UserRound, Tags, Wallet, PieChart, Repeat, HandCoins, Palette, Languages, EyeOff, LayoutGrid,
   CloudUpload, Download, Upload, FileSpreadsheet, RotateCcw, Sparkles, KeyRound, LogOut, ChevronRight,
-  ChevronLeft, Plus, Trash2, Pencil, Check, X, Lock, BadgeCheck, Info, Mail, Smartphone,
+  ChevronLeft, MessageCircle, Plus, Trash2, Pencil, Check, X, Lock, BadgeCheck, Info, Mail, Smartphone,
 } from 'lucide-react';
 import ThemeSettings from '../ThemeSettings.jsx';
 import DriveBackup from '../DriveBackup.jsx';
@@ -15,6 +15,7 @@ const DEFAULT_EXPENSE = [
 ];
 const DEFAULT_INCOME = ['Primary Salary', 'Consulting & Advisory', 'Dividends & Yield', 'Client Retainer', 'Other Income'];
 
+const CS_WA = '6283177143578'; // wa.me/6283177143578
 const LICENSE_KEY = 'lifeos:license:v1';
 const DEVICE_KEY = 'lifeos:device:v1';
 
@@ -390,6 +391,18 @@ export default function ProfileView(props) {
       </Group>
 
       <Group title={L('Lisensi & Bantuan', 'License & Help')}>
+        <Row
+          icon={MessageCircle}
+          label={L('Customer Service (WhatsApp)', 'Customer Service (WhatsApp)')}
+          hint={L('Chat langsung dengan tim LIFE OS', 'Chat with the LIFE OS team')}
+          onClick={() => {
+            const text = L(
+              `Halo CS LIFE OS, saya ${profile.name}${currentUser?.email ? ` (${currentUser.email})` : ''} butuh bantuan.`,
+              `Hello LIFE OS support, I'm ${profile.name}${currentUser?.email ? ` (${currentUser.email})` : ''} and I need help.`
+            );
+            window.open(`https://wa.me/${CS_WA}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+          }}
+        />
         <Row icon={KeyRound} label={L('Lisensi LIFE OS', 'LIFE OS license')} hint={licenseHint} onClick={() => setPage('license')} />
         <Row icon={Info} label={L('Tentang LIFE OS', 'About LIFE OS')} hint="v1.0 • Personal Life & Wealth" chevron={false} />
       </Group>

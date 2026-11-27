@@ -30,5 +30,4 @@ Di iPhone (Safari): Share → **Add to Home Screen**.
 Untuk menjual app sebagai lisensi seumur hidup, ikuti `LICENSE_SETUP.md`.
 
 ## Opsional
-- **Fitur AI (Gemini):** saat pertama kali dipakai app akan meminta API key dan menyimpannya di perangkat. Jangan menaruh key di repo publik.
 - **Sinkron cloud Firebase:** tambahkan secret repo `VITE_FIREBASE_CONFIG` (JSON config Firebase satu baris). Tanpa ini app berjalan penuh secara lokal.

@@ -102,6 +102,7 @@ import ProfileView from './ewallet/ProfileView.jsx';
 import Stepper from './ewallet/Stepper.jsx';
 import { BottomNav } from './ewallet/parts.jsx';
 import { parseQris } from './ewallet/helpers.js';
+import { decodeCode, loadImage } from './ewallet/qrScan.js';
 import { licenseEnabled } from './LicenseGate.jsx';
 import { initializeApp, getApps } from 'firebase/app';
 import {
@@ -131,22 +132,6 @@ try {
   console.error('Firebase initialization notice:', err);
 }
 
-
-// Gemini API key: dari VITE_GEMINI_API_KEY (opsional) atau diminta sekali lalu disimpan di perangkat.
-function getGeminiKey() {
-  try {
-    const envKey = import.meta.env?.VITE_GEMINI_API_KEY;
-    if (envKey) return envKey;
-    let k = localStorage.getItem('lifeos:gemini_key') || '';
-    if (!k && typeof window !== 'undefined') {
-      k = (window.prompt('Masukkan Gemini API key untuk fitur AI (disimpan hanya di perangkat ini):') || '').trim();
-      if (k) localStorage.setItem('lifeos:gemini_key', k);
-    }
-    return k;
-  } catch {
-    return '';
-  }
-}
 
 // Persistensi lokal (offline-first)
 const STORAGE_KEY = 'lifeos:workspace:v1';
@@ -6907,8 +6892,6 @@ const ShoppingView = ({
 // --- MODULE L: REPORTS & ANALYTICS (WITH AI ADVISOR & WELLNESS CORRELATION CHART) ---
 const ReportsView = ({ data, derived, maskBalances, t, lang, onExportCsv }) => {
   const { currency } = data.profile;
-  const [aiInsights, setAiInsights] = useState(null);
-  const [aiLoading, setAiLoading] = useState(false);
 
   const wellnessCorrelationData = useMemo(() => {
     const last7 = getLastNDays(7, TODAY_STR, lang);
@@ -6936,101 +6919,6 @@ const ReportsView = ({ data, derived, maskBalances, t, lang, onExportCsv }) => {
     const avgEnergy = (logs.reduce((s, l) => s + (l.energyScore || 0), 0) / logs.length).toFixed(1);
     return { avgSleep, avgEnergy };
   }, [data.wellnessLogs]);
-
-  const runAiAdvisorAudit = async () => {
-    setAiLoading(true);
-    const savingsRate =
-      derived.monthlyIncome > 0
-        ? Math.max(0, ((derived.monthlyIncome - derived.monthlyExpenses) / derived.monthlyIncome) * 100)
-        : 0;
-    const completedTasksCount = data.tasks.filter((tk) => tk.status === 'completed').length;
-    const taskRate = data.tasks.length > 0 ? Math.round((completedTasksCount / data.tasks.length) * 100) : 0;
-    const avgStreak =
-      data.habits.length > 0
-        ? (
-            data.habits.reduce((s, h) => s + calculateHabitStreak(h.completedDates), 0) /
-            data.habits.length
-          ).toFixed(1)
-        : '0';
-
-    const buildFallbackInsights = () => {
-      const topCat = derived.categoryBreakdown[0];
-      if (lang === 'id') {
-        return {
-          summary: `Rasio tabungan bulanan Anda berada di ${savingsRate.toFixed(1)}% dengan rata-rata tidur ${wellnessAverages.avgSleep} jam/malam dan skor energi ${wellnessAverages.avgEnergy}/10.`,
-          recommendations: [
-            topCat
-              ? `Pos pengeluaran terbesar adalah "${topCat.category}" (${formatMoney(topCat.amount, currency)}). Audit pos rutin ini untuk meningkatkan rasio tabungan.`
-              : 'Catat pengeluaran harian secara konsisten untuk memetakan pola konsumsi utama Anda.',
-            `Rata-rata tidur ${wellnessAverages.avgSleep} jam berbanding lurus dengan skor energi (${wellnessAverages.avgEnergy}/10). Pertahankan durasi tidur minimal 7,5 jam di hari kerja padat.`,
-            `Pertahankan momentum streak kebiasaan (${avgStreak} hari) serta tingkat penyelesaian tugas (${taskRate}%).`,
-          ],
-        };
-      }
-      return {
-        summary: `Your monthly savings rate is ${savingsRate.toFixed(1)}% with ${wellnessAverages.avgSleep} hrs average sleep and a ${wellnessAverages.avgEnergy}/10 energy score.`,
-        recommendations: [
-          topCat
-            ? `Your largest spending category is "${topCat.category}" (${formatMoney(topCat.amount, currency)}). Auditing items here can lift your savings rate.`
-            : 'Log daily expenses consistently to surface your primary spending drivers.',
-          `Your ${wellnessAverages.avgSleep}h average sleep strongly supports your ${wellnessAverages.avgEnergy}/10 energy score. Protect 7.5+ hours before high-leverage workdays.`,
-          `Sustain your ${avgStreak}-day habit streak and ${taskRate}% task execution velocity.`,
-        ],
-      };
-    };
-
-    try {
-      const apiKey = getGeminiKey();
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
-      const telemetrySummary = {
-        language: lang,
-        currency,
-        totalNetWorth: derived.totalNetWorth,
-        monthlyIncome: derived.monthlyIncome,
-        monthlyExpenses: derived.monthlyExpenses,
-        savingsRatePct: Number(savingsRate.toFixed(1)),
-        budgetUtilizationPct: Number(derived.budgetUtilizationPct.toFixed(1)),
-        topExpenseCategories: derived.categoryBreakdown.slice(0, 3),
-        taskCompletionPct: taskRate,
-        averageHabitStreakDays: Number(avgStreak),
-        averageSleepHours: Number(wellnessAverages.avgSleep),
-        averageEnergyScore: Number(wellnessAverages.avgEnergy),
-      };
-
-      const prompt = `Act as a Senior Wealth & Executive Productivity Advisor. Analyze this user telemetry JSON and respond in ${
-        lang === 'id' ? 'Bahasa Indonesia' : 'English'
-      }. Return ONLY valid JSON with keys: "summary" (1 concise executive sentence) and "recommendations" (array of 3 specific, actionable bullet strings). Telemetry: ${JSON.stringify(
-        telemetrySummary
-      )}`;
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: 'application/json' },
-        }),
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        const textOut = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (textOut) {
-          const parsed = JSON.parse(textOut);
-          if (parsed.summary && Array.isArray(parsed.recommendations)) {
-            setAiInsights(parsed);
-            setAiLoading(false);
-            return;
-          }
-        }
-      }
-      setAiInsights(buildFallbackInsights());
-    } catch {
-      setAiInsights(buildFallbackInsights());
-    } finally {
-      setAiLoading(false);
-    }
-  };
 
   const budgetComparisonData = useMemo(() => {
     const spendMap = {};
@@ -7067,53 +6955,6 @@ const ReportsView = ({ data, derived, maskBalances, t, lang, onExportCsv }) => {
           <Download className="w-4 h-4" /> {t('export_csv')}
         </Button>
       </div>
-
-      {/* AI FINANCIAL & PRODUCTIVITY ADVISOR CARD */}
-      <GlassCard className="p-5 sm:p-6 bg-gradient-to-br from-life-surface2/90 via-life-surface to-life-bg border-life-accent/45 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-life-accent/20 border border-life-accent/50 flex items-center justify-center text-life-soft shrink-0">
-              <BrainCircuit className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-life-text">{t('ai_advisor_title')}</h2>
-              <p className="text-xs text-life-muted mt-0.5">{t('ai_advisor_sub')}</p>
-            </div>
-          </div>
-          <Button size="sm" onClick={runAiAdvisorAudit} disabled={aiLoading}>
-            {aiLoading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" /> {t('ai_analyzing')}
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4" /> {t('ai_run_audit')}
-              </>
-            )}
-          </Button>
-        </div>
-
-        {aiInsights && (
-          <div className="pt-3 border-t border-life-border/40 space-y-3">
-            <p className="text-xs sm:text-sm font-medium text-life-soft leading-relaxed">
-              {aiInsights.summary}
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {aiInsights.recommendations.map((rec, idx) => (
-                <div
-                  key={idx}
-                  className="p-3.5 rounded-xl bg-life-bg/80 border border-life-border/45 text-xs text-life-text leading-relaxed flex items-start gap-2.5"
-                >
-                  <span className="w-5 h-5 rounded-md bg-life-accent text-life-bg font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">
-                    {idx + 1}
-                  </span>
-                  <span>{rec}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </GlassCard>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <GlassCard className="p-4">
@@ -7267,214 +7108,6 @@ const ReportsView = ({ data, derived, maskBalances, t, lang, onExportCsv }) => {
 // ============================================================================
 // 8. GLOBAL CRUD MODALS, SMART TOOLS & SYSTEM SETTINGS
 // ============================================================================
-
-const SmartCommandBar = ({ t, lang, data, onExecuteBatch }) => {
-  const [command, setCommand] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  const parseCommandLocally = (text) => {
-    const actions = { transactions: [], tasks: [], events: [] };
-    const clauses = text
-      .split(/\b(?:dan|and|lalu|serta|then|,|;)\b/i)
-      .map((c) => c.trim())
-      .filter(Boolean);
-
-    const isTomorrow = /\b(?:besok|tomorrow)\b/i.test(text);
-    const targetDate = isTomorrow ? '2026-11-27' : TODAY_STR;
-
-    clauses.forEach((clause) => {
-      const amtMatch = clause.match(/(\d+(?:[.,]\d+)?)\s*(rb|ribu|k|jt|juta|m)?\b/i);
-      const timeMatch = clause.match(/\b(?:jam|at|pukul)?\s*(\d{1,2})[:.](\d{2})\b/i);
-      const isSchedule = /\b(?:jadwalkan|jadwal|meeting|rapat|acara|schedule|event|call)\b/i.test(clause);
-      const isTask = /\b(?:tugas|ingatkan|todo|bayar|selesaikan|kerjakan|remind|task)\b/i.test(clause);
-      const isIncome = /\b(?:gaji|pemasukan|terima|bonus|income|salary|masuk)\b/i.test(clause);
-
-      if (amtMatch && !isSchedule && !timeMatch) {
-        let num = parseFloat(amtMatch[1].replace(',', '.'));
-        const unit = (amtMatch[2] || '').toLowerCase();
-        if (unit === 'rb' || unit === 'ribu' || unit === 'k') num *= 1000;
-        else if (unit === 'jt' || unit === 'juta' || unit === 'm') num *= 1000000;
-
-        if (num > 0) {
-          const cleanDesc = clause
-            .replace(amtMatch[0], '')
-            .replace(/\b(?:beli|bayar|pakai|via|dengan|untuk|rp|idr)\b/gi, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-
-          let category = isIncome ? 'Other Income' : 'Shopping & Lifestyle';
-          if (/kopi|coffee|makan|lunch|dinner|cafe/i.test(clause)) category = 'Dining & Coffee';
-          else if (/belanja|groceries|supermarket|indomaret|alfamart/i.test(clause)) category = 'Groceries';
-          else if (/bensin|grab|gojek|tol|tiket|travel/i.test(clause)) category = 'Transport & Travel';
-          else if (/gaji|salary/i.test(clause)) category = 'Primary Salary';
-
-          actions.transactions.push({
-            type: isIncome ? 'income' : 'expense',
-            amount: Math.round(num),
-            date: targetDate,
-            category,
-            description: cleanDesc || (isIncome ? 'Pemasukan Cepat' : 'Transaksi Cepat'),
-            accountId: data.accounts[0]?.id || '',
-            paymentMethod: /qris/i.test(clause) ? 'QRIS' : 'Quick Command',
-            notes: text,
-          });
-          return;
-        }
-      }
-
-      if (isSchedule || timeMatch) {
-        const hh = timeMatch ? String(Math.min(23, parseInt(timeMatch[1], 10))).padStart(2, '0') : '10';
-        const mm = timeMatch ? timeMatch[2] : '00';
-        const endHh = String(Math.min(23, parseInt(hh, 10) + 1)).padStart(2, '0');
-        const cleanTitle = clause
-          .replace(timeMatch ? timeMatch[0] : '', '')
-          .replace(/\b(?:jadwalkan|jadwal|besok|tomorrow|hari ini|today|jam|pukul|at)\b/gi, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
-
-        actions.events.push({
-          title: cleanTitle || (lang === 'id' ? 'Agenda Terjadwal' : 'Scheduled Event'),
-          date: targetDate,
-          startTime: `${hh}:${mm}`,
-          endTime: `${endHh}:${mm}`,
-          category: 'Work',
-          location: '',
-          reminder: '15 min before',
-          notes: '',
-        });
-        return;
-      }
-
-      if (isTask || clause.length > 2) {
-        const cleanTask = clause
-          .replace(/\b(?:tugas|ingatkan|todo|besok|tomorrow)\b/gi, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
-        if (cleanTask) {
-          actions.tasks.push({
-            title: cleanTask,
-            description: '',
-            priority: 'Medium',
-            dueDate: targetDate,
-            category: 'Personal',
-            status: 'todo',
-            isTopPriority: false,
-          });
-        }
-      }
-    });
-
-    return actions;
-  };
-
-  const handleRunCommand = async (e) => {
-    e.preventDefault();
-    const raw = command.trim();
-    if (!raw) return;
-    setBusy(true);
-
-    try {
-      const apiKey = getGeminiKey();
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
-      const prompt = `Parse this personal life management command into structured actions. Today is ${TODAY_STR} (tomorrow is 2026-11-27). Return ONLY valid JSON with keys: "transactions" (array of {type:"expense"|"income", amount:number, date:"YYYY-MM-DD", category:string, description:string}), "tasks" (array of {title:string, priority:"Medium"|"High", dueDate:"YYYY-MM-DD", category:string}), and "events" (array of {title:string, date:"YYYY-MM-DD", startTime:"HH:MM", endTime:"HH:MM", category:string}). Command: "${raw}"`;
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: 'application/json' },
-        }),
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        const textOut = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (textOut) {
-          const parsed = JSON.parse(textOut);
-          const normalized = {
-            transactions: (parsed.transactions || []).map((tx) => ({
-              type: tx.type === 'income' ? 'income' : 'expense',
-              amount: Number(tx.amount) || 0,
-              date: tx.date || TODAY_STR,
-              category:
-                tx.category ||
-                (tx.type === 'income' ? 'Other Income' : 'Shopping & Lifestyle'),
-              description: tx.description || raw,
-              accountId: data.accounts[0]?.id || '',
-              paymentMethod: 'Smart Command',
-              notes: raw,
-            })),
-            tasks: (parsed.tasks || []).map((tk) => ({
-              title: tk.title || raw,
-              description: '',
-              priority: tk.priority || 'Medium',
-              dueDate: tk.dueDate || TODAY_STR,
-              category: tk.category || 'Personal',
-              status: 'todo',
-              isTopPriority: false,
-            })),
-            events: (parsed.events || []).map((ev) => ({
-              title: ev.title || raw,
-              date: ev.date || TODAY_STR,
-              startTime: ev.startTime || '10:00',
-              endTime: ev.endTime || '11:00',
-              category: ev.category || 'Work',
-              location: '',
-              reminder: '15 min before',
-              notes: '',
-            })),
-          };
-          if (
-            normalized.transactions.length ||
-            normalized.tasks.length ||
-            normalized.events.length
-          ) {
-            onExecuteBatch(normalized);
-            setCommand('');
-            setBusy(false);
-            return;
-          }
-        }
-      }
-    } catch {
-      // Fallback to deterministic local parser
-    }
-
-    const fallbackActions = parseCommandLocally(raw);
-    onExecuteBatch(fallbackActions);
-    setCommand('');
-    setBusy(false);
-  };
-
-  return (
-    <form
-      onSubmit={handleRunCommand}
-      className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-2 rounded-2xl bg-life-surface/90 border border-life-border/55 shadow-lg"
-    >
-      <div className="flex items-center gap-2.5 flex-1 px-2 min-w-0">
-        <Wand2 className="w-4 h-4 text-life-accent shrink-0" />
-        <input
-          value={command}
-          onChange={(e) => setCommand(e.target.value)}
-          placeholder={t('smart_cmd_placeholder')}
-          className="w-full bg-transparent text-xs sm:text-sm text-life-text placeholder-life-muted/65 focus:outline-none py-1.5"
-        />
-      </div>
-      <Button type="submit" size="sm" disabled={busy || !command.trim()} className="shrink-0">
-        {busy ? (
-          <>
-            <Loader2 className="w-3.5 h-3.5 animate-spin" /> {t('smart_cmd_processing')}
-          </>
-        ) : (
-          <>
-            <Sparkles className="w-3.5 h-3.5" /> {t('smart_cmd_btn')}
-          </>
-        )}
-      </Button>
-    </form>
-  );
-};
 
 const SplitBillModal = ({ open, onClose, data, t, lang, onExecuteSplitBill }) => {
   const { currency } = data.profile;
@@ -7800,7 +7433,20 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
   const [cameraReady, setCameraReady] = useState(false);
   const [detectedCode, setDetectedCode] = useState('');
   const [capturedPreview, setCapturedPreview] = useState('');
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [qrMissed, setQrMissed] = useState(false);
+  const applyCodeRef = useRef(() => {});
+  // Isi data dari isi kode yang terbaca: QRIS -> merchant & nominal; kode lain -> disimpan sebagai catatan
+  applyCodeRef.current = (codeVal) => {
+    setDetectedCode(codeVal);
+    setQrMissed(false);
+    const qris = parseQris(codeVal);
+    if (qris) {
+      setMerchant(qris.merchant || 'QRIS');
+      if (qris.amount > 0) setAmount(String(qris.amount));
+    } else {
+      setMerchant((prev) => prev || `Scan: ${codeVal.slice(0, 32)}`);
+    }
+  };
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -7819,6 +7465,7 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
       setCapturedPreview('');
       setDetectedCode('');
       setCameraError('');
+      setQrMissed(false);
       return undefined;
     }
 
@@ -7852,32 +7499,12 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
           setCameraReady(true);
         }
 
-        if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
-          const detector = new window.BarcodeDetector({
-            formats: ['qr_code', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39'],
-          });
-          barcodeInterval = setInterval(async () => {
-            if (!videoRef.current || videoRef.current.readyState !== 4) return;
-            try {
-              const codes = await detector.detect(videoRef.current);
-              if (codes && codes.length > 0 && codes[0].rawValue) {
-                const codeVal = codes[0].rawValue;
-                setDetectedCode(codeVal);
-                // QRIS (EMVCo): ambil nama merchant & nominal bila ada di dalam kode
-                const qris = parseQris(codeVal);
-                if (qris) {
-                  if (qris.merchant) setMerchant(qris.merchant);
-                  else setMerchant((prev) => prev || 'QRIS');
-                  if (qris.amount > 0) setAmount(String(qris.amount));
-                } else {
-                  setMerchant((prev) => prev || `Scan: ${codeVal.slice(0, 32)}`);
-                }
-              }
-            } catch {
-              // Ignore single-frame detection errors
-            }
-          }, 700);
-        }
+        // Baca QR langsung di perangkat (tanpa AI & tanpa internet)
+        barcodeInterval = setInterval(async () => {
+          if (!videoRef.current || videoRef.current.readyState !== 4) return;
+          const codeVal = await decodeCode(videoRef.current).catch(() => '');
+          if (codeVal) applyCodeRef.current(codeVal);
+        }, 500);
       } catch {
         if (!cancelled) {
           setCameraError(t('camera_error_hint'));
@@ -7894,65 +7521,16 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
     };
   }, [open, scanMode, stopCameraStream, t]);
 
-  const analyzeImageWithGemini = async (base64Data, mimeType) => {
-    setIsAnalyzing(true);
+  const scanStillImage = async (dataUrl, mimeType) => {
+    setCapturedPreview(dataUrl);
+    setQrMissed(false);
     try {
-      const apiKey = getGeminiKey();
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
-      const prompt =
-        'Extract receipt or barcode purchase details from this image. Return ONLY valid JSON with keys: "merchant" (string), "amount" (number, total paid), and "category" (one of: "Housing & Utilities", "Dining & Coffee", "Groceries", "Transport & Travel", "Software & Subscriptions", "Health & Wellness", "Shopping & Lifestyle").';
-
-      const payload = {
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              { text: prompt },
-              {
-                inlineData: {
-                  mimeType,
-                  data: base64Data,
-                },
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          responseMimeType: 'application/json',
-        },
-      };
-
-      let response = null;
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        try {
-          response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-          if (response.ok) break;
-        } catch {
-          // Retry with backoff
-        }
-        await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
-      }
-
-      if (response && response.ok) {
-        const result = await response.json();
-        const textOut = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (textOut) {
-          const parsed = JSON.parse(textOut);
-          if (parsed.merchant) setMerchant(String(parsed.merchant));
-          if (parsed.amount && Number(parsed.amount) > 0) setAmount(String(parsed.amount));
-          if (parsed.category && [...DEFAULT_EXPENSE_CATEGORIES, ...(data.customExpenseCategories || [])].includes(parsed.category)) {
-            setCategory(parsed.category);
-          }
-        }
-      }
+      const img = await loadImage(dataUrl);
+      const codeVal = await decodeCode(img);
+      if (codeVal) applyCodeRef.current(codeVal);
+      else setQrMissed(true);
     } catch {
-      // Fallback gracefully
-    } finally {
-      setIsAnalyzing(false);
+      setQrMissed(true);
     }
   };
 
@@ -7965,10 +7543,7 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-    setCapturedPreview(dataUrl);
-    const base64Only = dataUrl.split(',')[1];
-    await analyzeImageWithGemini(base64Only, 'image/jpeg');
+    await scanStillImage(canvas.toDataURL('image/jpeg', 0.85), 'image/jpeg');
   };
 
   const handleImageFileUpload = (e) => {
@@ -7977,10 +7552,7 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
     const reader = new FileReader();
     reader.onload = async (ev) => {
       const dataUrl = String(ev.target?.result || '');
-      if (!dataUrl) return;
-      setCapturedPreview(dataUrl);
-      const base64Only = dataUrl.split(',')[1];
-      await analyzeImageWithGemini(base64Only, file.type || 'image/jpeg');
+      if (dataUrl) await scanStillImage(dataUrl, file.type || 'image/jpeg');
     };
     reader.readAsDataURL(file);
   };
@@ -8056,6 +7628,15 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
           })}
         </div>
 
+        {qrMissed && (
+          <div className="p-3 rounded-xl bg-life-bg border border-life-border/50 text-xs text-life-muted space-y-2">
+            <p>
+              {lang === 'id'
+                ? 'QR tidak terbaca pada gambar ini. Arahkan lebih dekat/terang, atau isi nominal di bawah secara manual.'
+                : 'No QR found in this image. Move closer / add light, or enter the amount manually below.'}
+            </p>
+          </div>
+        )}
         {scanMode === 'camera' && (
           <div className="space-y-2.5">
             {cameraError ? (
@@ -8100,18 +7681,9 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
                 variant="secondary"
                 size="sm"
                 className="w-full"
-                disabled={isAnalyzing}
                 onClick={handleSnapCamera}
               >
-                {isAnalyzing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> {t('scanning_ai')}
-                  </>
-                ) : (
-                  <>
-                    <Camera className="w-4 h-4 text-life-accent" /> {t('capture_scan')}
-                  </>
-                )}
+                <Camera className="w-4 h-4 text-life-accent" /> {lang === 'id' ? 'Ambil foto & baca QR' : 'Capture & read QR'}
               </Button>
             )}
           </div>
@@ -8134,12 +7706,6 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
                 className="hidden"
               />
             </label>
-            {isAnalyzing && (
-              <div className="flex items-center justify-center gap-2 text-xs text-life-soft py-1">
-                <Loader2 className="w-4 h-4 animate-spin text-life-accent" />
-                <span>{t('scanning_ai')}</span>
-              </div>
-            )}
           </div>
         )}
 
@@ -9344,44 +8910,6 @@ function LifeOsWorkspace() {
     );
   };
 
-  const handleSmartCommandBatch = ({ transactions = [], tasks = [], events = [] }) => {
-    const totalCreated = transactions.length + tasks.length + events.length;
-    if (totalCreated === 0) {
-      notify(
-        lang === 'id'
-          ? 'Perintah belum dikenali. Coba sertakan nominal atau jam agenda.'
-          : 'Could not parse command. Try adding an amount or event time.'
-      );
-      return;
-    }
-
-    setData((prev) => ({
-      ...prev,
-      transactions: [
-        ...transactions.map((tx, idx) => ({ ...tx, id: `tx-cmd-${Date.now()}-${idx}` })),
-        ...prev.transactions,
-      ],
-      tasks: [
-        ...tasks.map((tk, idx) => ({ ...tk, id: `tsk-cmd-${Date.now()}-${idx}` })),
-        ...prev.tasks,
-      ],
-      events: [
-        ...events.map((ev, idx) => ({ ...ev, id: `evt-cmd-${Date.now()}-${idx}` })),
-        ...prev.events,
-      ],
-    }));
-
-    const parts = [];
-    if (transactions.length) parts.push(`${transactions.length} ${lang === 'id' ? 'transaksi' : 'tx'}`);
-    if (tasks.length) parts.push(`${tasks.length} ${lang === 'id' ? 'tugas' : 'tasks'}`);
-    if (events.length) parts.push(`${events.length} ${lang === 'id' ? 'agenda' : 'events'}`);
-    notify(
-      lang === 'id'
-        ? `Berhasil dibuat otomatis: ${parts.join(', ')}`
-        : `Auto-created: ${parts.join(', ')}`
-    );
-  };
-
   const handleAddInvestment = (asset) => {
     const { accountId, ...rest } = asset;
     const id = `inv-${Date.now()}`;
@@ -10533,14 +10061,6 @@ function LifeOsWorkspace() {
 
         {/* MODULE CONTENT WITH SMOOTH TRANSITION */}
         <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-8 py-5 sm:py-8 min-w-0 space-y-6">
-          {(activeTab === 'dashboard' || activeTab === 'wallet') && (
-            <SmartCommandBar
-              t={t}
-              lang={lang}
-              data={data}
-              onExecuteBatch={handleSmartCommandBatch}
-            />
-          )}
           <div key={activeTab} className="life-motion-enter">
             {renderModule()}
           </div>
