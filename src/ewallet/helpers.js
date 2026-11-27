@@ -95,7 +95,29 @@ export function parseQris(raw) {
     if (tag === '59') out.merchant = val.trim();
     else if (tag === '60') out.city = val.trim();
     else if (tag === '54') out.amount = Number(val) || 0;
+    else if (tag === '55') out.feeType = val; // 02 = biaya tetap, 03 = persen
+    else if (tag === '56') out.feeFixed = Number(val) || 0;
+    else if (tag === '57') out.feePct = Number(val) || 0;
     i += 4 + len;
   }
-  return out.merchant || out.amount ? out : { merchant: '', amount: 0 };
+  // Nominal sudah termasuk biaya layanan/tip bila QR mencantumkannya
+  if (out.amount > 0) {
+    if (out.feeType === '02' && out.feeFixed) out.amount += out.feeFixed;
+    else if (out.feeType === '03' && out.feePct) out.amount = Math.round(out.amount * (1 + out.feePct / 100));
+  }
+  return out;
+}
+
+// Tebak kategori dari nama merchant (hanya kategori bawaan; pengguna tetap bisa ganti)
+const GUESS = [
+  [/kopi|coffee|cafe|caf[eé]|resto|warung|bakso|mie|nasi|ayam|bakery|roti|food|kitchen|pizza|burger|janji jiwa|starbucks|kfc|mcd/i, 'Dining & Coffee'],
+  [/indomaret|alfamart|alfamidi|supermarket|swalayan|hypermart|superindo|lotte|mart\b|toko|pasar/i, 'Groceries'],
+  [/grab|gojek|pertamina|spbu|shell|bp\b|parkir|tol|krl|mrt|transjakarta|bluebird|kai|garuda|traveloka/i, 'Transport & Travel'],
+  [/apotek|apotik|klinik|rumah sakit|\brs\b|dokter|kimia farma|guardian|watson|gym|fitness/i, 'Health & Wellness'],
+  [/pln|pdam|telkom|indihome|listrik|air\b|pulsa/i, 'Housing & Utilities'],
+  [/netflix|spotify|youtube|google|apple|software|cloud/i, 'Software & Subscriptions'],
+];
+export function guessCategory(name) {
+  const hit = GUESS.find(([re]) => re.test(String(name || '')));
+  return hit ? hit[1] : '';
 }

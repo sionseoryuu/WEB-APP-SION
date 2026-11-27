@@ -101,7 +101,7 @@ import ActivityView from './ewallet/ActivityView.jsx';
 import ProfileView from './ewallet/ProfileView.jsx';
 import Stepper from './ewallet/Stepper.jsx';
 import { BottomNav } from './ewallet/parts.jsx';
-import { parseQris } from './ewallet/helpers.js';
+import { parseQris, guessCategory } from './ewallet/helpers.js';
 import { decodeCode, loadImage } from './ewallet/qrScan.js';
 import { licenseEnabled } from './LicenseGate.jsx';
 import { initializeApp, getApps } from 'firebase/app';
@@ -7434,18 +7434,43 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
   const [detectedCode, setDetectedCode] = useState('');
   const [capturedPreview, setCapturedPreview] = useState('');
   const [qrMissed, setQrMissed] = useState(false);
+  const [scanKey, setScanKey] = useState(0);
+  const scannedRef = useRef('');
   const applyCodeRef = useRef(() => {});
-  // Isi data dari isi kode yang terbaca: QRIS -> merchant & nominal; kode lain -> disimpan sebagai catatan
+  // Begitu QR terbaca: isi form otomatis (merchant, nominal, kategori), hentikan kamera, tinggal tekan Selesai
   applyCodeRef.current = (codeVal) => {
+    if (!codeVal || scannedRef.current === codeVal) return;
+    scannedRef.current = codeVal;
+    try { navigator.vibrate?.(60); } catch { /* abaikan */ }
     setDetectedCode(codeVal);
     setQrMissed(false);
     const qris = parseQris(codeVal);
+    let name;
     if (qris) {
-      setMerchant(qris.merchant || 'QRIS');
-      if (qris.amount > 0) setAmount(String(qris.amount));
+      name = qris.merchant || 'QRIS';
+      setAmount(qris.amount > 0 ? String(qris.amount) : '');
     } else {
-      setMerchant((prev) => prev || `Scan: ${codeVal.slice(0, 32)}`);
+      let host = '';
+      try { host = new URL(codeVal).hostname; } catch { /* bukan URL */ }
+      name = host ? `Struk ${host}` : `Scan: ${codeVal.slice(0, 32)}`;
     }
+    setMerchant(name);
+    const guess = guessCategory(name);
+    if (guess) setCategory(guess);
+    stopCameraStream();
+    if (!(qris && qris.amount > 0)) {
+      setTimeout(() => document.getElementById('scan-amount-input')?.focus(), 150);
+    }
+  };
+
+  const rescan = () => {
+    scannedRef.current = '';
+    setDetectedCode('');
+    setMerchant('');
+    setAmount('');
+    setCapturedPreview('');
+    setQrMissed(false);
+    setScanKey((k) => k + 1);
   };
 
   const videoRef = useRef(null);
@@ -7464,6 +7489,7 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
       stopCameraStream();
       setCapturedPreview('');
       setDetectedCode('');
+      scannedRef.current = '';
       setCameraError('');
       setQrMissed(false);
       return undefined;
@@ -7501,7 +7527,7 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
 
         // Baca QR langsung di perangkat (tanpa AI & tanpa internet)
         barcodeInterval = setInterval(async () => {
-          if (!videoRef.current || videoRef.current.readyState !== 4) return;
+          if (scannedRef.current || !videoRef.current || videoRef.current.readyState !== 4) return;
           const codeVal = await decodeCode(videoRef.current).catch(() => '');
           if (codeVal) applyCodeRef.current(codeVal);
         }, 500);
@@ -7519,7 +7545,7 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
       if (barcodeInterval) clearInterval(barcodeInterval);
       stopCameraStream();
     };
-  }, [open, scanMode, stopCameraStream, t]);
+  }, [open, scanMode, scanKey, stopCameraStream, t]);
 
   const scanStillImage = async (dataUrl, mimeType) => {
     setCapturedPreview(dataUrl);
@@ -7596,6 +7622,7 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
     setMerchant('');
     setAmount('');
     setDetectedCode('');
+    scannedRef.current = '';
     setCapturedPreview('');
     onClose();
   };
@@ -7637,7 +7664,28 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
             </p>
           </div>
         )}
-        {scanMode === 'camera' && (
+        {detectedCode && (
+          <div className="p-3.5 rounded-2xl bg-[#5B8056]/20 border border-[#5B8056]/50 flex items-center gap-3">
+            <CheckCircle2 className="w-6 h-6 text-[#87B082] shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-semibold text-[#87B082]">
+                {lang === 'id' ? 'QR terbaca & terisi otomatis' : 'QR read & filled in'}
+              </p>
+              <p className="text-sm font-semibold text-life-text truncate">{merchant}</p>
+              <p className="text-xs text-life-muted">
+                {Number(amount) > 0
+                  ? formatMoney(Number(amount), data.profile.currency)
+                  : lang === 'id'
+                    ? 'Nominal tidak ada di QR — isi di bawah'
+                    : 'No amount in the QR — enter it below'}
+              </p>
+            </div>
+            <Button type="button" size="sm" variant="secondary" onClick={rescan}>
+              {lang === 'id' ? 'Scan ulang' : 'Rescan'}
+            </Button>
+          </div>
+        )}
+        {scanMode === 'camera' && !detectedCode && (
           <div className="space-y-2.5">
             {cameraError ? (
               <div className="p-4 rounded-2xl bg-[#D96B52]/15 border border-[#D96B52]/40 text-xs text-[#F29B87] space-y-2">
@@ -7752,6 +7800,8 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input
+            id="scan-amount-input"
+            inputMode="decimal"
             label={`${t('amount')} (${data.profile.currency})`}
             type="number"
             step="0.01"
@@ -7791,7 +7841,7 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
           >
             {t('cancel')}
           </Button>
-          <Button type="submit">{t('save')}</Button>
+          <Button type="submit">{lang === 'id' ? 'Selesai' : 'Done'}</Button>
         </div>
       </form>
     </Modal>
