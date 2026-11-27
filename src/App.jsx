@@ -76,6 +76,7 @@ import {
   Cake,
   PhoneCall,
   MessageSquare,
+  User,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -95,6 +96,13 @@ import {
 } from 'recharts';
 import ThemeSettings from './ThemeSettings.jsx';
 import DriveBackup from './DriveBackup.jsx';
+import HomeView from './ewallet/HomeView.jsx';
+import ActivityView from './ewallet/ActivityView.jsx';
+import ProfileView from './ewallet/ProfileView.jsx';
+import Stepper from './ewallet/Stepper.jsx';
+import { BottomNav } from './ewallet/parts.jsx';
+import { parseQris } from './ewallet/helpers.js';
+import { licenseEnabled } from './LicenseGate.jsx';
 import { initializeApp, getApps } from 'firebase/app';
 import {
   getAuth,
@@ -193,7 +201,10 @@ const I18N = {
     grp_time: 'Time & Execution',
     grp_growth: 'Growth & Life',
     grp_intel: 'Intelligence',
-    nav_dashboard: 'Dashboard',
+    nav_dashboard: 'Home',
+    nav_activity: 'Activity',
+    nav_profile: 'My Profile',
+    nav_overview: 'Full Overview',
     nav_wallet: 'Digital Wallet',
     nav_budgets: 'Budgets',
     nav_savings: 'Savings Vaults',
@@ -479,7 +490,10 @@ const I18N = {
     grp_time: 'Waktu & Eksekusi',
     grp_growth: 'Pengembangan Diri',
     grp_intel: 'Analitik',
-    nav_dashboard: 'Dasbor Utama',
+    nav_dashboard: 'Beranda',
+    nav_activity: 'Aktivitas',
+    nav_profile: 'Profil Saya',
+    nav_overview: 'Ringkasan Lengkap',
     nav_wallet: 'Dompet Digital',
     nav_budgets: 'Anggaran',
     nav_savings: 'Brankas Tabungan',
@@ -813,7 +827,10 @@ const CHART_PALETTE = [
 const NAV_GROUPS = [
   {
     labelKey: 'grp_command',
-    items: [{ id: 'dashboard', labelKey: 'nav_dashboard', icon: LayoutDashboard }],
+    items: [
+      { id: 'dashboard', labelKey: 'nav_dashboard', icon: LayoutDashboard },
+      { id: 'activity', labelKey: 'nav_activity', icon: History },
+    ],
   },
   {
     labelKey: 'grp_wealth',
@@ -846,7 +863,14 @@ const NAV_GROUPS = [
   },
   {
     labelKey: 'grp_intel',
-    items: [{ id: 'reports', labelKey: 'nav_reports', icon: BarChart3 }],
+    items: [
+      { id: 'overview', labelKey: 'nav_overview', icon: LayoutDashboard },
+      { id: 'reports', labelKey: 'nav_reports', icon: BarChart3 },
+    ],
+  },
+  {
+    labelKey: 'nav_profile',
+    items: [{ id: 'profile', labelKey: 'nav_profile', icon: User }],
   },
 ];
 
@@ -2191,6 +2215,7 @@ const AuthPortalScreen = ({ lang, onToggleLang, t, onAuthenticateSuccess }) => {
       </div>
 
       <div className="max-w-md w-full mx-auto my-8 relative z-10 life-motion-enter">
+        <Stepper current="account" withLicense={licenseEnabled} lang={lang} />
         <GlassCard className="p-6 sm:p-8 space-y-6 border-life-accent/35">
           <div className="text-center space-y-2">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-life-bg border border-life-border/60 text-[11px] text-life-soft">
@@ -7838,7 +7863,15 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
               if (codes && codes.length > 0 && codes[0].rawValue) {
                 const codeVal = codes[0].rawValue;
                 setDetectedCode(codeVal);
-                setMerchant((prev) => prev || `Scan: ${codeVal.slice(0, 32)}`);
+                // QRIS (EMVCo): ambil nama merchant & nominal bila ada di dalam kode
+                const qris = parseQris(codeVal);
+                if (qris) {
+                  if (qris.merchant) setMerchant(qris.merchant);
+                  else setMerchant((prev) => prev || 'QRIS');
+                  if (qris.amount > 0) setAmount(String(qris.amount));
+                } else {
+                  setMerchant((prev) => prev || `Scan: ${codeVal.slice(0, 32)}`);
+                }
               }
             } catch {
               // Ignore single-frame detection errors
@@ -7911,7 +7944,7 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
           const parsed = JSON.parse(textOut);
           if (parsed.merchant) setMerchant(String(parsed.merchant));
           if (parsed.amount && Number(parsed.amount) > 0) setAmount(String(parsed.amount));
-          if (parsed.category && DEFAULT_EXPENSE_CATEGORIES.includes(parsed.category)) {
+          if (parsed.category && [...DEFAULT_EXPENSE_CATEGORIES, ...(data.customExpenseCategories || [])].includes(parsed.category)) {
             setCategory(parsed.category);
           }
         }
@@ -8162,7 +8195,7 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
             required
           />
           <Select label={t('category')} value={category} onChange={(e) => setCategory(e.target.value)}>
-            {DEFAULT_EXPENSE_CATEGORIES.map((c) => (
+            {[...new Set([...DEFAULT_EXPENSE_CATEGORIES, ...(data.customExpenseCategories || [])])].map((c) => (
               <option key={c} value={c}>
                 {c}
               </option>
@@ -9452,6 +9485,30 @@ function LifeOsWorkspace() {
     notify(lang === 'id' ? `Kategori ditambahkan: ${catName}` : `Added category: ${catName}`);
   };
 
+  const handleDeleteCustomCategory = (kind, catName) => {
+    const key = kind === 'income' ? 'customIncomeCategories' : 'customExpenseCategories';
+    setData((prev) => ({ ...prev, [key]: (prev[key] || []).filter((c) => c !== catName) }));
+    notify(lang === 'id' ? `Kategori dihapus: ${catName}` : `Deleted category: ${catName}`);
+  };
+
+  // Ganti nama kategori buatan sendiri; transaksi & anggaran lama ikut diperbarui
+  const handleRenameCustomCategory = (kind, from, to) => {
+    const key = kind === 'income' ? 'customIncomeCategories' : 'customExpenseCategories';
+    setData((prev) => ({
+      ...prev,
+      [key]: (prev[key] || []).map((c) => (c === from ? to : c)),
+      transactions: prev.transactions.map((tx) => (tx.category === from ? { ...tx, category: to } : tx)),
+      budgets: (prev.budgets || []).map((b) => (b.category === from ? { ...b, category: to } : b)),
+    }));
+    notify(lang === 'id' ? `Kategori diubah: ${to}` : `Renamed category: ${to}`);
+  };
+
+  const handleUpdateProfileQuiet = (patch) => {
+    setData((prev) => ({ ...prev, profile: { ...prev.profile, ...patch } }));
+    if (patch.name || patch.currency) notify(lang === 'id' ? 'Profil disimpan' : 'Profile saved');
+    else if (patch.avatar !== undefined) notify(lang === 'id' ? 'Foto profil diperbarui' : 'Profile photo updated');
+  };
+
   const handleSaveBudget = (bud) => {
     setData((prev) => {
       const existing = prev.budgets.find(
@@ -10044,6 +10101,55 @@ function LifeOsWorkspace() {
     switch (activeTab) {
       case 'dashboard':
         return (
+          <HomeView
+            data={data}
+            derived={derived}
+            lang={lang}
+            maskBalances={maskBalances}
+            onToggleMask={() => setMaskBalances((prev) => !prev)}
+            onNavigate={navigateTab}
+            onOpenTx={(tx = null) => setTxModal({ open: true, tx })}
+            onOpenReceipt={() => setReceiptModalOpen(true)}
+            onOpenSplit={() => setSplitBillModalOpen(true)}
+            onOpenPayday={() => setPaydayModalOpen(true)}
+            onOpenBriefing={() => setBriefingModalOpen(true)}
+          />
+        );
+      case 'activity':
+        return (
+          <ActivityView
+            data={data}
+            lang={lang}
+            maskBalances={maskBalances}
+            onOpenTx={(tx = null) => setTxModal({ open: true, tx })}
+            onDeleteTx={handleDeleteTx}
+            onOpenReceipt={() => setReceiptModalOpen(true)}
+          />
+        );
+      case 'profile':
+        return (
+          <ProfileView
+            data={data}
+            derived={derived}
+            currentUser={currentUser}
+            lang={lang}
+            maskBalances={maskBalances}
+            onToggleMask={() => setMaskBalances((prev) => !prev)}
+            onUpdateProfile={handleUpdateProfileQuiet}
+            onNavigate={navigateTab}
+            onExportJson={handleExportJson}
+            onExportCsv={handleExportCsv}
+            onImportJson={handleImportJson}
+            onResetEmpty={handleResetEmpty}
+            onRestoreDemo={handleRestoreDemo}
+            onLogout={() => setCurrentUser(null)}
+            onAddCategory={handleAddCustomCategory}
+            onDeleteCategory={handleDeleteCustomCategory}
+            onRenameCategory={handleRenameCustomCategory}
+          />
+        );
+      case 'overview':
+        return (
           <DashboardView
             data={data}
             derived={derived}
@@ -10252,12 +10358,10 @@ function LifeOsWorkspace() {
     }
   };
 
-  const mobilePrimaryTabs = [
-    { id: 'dashboard', labelKey: 'nav_dashboard', icon: LayoutDashboard },
-    { id: 'wallet', labelKey: 'nav_wallet', icon: Wallet },
-    { id: 'planner', labelKey: 'nav_planner', icon: CalendarDays },
-    { id: 'tasks', labelKey: 'nav_tasks', icon: CheckSquare },
-  ];
+  // Halaman dengan header sendiri (gaya e-wallet) & penanda tab aktif di navigasi bawah
+  const PRIMARY_TABS = ['dashboard', 'activity', 'wallet', 'profile'];
+  const ownHeader = ['dashboard', 'activity', 'profile'].includes(activeTab);
+  const navActive = PRIMARY_TABS.includes(activeTab) ? activeTab : 'dashboard';
 
   const allNavItems = NAV_GROUPS.flatMap((g) => g.items);
 
@@ -10334,7 +10438,7 @@ function LifeOsWorkspace() {
 
         <div className="p-4 border-t border-life-border/35 space-y-2">
           <button
-            onClick={() => setSettingsOpen(true)}
+            onClick={() => navigateTab('profile')}
             className="w-full flex items-center justify-between p-3 rounded-xl bg-life-bg/80 border border-life-border/40 hover:border-life-accent/60 transition-colors"
           >
             <div className="text-left min-w-0">
@@ -10349,13 +10453,21 @@ function LifeOsWorkspace() {
       </aside>
 
       {/* MAIN WORKSPACE COLUMN */}
-      <div className="flex-1 lg:pl-64 flex flex-col min-h-screen min-w-0 pb-24 lg:pb-0 relative z-10">
+      <div className="flex-1 lg:pl-64 flex flex-col min-h-screen min-w-0 pb-28 lg:pb-0 relative z-10">
         {/* STICKY RESPONSIVE HEADER */}
-        <header className="sticky top-0 z-20 bg-life-bg/90 backdrop-blur-md border-b border-life-border/35 px-3 sm:px-8 h-16 flex items-center justify-between gap-2">
+        <header
+          className={`sticky top-0 z-20 bg-life-bg/90 backdrop-blur-md border-b border-life-border/35 px-3 sm:px-8 h-16 items-center justify-between gap-2 ${
+            ownHeader ? 'hidden lg:flex' : 'flex'
+          }`}
+        >
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="lg:hidden w-8 h-8 rounded-xl bg-gradient-to-br from-life-accent to-life-border flex items-center justify-center text-life-bg font-bold shrink-0">
-              L
-            </div>
+            <button
+              onClick={() => navigateTab('dashboard')}
+              className="lg:hidden p-2 -ml-1 rounded-xl text-life-text shrink-0"
+              aria-label={lang === 'id' ? 'Kembali ke Beranda' : 'Back to Home'}
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
             <div className="min-w-0">
               <span className="text-sm font-semibold text-life-text truncate block sm:inline">
                 {t(allNavItems.find((i) => i.id === activeTab)?.labelKey || 'nav_dashboard')}
@@ -10401,13 +10513,17 @@ function LifeOsWorkspace() {
             </button>
 
             <button
-              onClick={() => setSettingsOpen(true)}
+              onClick={() => navigateTab('profile')}
               className="p-2 sm:p-2.5 rounded-xl bg-life-surface border border-life-border/50 text-life-muted hover:text-life-soft"
-              aria-label="Workspace settings"
+              aria-label={lang === 'id' ? 'Profil saya' : 'My profile'}
             >
               <Settings className="w-4 h-4" />
             </button>
 
+            <Button size="sm" variant="secondary" onClick={() => setReceiptModalOpen(true)}>
+              <QrCode className="w-4 h-4" />
+              <span className="hidden sm:inline">{lang === 'id' ? 'Scan Struk' : 'Scan'}</span>
+            </Button>
             <Button size="sm" onClick={() => setTxModal({ open: true, tx: null })}>
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">{t('quick_entry')}</span>
@@ -10417,82 +10533,27 @@ function LifeOsWorkspace() {
 
         {/* MODULE CONTENT WITH SMOOTH TRANSITION */}
         <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-8 py-5 sm:py-8 min-w-0 space-y-6">
-          <SmartCommandBar
-            t={t}
-            lang={lang}
-            data={data}
-            onExecuteBatch={handleSmartCommandBatch}
-          />
+          {(activeTab === 'dashboard' || activeTab === 'wallet') && (
+            <SmartCommandBar
+              t={t}
+              lang={lang}
+              data={data}
+              onExecuteBatch={handleSmartCommandBatch}
+            />
+          )}
           <div key={activeTab} className="life-motion-enter">
             {renderModule()}
           </div>
         </main>
       </div>
 
-      {/* MOBILE BOTTOM NAVIGATION */}
-      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-life-surface/95 backdrop-blur-lg border-t border-life-border/50 px-1.5 py-1.5 flex items-center justify-around">
-        {mobilePrimaryTabs.map((tab) => {
-          const Icon = tab.icon;
-          const active = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => {
-                navigateTab(tab.id);
-                setMobileMoreOpen(false);
-              }}
-              className={`flex flex-col items-center justify-center py-1.5 px-2 rounded-xl min-w-[58px] ${
-                active ? 'text-life-accent' : 'text-life-muted'
-              }`}
-            >
-              <Icon className="w-5 h-5" />
-              <span className="text-[10px] font-medium mt-1 truncate max-w-[66px]">
-                {t(tab.labelKey)}
-              </span>
-            </button>
-          );
-        })}
-        <button
-          onClick={() => setMobileMoreOpen((prev) => !prev)}
-          className={`flex flex-col items-center justify-center py-1.5 px-2 rounded-xl min-w-[58px] ${
-            mobileMoreOpen ? 'text-life-accent' : 'text-life-muted'
-          }`}
-        >
-          <MoreHorizontal className="w-5 h-5" />
-          <span className="text-[10px] font-medium mt-1">{t('all_modules')}</span>
-        </button>
-      </nav>
-
-      {/* MOBILE ALL MODULES DRAWER */}
-      <Modal
-        open={mobileMoreOpen}
-        onClose={() => setMobileMoreOpen(false)}
-        title={t('all_modules')}
-      >
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-          {allNavItems.map((item) => {
-            const Icon = item.icon;
-            const active = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  navigateTab(item.id);
-                  setMobileMoreOpen(false);
-                }}
-                className={`p-3.5 rounded-2xl border flex flex-col items-start gap-2 text-left ${
-                  active
-                    ? 'bg-life-surface2 border-life-accent text-life-soft'
-                    : 'bg-life-bg/80 border-life-border/40 text-life-text'
-                }`}
-              >
-                <Icon className="w-5 h-5 text-life-accent" />
-                <span className="text-xs font-medium">{t(item.labelKey)}</span>
-              </button>
-            );
-          })}
-        </div>
-      </Modal>
+      {/* MOBILE BOTTOM NAVIGATION: tombol QRIS di tengah = langsung scan / catat struk */}
+      <BottomNav
+        active={navActive}
+        onNavigate={navigateTab}
+        onScan={() => setReceiptModalOpen(true)}
+        lang={lang}
+      />
 
       {/* GLOBAL MODALS */}
       <TransactionModal
@@ -10595,7 +10656,7 @@ function LifeOsWorkspace() {
 
       {/* TOAST NOTIFICATION */}
       {toast && (
-        <div className="fixed bottom-20 lg:bottom-6 right-4 sm:right-6 z-50 px-4 py-3 rounded-2xl bg-life-surface2 border border-life-accent/70 text-xs font-medium text-life-text shadow-2xl flex items-center gap-2.5 max-w-[90vw] life-motion-enter">
+        <div className="fixed bottom-28 lg:bottom-6 right-4 sm:right-6 z-50 px-4 py-3 rounded-2xl bg-life-surface2 border border-life-accent/70 text-xs font-medium text-life-text shadow-2xl flex items-center gap-2.5 max-w-[90vw] life-motion-enter">
           <CheckCircle2 className="w-4 h-4 text-life-accent shrink-0" />
           <span className="truncate">{toast}</span>
         </div>

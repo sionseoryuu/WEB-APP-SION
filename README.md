@@ -2,6 +2,15 @@
 
 Web app (PWA) yang bisa di-install di HP / desktop. Data tersimpan otomatis di perangkat (localStorage).
 
+## Alur pengguna (setelah beli produk digital)
+1. **Lisensi** — masukkan email pembelian / kode lisensi (`LicenseGate.jsx`). Aktif hanya bila `VITE_LICENSE_API` & `VITE_LICENSE_PUBLIC_KEY` diisi.
+2. **Buat akun** — daftar nama, email, kata sandi (atau masuk bila sudah punya).
+3. **Dashboard** — Beranda gaya e-wallet.
+
+## Tampilan e-wallet
+Navigasi bawah: **Beranda · Aktivitas · [QRIS] · Dompet · Profil**. Tombol QRIS di tengah langsung membuka scan struk/QRIS.
+Kode tampilan baru ada di `src/ewallet/` (HomeView, ActivityView, ProfileView, parts, Stepper). Dashboard lama tetap ada di Beranda → Layanan → Ringkasan.
+
 ## Jalankan lokal
 ```bash
 npm install
