@@ -1,6 +1,7 @@
 // Baca FOTO struk di perangkat (OCR via tesseract.js), lalu rapikan menjadi
 // nama merchant + daftar barang (nama, jumlah, harga) + total.
 // Modul OCR dimuat malas (lazy) supaya aplikasi tetap ringan saat dibuka.
+export const OCR_BUILD = 'OCR v3 (crop + angka)';
 let workerPromise = null;
 
 const getWorker = () => {

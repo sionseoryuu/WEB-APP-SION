@@ -103,7 +103,7 @@ import Stepper from './ewallet/Stepper.jsx';
 import { BottomNav } from './ewallet/parts.jsx';
 import { parseQris, guessCategory } from './ewallet/helpers.js';
 import { decodeCode, loadImage } from './ewallet/qrScan.js';
-import { ocrReceiptImage, parseReceipt } from './ewallet/receiptOcr.js';
+import { ocrReceiptImage, parseReceipt, OCR_BUILD } from './ewallet/receiptOcr.js';
 import { licenseEnabled } from './LicenseGate.jsx';
 import { initializeApp, getApps } from 'firebase/app';
 import {
@@ -7883,6 +7883,17 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
                 : 'Image captured. Review extracted details below before saving.'}
             </span>
           </div>
+        )}
+
+        {capturedPreview && scanMode !== 'text' && !detectedCode && !ocrBusy && (
+          <details className="text-[11px] text-life-muted">
+            <summary className="cursor-pointer select-none">
+              {lang === 'id' ? 'Teks hasil baca' : 'Raw text read'} · {OCR_BUILD}
+            </summary>
+            <pre className="mt-1.5 p-2 rounded-lg bg-life-bg border border-life-border/40 whitespace-pre-wrap break-words max-h-48 overflow-auto">
+              {rawText || (lang === 'id' ? '(tidak ada teks terbaca)' : '(no text read)')}
+            </pre>
+          </details>
         )}
 
         <Input
