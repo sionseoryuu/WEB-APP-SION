@@ -1985,7 +1985,7 @@ const Modal = ({ open, onClose, title, subtitle, children, maxWidth = 'max-w-lg'
           <button
             onClick={onClose}
             className="p-2 rounded-xl text-life-muted hover:text-life-text hover:bg-life-surface2 shrink-0"
-            aria-label={lang === 'id' ? 'Tutup' : 'Close'}
+            aria-label={typeof document !== 'undefined' && document.documentElement.lang === 'en' ? 'Close' : 'Tutup'}
           >
             <X className="w-5 h-5" />
           </button>
@@ -8987,6 +8987,13 @@ function LifeOsWorkspace() {
   const [toast, setToast] = useState(null);
 
   const lang = data.profile.language || 'id';
+  useEffect(() => {
+    try {
+      document.documentElement.lang = lang;
+    } catch {
+      /* abaikan */
+    }
+  }, [lang]);
   const t = useCallback((key) => I18N[lang]?.[key] || I18N.en[key] || key, [lang]);
 
   const notify = useCallback((message, action) => {
