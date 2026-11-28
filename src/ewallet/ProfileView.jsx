@@ -2,7 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import {
   Camera, UserRound, Tags, Wallet, PieChart, Repeat, HandCoins, Palette, Languages, EyeOff, LayoutGrid,
   CloudUpload, Download, Upload, FileSpreadsheet, RotateCcw, Sparkles, KeyRound, LogOut, ChevronRight,
-  ChevronLeft, MessageCircle, Plus, Trash2, Pencil, Check, X, Lock, BadgeCheck, Info, Mail, Smartphone,
+  ChevronLeft, MessageCircle, Plus, Trash2, Pencil, Check, X, Lock, BadgeCheck, Info, Mail, Smartphone, Bell, Star, FileText,
 } from 'lucide-react';
 import ThemeSettings from '../ThemeSettings.jsx';
 import DriveBackup from '../DriveBackup.jsx';
@@ -42,9 +42,9 @@ const Row = ({ icon: Icon, label, hint, onClick, right, danger, chevron = true }
   );
 };
 
-const SubHeader = ({ title, onBack }) => (
+const SubHeader = ({ title, onBack, lang }) => (
   <div className="flex items-center gap-2 mb-4">
-    <button onClick={onBack} className="p-2 -ml-2 rounded-xl text-life-text" aria-label="Back"><ChevronLeft className="w-5 h-5" /></button>
+    <button onClick={onBack} className="p-2 -ml-2 rounded-xl text-life-text" aria-label={lang === 'id' ? 'Kembali' : 'Back'}><ChevronLeft className="w-5 h-5" /></button>
     <h1 className="text-lg font-bold text-life-text">{title}</h1>
   </div>
 );
@@ -59,7 +59,7 @@ function EditPage({ data, lang, onUpdateProfile, onBack }) {
   const field = 'w-full rounded-xl bg-life-bg border border-life-border/60 px-3 py-3 text-sm text-life-text outline-none focus:border-life-accent';
   return (
     <div>
-      <SubHeader title={L('Ubah Nama & Info', 'Edit Name & Info')} onBack={onBack} />
+      <SubHeader title={L('Ubah Nama & Info', 'Edit Name & Info')} onBack={onBack} lang={lang} />
       <form
         className="space-y-4"
         onSubmit={(e) => {
@@ -130,7 +130,7 @@ function CategoryPage({ data, derived, lang, onAddCategory, onDeleteCategory, on
 
   return (
     <div>
-      <SubHeader title={L('Semua Kategori', 'All Categories')} onBack={onBack} />
+      <SubHeader title={L('Semua Kategori', 'All Categories')} onBack={onBack} lang={lang} />
       <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-life-bg border border-life-border/50 mb-4">
         {[['expense', L('Pengeluaran', 'Expense')], ['income', L('Pemasukan', 'Income')]].map(([v, label]) => (
           <button key={v} onClick={() => { setKind(v); setEditing(null); }} className={`py-2.5 rounded-lg text-xs font-semibold ${kind === v ? 'bg-life-accent text-life-bg' : 'text-life-muted'}`}>{label}</button>
@@ -197,7 +197,7 @@ function LayoutPage({ data, lang, onUpdateProfile, onBack }) {
   ];
   return (
     <div>
-      <SubHeader title={L('Atur Tampilan Beranda', 'Customize Home')} onBack={onBack} />
+      <SubHeader title={L('Atur Tampilan Beranda', 'Customize Home')} onBack={onBack} lang={lang} />
       <Group>
         {items.map(([key, label]) => (
           <div key={key} className="flex items-center justify-between gap-3 px-3.5 py-3.5">
@@ -214,7 +214,7 @@ function BackupPage({ data, lang, onImportJson, onBack }) {
   const L = (a, b) => (lang === 'id' ? a : b);
   return (
     <div>
-      <SubHeader title={L('Cadangan Google Drive', 'Google Drive Backup')} onBack={onBack} />
+      <SubHeader title={L('Cadangan Google Drive', 'Google Drive Backup')} onBack={onBack} lang={lang} />
       <DriveBackup lang={lang} data={data} onRestore={onImportJson} />
     </div>
   );
@@ -223,7 +223,7 @@ function BackupPage({ data, lang, onImportJson, onBack }) {
 function ThemePage({ lang, onBack }) {
   return (
     <div>
-      <SubHeader title={lang === 'id' ? 'Tema & Warna' : 'Theme & Colors'} onBack={onBack} />
+      <SubHeader title={lang === 'id' ? 'Tema & Warna' : 'Theme & Colors'} onBack={onBack} lang={lang} />
       <ThemeSettings lang={lang} />
     </div>
   );
@@ -234,7 +234,7 @@ export default function ProfileView(props) {
   const {
     data, derived, currentUser, lang, maskBalances, onToggleMask, onUpdateProfile, onNavigate,
     onExportJson, onExportCsv, onImportJson, onResetEmpty, onRestoreDemo, onLogout,
-    onAddCategory, onDeleteCategory, onRenameCategory,
+    onAddCategory, onDeleteCategory, onRenameCategory, lockEnabled, onExportReport,
   } = props;
   const L = (a, b) => (lang === 'id' ? a : b);
   const [page, setPage] = useState('menu');
@@ -332,6 +332,13 @@ export default function ProfileView(props) {
         <Row icon={PieChart} label={L('Anggaran', 'Budgets')} onClick={() => onNavigate('budgets')} />
         <Row icon={Repeat} label={L('Langganan & tagihan', 'Bills & subscriptions')} onClick={() => onNavigate('subscriptions')} />
         <Row icon={HandCoins} label={L('Utang & piutang', 'Debts')} onClick={() => onNavigate('debts')} />
+        <Row icon={Repeat} label={L('Transaksi berulang', 'Recurring transactions')} hint={L('Gaji, kos, cicilan otomatis', 'Automatic salary, rent, installments')} onClick={() => onNavigate('recurring')} />
+        <Row icon={Star} label={L('Menu favorit', 'Favorite orders')} hint={L('Catat pesanan langganan sekali ketuk', 'Log usual orders in one tap')} onClick={() => onNavigate('templates')} />
+      </Group>
+
+      <Group title={L('Keamanan & Pengingat', 'Security & Reminders')}>
+        <Row icon={Bell} label={L('Pengingat & notifikasi', 'Reminders & notifications')} hint={L('Tagihan, tugas, kebiasaan', 'Bills, tasks, habits')} onClick={() => onNavigate('notifications')} />
+        <Row icon={Lock} label={L('Kunci aplikasi', 'App lock')} hint={lockEnabled ? L('Aktif', 'On') : L('Mati', 'Off')} onClick={() => onNavigate('security')} />
       </Group>
 
       <Group title={L('Tampilan & Preferensi', 'Appearance & Preferences')}>
@@ -343,6 +350,7 @@ export default function ProfileView(props) {
 
       <Group title={L('Data & Cadangan', 'Data & Backup')}>
         <Row icon={CloudUpload} label={L('Cadangan Google Drive', 'Google Drive backup')} onClick={() => setPage('backup')} />
+        <Row icon={FileText} label={L('Ekspor laporan bulanan', 'Export monthly report')} hint={L('PDF, Excel, atau CSV', 'PDF, Excel or CSV')} onClick={onExportReport} />
         <Row icon={Download} label={L('Ekspor data (JSON)', 'Export data (JSON)')} onClick={onExportJson} />
         <Row icon={FileSpreadsheet} label={L('Ekspor transaksi (CSV)', 'Export transactions (CSV)')} onClick={onExportCsv} />
         <Row icon={Upload} label={L('Impor dari JSON', 'Import from JSON')} onClick={() => importRef.current?.click()} />
@@ -351,7 +359,7 @@ export default function ProfileView(props) {
       </Group>
 
       <Group title={L('Tentang', 'About')}>
-        <Row icon={Info} label={L('Tentang LIFE OS', 'About LIFE OS')} hint="v1.0 • Personal Life & Wealth" chevron={false} />
+        <Row icon={Info} label={L('Tentang LIFE OS', 'About LIFE OS')} hint={`v1.0 • ${L('Kehidupan & Kekayaan Pribadi', 'Personal Life & Wealth')}`} chevron={false} />
       </Group>
 
       <button onClick={onLogout} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-[#D96B52]/15 border border-[#D96B52]/40 text-sm font-semibold text-[#F29B87]">

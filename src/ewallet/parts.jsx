@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, QrCode, Home, History, Wallet, User, LayoutGrid, X, Plus, ScanLine, Split, Banknote, Send } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, QrCode, Home, History, Wallet, User, LayoutGrid, X, Plus, ScanLine, Split, Banknote, Send, Search, FileText, CalendarRange } from 'lucide-react';
 import { fmt, catName, isQrisTx } from './helpers.js';
 import { SERVICE_GROUPS } from './services.js';
 
@@ -73,10 +73,10 @@ export const TxRow = ({ tx, data, lang, masked, onClick, compact = false }) => {
       <span className="flex-1 min-w-0">
         <span className="block text-sm font-medium text-life-text truncate">{tx.description || catName(tx.category, lang)}</span>
         <span className="block text-[11px] text-life-muted truncate">
-          {catName(tx.category, lang) || (lang === 'id' ? 'Transfer' : 'Transfer')}
+          {catName(tx.category, lang) || 'Transfer'}
           {!compact && acc ? ` • ${acc.name}` : ''}
           {qris ? ' • QRIS' : ''}
-          {tx.items?.length > 1 ? ` • ${tx.items.length} item` : ''}
+          {tx.items?.length > 1 ? ` • ${tx.items.length} ${lang === 'id' ? 'item' : 'items'}` : ''}
         </span>
       </span>
       <span className={`text-sm font-semibold tabular-nums shrink-0 ${isIn ? 'text-[#87B082]' : 'text-life-text'}`}>
@@ -122,7 +122,7 @@ export const BottomNav = ({ active, onNavigate, onMenu, menuOpen, lang }) => {
               >
                 <LayoutGrid className="w-7 h-7" />
               </button>
-              <span className="text-[10px] font-bold mt-1 text-life-accent tracking-wide">{id ? 'MENU' : 'MENU'}</span>
+              <span className="text-[10px] font-bold mt-1 text-life-accent tracking-wide">MENU</span>
             </div>
           )
         )}
@@ -138,9 +138,12 @@ export const MenuSheet = ({ open, onClose, onNavigate, actions, lang }) => {
   const quick = [
     { icon: Plus, label: L('Catat', 'Add'), run: actions.addTx },
     { icon: ScanLine, label: L('Scan QRIS/Struk', 'Scan QRIS/Receipt'), run: actions.scan },
-    { icon: Split, label: L('Split Bill', 'Split Bill'), run: actions.split },
+    { icon: Split, label: L('Bagi Tagihan', 'Split Bill'), run: actions.split },
     { icon: Banknote, label: L('Bagi Gaji', 'Payday'), run: actions.payday },
-    { icon: Send, label: L('Briefing', 'Briefing'), run: actions.briefing },
+    { icon: Send, label: L('Ringkasan Harian', 'Daily Briefing'), run: actions.briefing },
+    { icon: Search, label: L('Cari', 'Search'), run: actions.search },
+    { icon: CalendarRange, label: L('Ringkasan Mingguan', 'Weekly Summary'), run: actions.weekly },
+    { icon: FileText, label: L('Ekspor Laporan', 'Export Report'), run: actions.exportReport },
   ];
   const go = (fn) => () => { onClose(); fn(); };
   return (
@@ -159,7 +162,7 @@ export const MenuSheet = ({ open, onClose, onNavigate, actions, lang }) => {
         </div>
 
         <p className="text-[11px] font-semibold uppercase tracking-widest text-life-muted/75 mb-2">{L('Aksi Cepat', 'Quick Actions')}</p>
-        <div className="grid grid-cols-5 gap-2 mb-5">
+        <div className="grid grid-cols-4 gap-2 mb-5">
           {quick.map((q) => (
             <button key={q.label} onClick={go(q.run)} className="flex flex-col items-center gap-1.5 active:scale-95 transition-transform">
               <span className="w-12 h-12 rounded-2xl bg-life-accent/15 border border-life-accent/40 text-life-accent flex items-center justify-center">

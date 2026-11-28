@@ -23,7 +23,7 @@ const CAT_ID = {
   'Dining & Coffee': 'Makan & Kopi',
   Groceries: 'Belanja Harian',
   'Transport & Travel': 'Transportasi & Perjalanan',
-  'Software & Subscriptions': 'Software & Langganan',
+  'Software & Subscriptions': 'Perangkat Lunak & Langganan',
   'Health & Wellness': 'Kesehatan',
   'Shopping & Lifestyle': 'Belanja & Gaya Hidup',
   Investments: 'Investasi',
@@ -33,6 +33,10 @@ const CAT_ID = {
   'Dividends & Yield': 'Dividen & Imbal Hasil',
   'Client Retainer': 'Retainer Klien',
   'Other Income': 'Pemasukan Lain',
+  'Vault Allocation': 'Alokasi Brankas',
+  'Account Rebalance': 'Penyeimbangan Akun',
+  'Credit Card Settlement': 'Pelunasan Kartu Kredit',
+  Transfer: 'Transfer',
 };
 export const catName = (cat, lang) => (lang === 'id' ? CAT_ID[cat] || cat : cat);
 

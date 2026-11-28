@@ -1,11 +1,22 @@
 // Backup & restore ke Google Drive. Scope tunggal: drive.file
 // (app hanya bisa melihat file yang ia buat sendiri).
+// Kode galat bersifat netral bahasa (mis. 'drive_expired'); teks untuk pengguna diterjemahkan di UI.
 const CLIENT_ID =
   import.meta.env.VITE_GOOGLE_CLIENT_ID ||
   '1035980999137-v3rj893bonk7hpfn7358fpommjprn28g.apps.googleusercontent.com';
 const SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const FILE_NAME = 'life-os-backup.json';
 const TOKEN_KEY = 'lifeos:drive_token';
+const LINKED_KEY = 'lifeos:drive_linked';
+
+// Penanda bahwa pengguna pernah menautkan Drive di perangkat ini (dipakai cadangan otomatis)
+export const isDriveLinked = () => {
+  try {
+    return localStorage.getItem(LINKED_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
 
 let gisPromise = null;
 function loadGis() {
@@ -18,7 +29,7 @@ function loadGis() {
       s.onload = () => resolve();
       s.onerror = () => {
         gisPromise = null;
-        reject(new Error('Gagal memuat Google Sign-In'));
+        reject(new Error('drive_gis_load'));
       };
       document.head.appendChild(s);
     });
@@ -28,47 +39,57 @@ function loadGis() {
 
 function readToken() {
   try {
-    const t = JSON.parse(sessionStorage.getItem(TOKEN_KEY) || 'null');
+    const t = JSON.parse(localStorage.getItem(TOKEN_KEY) || 'null');
     return t && t.exp > Date.now() + 30000 ? t.value : null;
   } catch {
     return null;
   }
 }
 
+// interactive=false: coba diam-diam (tanpa jendela) — gagal bila izin Google tidak berlaku lagi.
 export async function getToken(interactive = true) {
   const cached = readToken();
   if (cached) return cached;
   await loadGis();
   return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('drive_timeout')), interactive ? 120000 : 15000);
+    const done = (fn) => (arg) => {
+      clearTimeout(timer);
+      fn(arg);
+    };
     const client = window.google.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
       scope: SCOPE,
-      prompt: interactive ? '' : 'none',
-      callback: (res) => {
+      callback: done((res) => {
         if (res.error) return reject(new Error(res.error_description || res.error));
         try {
-          sessionStorage.setItem(
+          localStorage.setItem(
             TOKEN_KEY,
             JSON.stringify({ value: res.access_token, exp: Date.now() + (res.expires_in || 3600) * 1000 })
           );
+          localStorage.setItem(LINKED_KEY, '1');
         } catch {
           /* abaikan */
         }
-        resolve(res.access_token);
-      },
-      error_callback: (err) => reject(new Error(err?.type || 'Login dibatalkan')),
+        return resolve(res.access_token);
+      }),
+      error_callback: done((err) => reject(new Error(err?.type || 'drive_cancelled'))),
     });
-    client.requestAccessToken();
+    client.requestAccessToken({ prompt: interactive ? '' : 'none' });
   });
 }
 
 async function api(token, url, init = {}) {
   const res = await fetch(url, { ...init, headers: { Authorization: `Bearer ${token}`, ...(init.headers || {}) } });
   if (res.status === 401) {
-    sessionStorage.removeItem(TOKEN_KEY);
-    throw new Error('Sesi Google habis, coba lagi');
+    try {
+      localStorage.removeItem(TOKEN_KEY);
+    } catch {
+      /* abaikan */
+    }
+    throw new Error('drive_expired');
   }
-  if (!res.ok) throw new Error(`Drive error ${res.status}`);
+  if (!res.ok) throw new Error(`drive_http_${res.status}`);
   return res;
 }
 
@@ -79,8 +100,8 @@ async function findFile(token) {
   return json.files?.[0] || null;
 }
 
-export async function backupToDrive(data) {
-  const token = await getToken(true);
+export async function backupToDrive(data, { interactive = true } = {}) {
+  const token = await getToken(interactive);
   const body = JSON.stringify(data);
   const existing = await findFile(token);
   if (existing) {

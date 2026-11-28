@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Wallet, PieChart, PiggyBank, TrendingUp, Repeat, HandCoins, CalendarDays, CheckSquare,
-  Calendar, Flame, Target, HeartHandshake, FileText, ShoppingCart, BarChart3,
+  Calendar, Flame, Target, HeartHandshake, FileText, ShoppingCart, BarChart3, Star, Bell, Lock,
 } from 'lucide-react';
 
 // Semua modul LIFE OS dikelompokkan seperti "layanan" di e-wallet
@@ -15,6 +15,8 @@ export const SERVICE_GROUPS = [
       { id: 'investments', icon: TrendingUp, label: { id: 'Investasi', en: 'Invest' } },
       { id: 'subscriptions', icon: Repeat, label: { id: 'Langganan', en: 'Bills' } },
       { id: 'debts', icon: HandCoins, label: { id: 'Utang', en: 'Debts' } },
+      { id: 'recurring', icon: Repeat, label: { id: 'Berulang', en: 'Recurring' } },
+      { id: 'templates', icon: Star, label: { id: 'Favorit', en: 'Favorites' } },
     ],
   },
   {
@@ -43,6 +45,14 @@ export const SERVICE_GROUPS = [
     items: [
       { id: 'overview', icon: LayoutDashboard, label: { id: 'Ringkasan', en: 'Overview' } },
       { id: 'reports', icon: BarChart3, label: { id: 'Laporan', en: 'Reports' } },
+    ],
+  },
+  {
+    id: 'safety',
+    label: { id: 'Keamanan', en: 'Safety' },
+    items: [
+      { id: 'notifications', icon: Bell, label: { id: 'Pengingat', en: 'Reminders' } },
+      { id: 'security', icon: Lock, label: { id: 'Kunci', en: 'Lock' } },
     ],
   },
 ];

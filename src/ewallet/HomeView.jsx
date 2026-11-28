@@ -1,8 +1,10 @@
 import React, { useMemo } from 'react';
 import {
   Eye, EyeOff, Plus, ScanLine, Split, Banknote, Send, LayoutGrid, CheckCircle2, Circle,
-  ArrowDownLeft, ArrowUpRight, ListTodo, Flame, CalendarDays, TrendingDown, PiggyBank,
+  ArrowDownLeft, ArrowUpRight, ListTodo, Flame, CalendarDays, TrendingDown, PiggyBank, Search,
 } from 'lucide-react';
+import { FavoritesStrip } from '../features/TemplatesView.jsx';
+import { WeeklyCard, dismissWeeklyToday } from '../features/WeeklySummary.jsx';
 import { Avatar, SectionTitle, TxRow } from './parts.jsx';
 import { fmt, todayStr, catName } from './helpers.js';
 import { ALL_SERVICES } from './services.js';
@@ -13,7 +15,9 @@ const PINNED_SERVICE_IDS = ['budgets', 'savings', 'tasks', 'habits'];
 export default function HomeView({
   data, derived, lang, maskBalances, onToggleMask, onNavigate,
   onOpenTx, onOpenReceipt, onOpenSplit, onOpenPayday, onOpenBriefing, onOpenMenu,
+  onOpenSearch, onOpenWeekly, onUseTemplate,
 }) {
+  const [, forceTick] = React.useState(0);
   const L = (idText, enText) => (lang === 'id' ? idText : enText);
   const { profile } = data;
   const currency = profile.currency;
@@ -60,7 +64,7 @@ export default function HomeView({
   const shortcuts = [
     { icon: Plus, label: L('Catat', 'Add'), onClick: () => onOpenTx() },
     { icon: ScanLine, label: L('Scan Struk', 'Scan'), onClick: onOpenReceipt },
-    { icon: Split, label: L('Split Bill', 'Split'), onClick: onOpenSplit },
+    { icon: Split, label: L('Bagi Tagihan', 'Split Bill'), onClick: onOpenSplit },
     { icon: Banknote, label: L('Bagi Gaji', 'Payday'), onClick: onOpenPayday },
   ];
 
@@ -85,7 +89,10 @@ export default function HomeView({
           <p className="text-[11px] text-life-muted">{greet}</p>
           <p className="text-base font-semibold text-life-text truncate">{profile.name}</p>
         </div>
-        <button onClick={onOpenBriefing} className="p-2.5 rounded-xl bg-life-surface border border-life-border/50 text-life-muted" aria-label="Briefing">
+        <button onClick={onOpenSearch} className="p-2.5 rounded-xl bg-life-surface border border-life-border/50 text-life-muted" aria-label={L('Cari', 'Search')}>
+          <Search className="w-4 h-4" />
+        </button>
+        <button onClick={onOpenBriefing} className="p-2.5 rounded-xl bg-life-surface border border-life-border/50 text-life-muted" aria-label={L('Ringkasan harian', 'Daily briefing')}>
           <Send className="w-4 h-4" />
         </button>
       </div>
@@ -99,7 +106,7 @@ export default function HomeView({
             <p className="text-xs font-medium opacity-80">{L('Total Kekayaan Bersih', 'Total Net Worth')}</p>
             <div className="flex items-center gap-2 mt-1">
               <h2 className="text-3xl font-bold tabular-nums tracking-tight">{fmt(derived.totalNetWorth, currency, maskBalances)}</h2>
-              <button onClick={onToggleMask} className="p-1.5 rounded-full bg-black/15" aria-label="Toggle saldo">
+              <button onClick={onToggleMask} className="p-1.5 rounded-full bg-black/15" aria-label={L('Tampilkan atau sembunyikan saldo', 'Show or hide balance')}>
                 {maskBalances ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
@@ -149,6 +156,23 @@ export default function HomeView({
             </button>
           ))}
         </div>
+      )}
+
+      {/* Ringkasan mingguan (tiap Minggu) */}
+      <WeeklyCard
+        data={data}
+        lang={lang}
+        maskBalances={maskBalances}
+        onOpen={onOpenWeekly}
+        onDismiss={() => {
+          dismissWeeklyToday();
+          forceTick((n) => n + 1);
+        }}
+      />
+
+      {/* Menu favorit: satu ketukan */}
+      {sec.shortcuts && (
+        <FavoritesStrip data={data} lang={lang} maskBalances={maskBalances} onUse={onUseTemplate} onManage={() => onNavigate('templates')} />
       )}
 
       {/* Mulai cepat untuk pengguna baru */}

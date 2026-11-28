@@ -100,7 +100,26 @@ import HomeView from './ewallet/HomeView.jsx';
 import ActivityView from './ewallet/ActivityView.jsx';
 import ProfileView from './ewallet/ProfileView.jsx';
 import { BottomNav, MenuSheet } from './ewallet/parts.jsx';
-import { parseQris, guessCategory } from './ewallet/helpers.js';
+import { parseQris, guessCategory, catName } from './ewallet/helpers.js';
+import { Star, Lock, BellRing } from 'lucide-react';
+import { makeTr } from './features/i18n.js';
+import { enumLabel } from './features/labels.js';
+import { todayYmd, newId } from './features/dates.js';
+import { applyRecurring, advanceMonth } from './features/recurring.js';
+import { computeBudgetAlerts, pruneAlertLog } from './features/budgetAlerts.js';
+import { dueItemsForMonth } from './features/calendarItems.js';
+import { buildReminders, loadNotifPrefs, saveNotifPrefs, syncReminders, cancelAllReminders, notifyNow, onNotificationTap, requestPermission } from './features/notify.js';
+import { loadLock, saveLock, DEFAULT_LOCK } from './features/appLock.js';
+import { loadAutoPrefs, runAutoBackup } from './features/autoBackup.js';
+import LockScreen from './features/LockScreen.jsx';
+import RecurringView from './features/RecurringView.jsx';
+import TemplatesView from './features/TemplatesView.jsx';
+import NotificationSettings from './features/NotificationSettings.jsx';
+import SecuritySettings from './features/SecuritySettings.jsx';
+import SearchModal from './features/SearchModal.jsx';
+import ExportModal from './features/ExportModal.jsx';
+import DueList from './features/DueList.jsx';
+import { WeeklyModal } from './features/WeeklySummary.jsx';
 import { decodeCode, loadImage } from './ewallet/qrScan.js';
 import { ocrReceiptImage, parseReceipt, reconcileRows, receiptToJpeg, OCR_BUILD } from './ewallet/receiptOcr.js';
 import { aiParseReceipt, aiEnabled } from './ewallet/receiptAi.js';
@@ -710,7 +729,7 @@ const I18N = {
       'Ketik bebas: "Beli kopi 45rb pakai QRIS dan jadwalkan evaluasi proyek besok jam 14.00"',
     smart_cmd_btn: 'Proses Otomatis',
     smart_cmd_processing: 'Memproses...',
-    split_bill: 'Split Bill / Patungan',
+    split_bill: 'Bagi Tagihan',
     split_bill_sub: 'Bagi tagihan bersama dan otomatis catat bagian teman sebagai piutang.',
     split_equal: 'Bagi Rata',
     split_custom: 'Nominal Kustom',
@@ -763,6 +782,11 @@ const I18N = {
 // ============================================================================
 // 2. CONSTANTS & NAVIGATION CONFIG
 // ============================================================================
+
+['nav_recurring', 'nav_templates', 'nav_notifications', 'nav_security'].forEach((k) => {
+  I18N.id[k] = makeTr('id')(k);
+  I18N.en[k] = makeTr('en')(k);
+});
 
 const _now = new Date();
 const TODAY_STR = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
@@ -826,6 +850,8 @@ const NAV_GROUPS = [
       { id: 'investments', labelKey: 'nav_investments', icon: TrendingUp },
       { id: 'subscriptions', labelKey: 'nav_subscriptions', icon: Repeat },
       { id: 'debts', labelKey: 'nav_debts', icon: HandCoins },
+      { id: 'recurring', labelKey: 'nav_recurring', icon: Repeat },
+      { id: 'templates', labelKey: 'nav_templates', icon: Star },
     ],
   },
   {
@@ -855,7 +881,11 @@ const NAV_GROUPS = [
   },
   {
     labelKey: 'nav_profile',
-    items: [{ id: 'profile', labelKey: 'nav_profile', icon: User }],
+    items: [
+      { id: 'profile', labelKey: 'nav_profile', icon: User },
+      { id: 'notifications', labelKey: 'nav_notifications', icon: BellRing },
+      { id: 'security', labelKey: 'nav_security', icon: Lock },
+    ],
   },
 ];
 
@@ -1498,6 +1528,9 @@ const createEmptyState = (lang = 'id', ownerName = '') => ({
   events: [],
   habits: [],
   goals: [],
+  recurring: [],
+  templates: [],
+  alertLog: {},
   notes: [],
   shoppingLists: [
     {
@@ -1952,7 +1985,7 @@ const Modal = ({ open, onClose, title, subtitle, children, maxWidth = 'max-w-lg'
           <button
             onClick={onClose}
             className="p-2 rounded-xl text-life-muted hover:text-life-text hover:bg-life-surface2 shrink-0"
-            aria-label="Close modal"
+            aria-label={lang === 'id' ? 'Tutup' : 'Close'}
           >
             <X className="w-5 h-5" />
           </button>
@@ -2185,7 +2218,7 @@ const AuthPortalScreen = ({ lang, onToggleLang, t, onAuthenticateSuccess }) => {
           <div>
             <span className="text-base font-bold tracking-wider text-life-text block">LIFE OS</span>
             <span className="text-[10px] uppercase tracking-widest text-life-accent">
-              Dark Chocolate Edition
+              {lang === 'id' ? 'Edisi Cokelat Gelap' : 'Dark Chocolate Edition'}
             </span>
           </div>
         </div>
@@ -2248,7 +2281,7 @@ const AuthPortalScreen = ({ lang, onToggleLang, t, onAuthenticateSuccess }) => {
             {mode === 'register' && (
               <Input
                 label={t('fullname_label')}
-                placeholder="e.g. Budi Santoso"
+                placeholder={lang === 'id' ? 'mis. Budi Santoso' : 'e.g. Jane Smith'}
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
@@ -2258,7 +2291,7 @@ const AuthPortalScreen = ({ lang, onToggleLang, t, onAuthenticateSuccess }) => {
             <Input
               label={t('email_label')}
               type="email"
-              placeholder="nama@email.com"
+              placeholder={lang === 'id' ? 'nama@email.com' : 'name@email.com'}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -2314,7 +2347,7 @@ const AuthPortalScreen = ({ lang, onToggleLang, t, onAuthenticateSuccess }) => {
       </div>
 
       <div className="text-center text-[11px] text-life-muted/70 relative z-10">
-        LIFE OS • Private Personal Wealth & Productivity Architecture
+        {lang === 'id' ? 'LIFE OS • Arsitektur Keuangan & Produktivitas Pribadi' : 'LIFE OS • Private Personal Wealth & Productivity Architecture'}
       </div>
     </div>
   );
@@ -2685,7 +2718,7 @@ const DashboardView = ({
                     <button
                       type="button"
                       className="mt-0.5 text-life-accent hover:text-life-soft shrink-0"
-                      aria-label="Toggle task completion"
+                      aria-label={lang === 'id' ? 'Tandai tugas selesai' : 'Toggle task completion'}
                     >
                       <Circle className="w-4 h-4" />
                     </button>
@@ -3074,7 +3107,7 @@ const WalletView = ({
               <option value="all">{t('all_types')}</option>
               <option value="income">{lang === 'id' ? 'Pemasukan' : 'Income'}</option>
               <option value="expense">{lang === 'id' ? 'Pengeluaran' : 'Expense'}</option>
-              <option value="transfer">Transfer</option>
+              <option value="transfer">{lang === 'id' ? 'Transfer' : 'Transfer'}</option>
             </select>
             <select
               value={categoryFilter}
@@ -3260,7 +3293,7 @@ const WalletView = ({
         <form onSubmit={handleCreateAccount} className="space-y-4">
           <Input
             label={lang === 'id' ? 'Nama Akun / Rekening' : 'Account Name'}
-            placeholder="e.g. BCA Prioritas / Mandiri Tabungan"
+            placeholder={lang === 'id' ? 'mis. BCA Prioritas / Mandiri Tabungan' : 'e.g. Main Bank / Savings Account'}
             value={accName}
             onChange={(e) => setAccName(e.target.value)}
             required
@@ -3271,11 +3304,11 @@ const WalletView = ({
               value={accType}
               onChange={(e) => setAccType(e.target.value)}
             >
-              <option value="Checking">Checking / Giro</option>
-              <option value="Savings">Savings / Tabungan</option>
-              <option value="Credit">Credit Card / Kartu Kredit</option>
-              <option value="Cash">Cash / Tunai</option>
-              <option value="Investment">Investment / Investasi</option>
+              <option value="Checking">{enumLabel('accountType', 'Checking', lang)}</option>
+              <option value="Savings">{enumLabel('accountType', 'Savings', lang)}</option>
+              <option value="Credit">{enumLabel('accountType', 'Credit', lang)}</option>
+              <option value="Cash">{enumLabel('accountType', 'Cash', lang)}</option>
+              <option value="Investment">{enumLabel('accountType', 'Investment', lang)}</option>
             </Select>
             <Input
               label={lang === 'id' ? 'Saldo Awal' : 'Opening Balance'}
@@ -3289,7 +3322,7 @@ const WalletView = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               label={lang === 'id' ? 'Bank / Penyedia' : 'Institution'}
-              placeholder="e.g. Bank Central Asia"
+              placeholder={lang === 'id' ? 'mis. Bank Central Asia' : 'e.g. National Bank'}
               value={accInstitution}
               onChange={(e) => setAccInstitution(e.target.value)}
             />
@@ -3322,7 +3355,7 @@ const WalletView = ({
           </Select>
           <Input
             label={lang === 'id' ? 'Nama Kategori' : 'Category Name'}
-            placeholder="e.g. Kopi & Ngopi / Zakat & Sedekah"
+            placeholder={lang === 'id' ? 'mis. Kopi & Ngopi / Zakat & Sedekah' : 'e.g. Coffee Runs / Charity'}
             value={newCatName}
             onChange={(e) => setNewCatName(e.target.value)}
             required
@@ -3684,7 +3717,7 @@ const SavingsView = ({
                     <div>
                       <h3 className="text-base font-semibold text-life-text">{sg.name}</h3>
                       <p className="text-xs text-life-muted mt-0.5">
-                        Target: {formatDateReadable(sg.targetDate, lang)}
+                        {lang === 'id' ? 'Target' : 'Target'}: {formatDateReadable(sg.targetDate, lang)}
                       </p>
                     </div>
                     <button
@@ -3732,7 +3765,7 @@ const SavingsView = ({
         <form onSubmit={handleCreate} className="space-y-4">
           <Input
             label={lang === 'id' ? 'Nama Target Tabungan' : 'Vault Name'}
-            placeholder="e.g. Dana Pendidikan / Rumah Impian"
+            placeholder={lang === 'id' ? 'mis. Dana Pendidikan / Rumah Impian' : 'e.g. Education Fund / Dream Home'}
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
@@ -3829,7 +3862,7 @@ const SavingsView = ({
           )}
           <Input
             label={t('notes')}
-            placeholder="e.g. Setoran gaji bulanan"
+            placeholder={lang === 'id' ? 'mis. Setoran gaji bulanan' : 'e.g. Monthly salary deposit'}
             value={contribNote}
             onChange={(e) => setContribNote(e.target.value)}
           />
@@ -4014,7 +4047,7 @@ const SubscriptionsView = ({ data, maskBalances, t, lang, onAddSub, onPaySub, on
         <form onSubmit={handleCreate} className="space-y-4">
           <Input
             label={lang === 'id' ? 'Nama Tagihan / Langganan' : 'Bill / Subscription Name'}
-            placeholder="e.g. Listrik PLN / Netflix / Internet"
+            placeholder={lang === 'id' ? 'mis. Listrik PLN / Netflix / Internet' : 'e.g. Electricity / Netflix / Internet'}
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
@@ -4211,7 +4244,7 @@ const DebtsView = ({
                       </span>
                       <h3 className="text-base font-semibold text-life-text mt-2">{item.title}</h3>
                       <p className="text-xs text-life-muted">
-                        {item.counterparty} • Due: {formatDateReadable(item.dueDate, lang)}
+                        {item.counterparty} • {lang === 'id' ? 'Jatuh tempo' : 'Due'}: {formatDateReadable(item.dueDate, lang)}
                       </p>
                     </div>
                     <button
@@ -4288,14 +4321,14 @@ const DebtsView = ({
 
           <Input
             label={lang === 'id' ? 'Judul Utang / Piutang' : 'Title'}
-            placeholder="e.g. Cicilan Laptop / Pinjaman Budi"
+            placeholder={lang === 'id' ? 'mis. Cicilan Laptop / Pinjaman Budi' : 'e.g. Laptop Installment / Loan from Jane'}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
           />
           <Input
             label={lang === 'id' ? 'Pihak Terkait (Bank / Nama)' : 'Counterparty'}
-            placeholder="e.g. BCA PayLater / Budi Santoso"
+            placeholder={lang === 'id' ? 'mis. BCA PayLater / Budi Santoso' : 'e.g. PayLater / Jane Smith'}
             value={counterparty}
             onChange={(e) => setCounterparty(e.target.value)}
           />
@@ -4516,7 +4549,7 @@ const InvestmentsView = ({
                       </span>
                     </div>
                     <div className="flex justify-between text-xs pt-1">
-                      <span className="text-life-muted">Return</span>
+                      <span className="text-life-muted">{lang === 'id' ? 'Imbal hasil' : 'Return'}</span>
                       <span
                         className={`font-semibold tabular-nums ${
                           gain >= 0 ? 'text-[#87B082]' : 'text-[#D96B52]'
@@ -4555,7 +4588,7 @@ const InvestmentsView = ({
         <form onSubmit={handleCreate} className="space-y-4">
           <Input
             label={lang === 'id' ? 'Nama Aset Investasi' : 'Asset Name'}
-            placeholder="e.g. Emas Antam / Reksadana RDPU / Saham BBCA"
+            placeholder={lang === 'id' ? 'mis. Emas Antam / Reksadana RDPU / Saham BBCA' : 'e.g. Gold Bar / Index Fund / Blue-Chip Stock'}
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
@@ -4566,15 +4599,15 @@ const InvestmentsView = ({
               value={assetClass}
               onChange={(e) => setAssetClass(e.target.value)}
             >
-              <option value="Gold">Gold / Emas</option>
-              <option value="Mutual Fund">Mutual Fund / Reksadana</option>
-              <option value="Stocks">Stocks / Saham</option>
-              <option value="Bonds">Bonds / Obligasi & SBN</option>
-              <option value="Other">Other / Lainnya</option>
+              <option value="Gold">{enumLabel('assetClass', 'Gold', lang)}</option>
+              <option value="Mutual Fund">{enumLabel('assetClass', 'Mutual Fund', lang)}</option>
+              <option value="Stocks">{enumLabel('assetClass', 'Stocks', lang)}</option>
+              <option value="Bonds">{enumLabel('assetClass', 'Bonds', lang)}</option>
+              <option value="Other">{enumLabel('assetClass', 'Other', lang)}</option>
             </Select>
             <Input
               label={lang === 'id' ? 'Jumlah / Unit / Gram' : 'Quantity / Units'}
-              placeholder="e.g. 10 gr / 5 Lot"
+              placeholder={lang === 'id' ? 'mis. 10 gr / 5 Lot' : 'e.g. 10 g / 5 Lots'}
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
             />
@@ -5321,7 +5354,7 @@ const TasksView = ({ data, t, lang, onOpenTaskModal, onToggleTask, onUpdateTaskS
             onChange={(e) => setStatusFilter(e.target.value)}
             className="rounded-xl bg-life-bg border border-life-border/55 px-3 py-2 text-xs text-life-text"
           >
-            <option value="all">{t('status')}: All</option>
+            <option value="all">{t('status')}: {lang === 'id' ? 'Semua' : 'All'}</option>
             <option value="todo">{t('todo')}</option>
             <option value="in_progress">{t('in_progress')}</option>
             <option value="completed">{t('completed')}</option>
@@ -5331,11 +5364,11 @@ const TasksView = ({ data, t, lang, onOpenTaskModal, onToggleTask, onUpdateTaskS
             onChange={(e) => setPriorityFilter(e.target.value)}
             className="rounded-xl bg-life-bg border border-life-border/55 px-3 py-2 text-xs text-life-text"
           >
-            <option value="all">{t('priority')}: All</option>
-            <option value="Urgent">Urgent</option>
-            <option value="High">High</option>
-            <option value="Medium">Medium</option>
-            <option value="Low">Low</option>
+            <option value="all">{t('priority')}: {lang === 'id' ? 'Semua' : 'All'}</option>
+            <option value="Urgent">{enumLabel('priority', 'Urgent', lang)}</option>
+            <option value="High">{enumLabel('priority', 'High', lang)}</option>
+            <option value="Medium">{enumLabel('priority', 'Medium', lang)}</option>
+            <option value="Low">{enumLabel('priority', 'Low', lang)}</option>
           </select>
           <select
             value={categoryFilter}
@@ -5343,11 +5376,11 @@ const TasksView = ({ data, t, lang, onOpenTaskModal, onToggleTask, onUpdateTaskS
             className="rounded-xl bg-life-bg border border-life-border/55 px-3 py-2 text-xs text-life-text"
           >
             <option value="all">{t('all_categories')}</option>
-            <option value="Work">Work</option>
-            <option value="Finance">Finance</option>
-            <option value="Health">Health</option>
-            <option value="Personal">Personal</option>
-            <option value="Learning">Learning</option>
+            <option value="Work">{enumLabel('taskCategory', 'Work', lang)}</option>
+            <option value="Finance">{enumLabel('taskCategory', 'Finance', lang)}</option>
+            <option value="Health">{enumLabel('taskCategory', 'Health', lang)}</option>
+            <option value="Personal">{enumLabel('taskCategory', 'Personal', lang)}</option>
+            <option value="Learning">{enumLabel('taskCategory', 'Learning', lang)}</option>
           </select>
         </div>
       </GlassCard>
@@ -5496,9 +5529,10 @@ const TasksView = ({ data, t, lang, onOpenTaskModal, onToggleTask, onUpdateTaskS
 };
 
 // --- MODULE G: CALENDAR ---
-const CalendarView = ({ data, t, lang, onOpenEventModal, onDeleteEvent }) => {
-  const [cursorMonth, setCursorMonth] = useState('2026-11');
+const CalendarView = ({ data, t, lang, onOpenEventModal, onDeleteEvent, onNavigate, maskBalances }) => {
+  const [cursorMonth, setCursorMonth] = useState(CURRENT_MONTH);
   const [selectedDay, setSelectedDay] = useState(TODAY_STR);
+  const dueMap = useMemo(() => dueItemsForMonth(data, cursorMonth), [data, cursorMonth]);
 
   const calendarCells = useMemo(() => {
     const [y, m] = cursorMonth.split('-').map(Number);
@@ -5585,6 +5619,7 @@ const CalendarView = ({ data, t, lang, onOpenEventModal, onDeleteEvent }) => {
               const dayBdays = (data.contacts || []).filter(
                 (c) => c.birthday && c.birthday.slice(5) === cell.dateStr.slice(5)
               );
+              const dayDue = dueMap[cell.dateStr] || [];
               const isSelected = cell.dateStr === selectedDay;
               const isToday = cell.dateStr === TODAY_STR;
 
@@ -5611,6 +5646,7 @@ const CalendarView = ({ data, t, lang, onOpenEventModal, onDeleteEvent }) => {
                   <div className="flex sm:hidden gap-1">
                     {dayEvents.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-life-soft" />}
                     {dayTasks.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-life-accent" />}
+                    {dayDue.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-[#D96B52]" />}
                   </div>
                   <div className="hidden sm:block space-y-1 w-full overflow-hidden">
                     {dayEvents.slice(0, 1).map((ev) => (
@@ -5624,6 +5660,11 @@ const CalendarView = ({ data, t, lang, onOpenEventModal, onDeleteEvent }) => {
                     {dayTasks.length > 0 && (
                       <div className="text-[10px] truncate px-1.5 py-0.5 rounded bg-life-border/40 text-life-text">
                         {dayTasks.length} {lang === 'id' ? 'tugas' : 'due'}
+                      </div>
+                    )}
+                    {dayDue.length > 0 && (
+                      <div className="text-[10px] truncate px-1.5 py-0.5 rounded bg-[#D96B52]/20 text-[#F29B87]">
+                        {dayDue.length} {lang === 'id' ? 'tagihan' : 'bills'}
                       </div>
                     )}
                   </div>
@@ -5715,6 +5756,13 @@ const CalendarView = ({ data, t, lang, onOpenEventModal, onDeleteEvent }) => {
               ))
             )}
           </div>
+          <DueList
+            items={dueMap[selectedDay] || []}
+            lang={lang}
+            currency={data.profile.currency}
+            maskBalances={maskBalances}
+            onOpen={(tab) => onNavigate && onNavigate(tab)}
+          />
         </GlassCard>
       </div>
     </div>
@@ -5864,27 +5912,27 @@ const HabitsView = ({ data, t, lang, onToggleHabitDate, onCreateHabit, onDeleteH
         <form onSubmit={handleCreate} className="space-y-4">
           <Input
             label={t('habit_ritual')}
-            placeholder="e.g. Baca Buku 30 Menit / Olahraga Pagi"
+            placeholder={lang === 'id' ? 'mis. Baca Buku 30 Menit / Olahraga Pagi' : 'e.g. Read 30 Minutes / Morning Workout'}
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Select label={t('category')} value={category} onChange={(e) => setCategory(e.target.value)}>
-              <option value="Mindset">Mindset</option>
-              <option value="Health">Health</option>
-              <option value="Finance">Finance</option>
-              <option value="Productivity">Productivity</option>
+              <option value="Mindset">{enumLabel('taskCategory', 'Mindset', lang)}</option>
+              <option value="Health">{enumLabel('taskCategory', 'Health', lang)}</option>
+              <option value="Finance">{enumLabel('taskCategory', 'Finance', lang)}</option>
+              <option value="Productivity">{enumLabel('taskCategory', 'Productivity', lang)}</option>
             </Select>
             <Select
               label={lang === 'id' ? 'Waktu Pelaksanaan' : 'Time of Day'}
               value={timeOfDay}
               onChange={(e) => setTimeOfDay(e.target.value)}
             >
-              <option value="Morning">Morning / Pagi</option>
-              <option value="Afternoon">Afternoon / Siang</option>
-              <option value="Evening">Evening / Malam</option>
-              <option value="Anytime">Anytime / Kapan Saja</option>
+              <option value="Morning">{enumLabel('timeOfDay', 'Morning', lang)}</option>
+              <option value="Afternoon">{enumLabel('timeOfDay', 'Afternoon', lang)}</option>
+              <option value="Evening">{enumLabel('timeOfDay', 'Evening', lang)}</option>
+              <option value="Anytime">{enumLabel('timeOfDay', 'Anytime', lang)}</option>
             </Select>
           </div>
           <div className="flex justify-end gap-2 pt-2">
@@ -5992,7 +6040,7 @@ const GoalsView = ({ data, t, lang, onCreateGoal, onToggleMilestone, onAddMilest
                     </div>
                     <h3 className="text-base font-semibold text-life-text">{goal.title}</h3>
                     <p className="text-xs text-life-muted mt-0.5">
-                      Deadline: {formatDateReadable(goal.deadline, lang)}
+                      {lang === 'id' ? 'Tenggat' : 'Deadline'}: {formatDateReadable(goal.deadline, lang)}
                     </p>
                   </div>
                   <button
@@ -6068,7 +6116,7 @@ const GoalsView = ({ data, t, lang, onCreateGoal, onToggleMilestone, onAddMilest
         <form onSubmit={handleCreate} className="space-y-4">
           <Input
             label={lang === 'id' ? 'Nama Target' : 'Goal Objective'}
-            placeholder="e.g. Capai Dana Darurat 100 Juta"
+            placeholder={lang === 'id' ? 'mis. Capai Dana Darurat 100 Juta' : 'e.g. Reach $10,000 Emergency Fund'}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
@@ -6079,18 +6127,18 @@ const GoalsView = ({ data, t, lang, onCreateGoal, onToggleMilestone, onAddMilest
               value={horizon}
               onChange={(e) => setHorizon(e.target.value)}
             >
-              <option value="Short-Term">Short-Term</option>
-              <option value="Long-Term">Long-Term</option>
+              <option value="Short-Term">{enumLabel('horizon', 'Short-Term', lang)}</option>
+              <option value="Long-Term">{enumLabel('horizon', 'Long-Term', lang)}</option>
             </Select>
             <Select label={t('category')} value={category} onChange={(e) => setCategory(e.target.value)}>
-              <option value="Career">Career</option>
+              <option value="Career">{enumLabel('goalCategory', 'Career', lang)}</option>
               <option value="Financial">Financial</option>
-              <option value="Health">Health</option>
-              <option value="Personal">Personal</option>
+              <option value="Health">{enumLabel('taskCategory', 'Health', lang)}</option>
+              <option value="Personal">{enumLabel('taskCategory', 'Personal', lang)}</option>
             </Select>
           </div>
           <Input
-            label="Deadline"
+            label={lang === 'id' ? 'Tenggat' : 'Deadline'}
             type="date"
             value={deadline}
             onChange={(e) => setDeadline(e.target.value)}
@@ -6098,7 +6146,7 @@ const GoalsView = ({ data, t, lang, onCreateGoal, onToggleMilestone, onAddMilest
           />
           <Input
             label={lang === 'id' ? 'Milestone Pertama (Opsional)' : 'Initial Milestone (Optional)'}
-            placeholder="e.g. Selesaikan tahap 1"
+            placeholder={lang === 'id' ? 'mis. Selesaikan tahap 1' : 'e.g. Finish phase 1'}
             value={firstMilestone}
             onChange={(e) => setFirstMilestone(e.target.value)}
           />
@@ -6323,7 +6371,7 @@ const PersonalCrmView = ({ data, t, lang, onAddContact, onLogContactToday, onDel
         <form onSubmit={handleCreate} className="space-y-4">
           <Input
             label={t('contact_name')}
-            placeholder="e.g. Budi Santoso / Klien PT Maju"
+            placeholder={lang === 'id' ? 'mis. Budi Santoso / Klien PT Maju' : 'e.g. Jane Smith / Client Acme Inc.'}
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
@@ -6334,14 +6382,14 @@ const PersonalCrmView = ({ data, t, lang, onAddContact, onLogContactToday, onDel
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             >
-              <option value="Family">Family / Keluarga</option>
-              <option value="Client">Client / Klien</option>
-              <option value="Mentor">Mentor</option>
-              <option value="Friend">Friend / Teman</option>
+              <option value="Family">{enumLabel('contact', 'Family', lang)}</option>
+              <option value="Client">{enumLabel('contact', 'Client', lang)}</option>
+              <option value="Mentor">{enumLabel('contact', 'Mentor', lang)}</option>
+              <option value="Friend">{enumLabel('contact', 'Friend', lang)}</option>
             </Select>
             <Input
               label={t('contact_handle')}
-              placeholder="+62 812... / @username"
+              placeholder={lang === 'id' ? '+62 812... / @nama_pengguna' : '+1 555... / @username'}
               value={handle}
               onChange={(e) => setHandle(e.target.value)}
             />
@@ -6369,7 +6417,7 @@ const PersonalCrmView = ({ data, t, lang, onAddContact, onLogContactToday, onDel
           </div>
           <Input
             label={t('last_topic')}
-            placeholder="e.g. Pembahasan kerjasama Q1"
+            placeholder={lang === 'id' ? 'mis. Pembahasan kerjasama Q1' : 'e.g. Q1 partnership discussion'}
             value={lastTopic}
             onChange={(e) => setLastTopic(e.target.value)}
           />
@@ -6559,8 +6607,8 @@ const NotesView = ({ data, t, lang, onSaveNote, onDeleteNote, onTogglePinNote })
                   onChange={(e) => onSaveNote({ ...activeNote, type: e.target.value })}
                   className="rounded-xl bg-life-bg border border-life-border/50 px-3 py-1.5 text-xs text-life-soft"
                 >
-                  <option value="Note">Note</option>
-                  <option value="Journal">Daily Journal</option>
+                  <option value="Note">{enumLabel('noteType', 'Note', lang)}</option>
+                  <option value="Journal">{enumLabel('noteType', 'Journal', lang)}</option>
                 </select>
                 <input
                   value={activeNote.category}
@@ -6571,7 +6619,7 @@ const NotesView = ({ data, t, lang, onSaveNote, onDeleteNote, onTogglePinNote })
                   <input
                     value={activeNote.mood || ''}
                     onChange={(e) => onSaveNote({ ...activeNote, mood: e.target.value })}
-                    placeholder="Mood..."
+                    placeholder={lang === 'id' ? 'Suasana hati...' : 'Mood...'}
                     className="rounded-xl bg-life-bg border border-life-border/50 px-3 py-1.5 text-xs text-life-soft"
                   />
                 )}
@@ -6753,7 +6801,7 @@ const ShoppingView = ({
               <div className="sm:col-span-5">
                 <Input
                   label={lang === 'id' ? 'Nama Barang' : 'Item Name'}
-                  placeholder="e.g. Kopi Arabika / Beras Organik"
+                  placeholder={lang === 'id' ? 'mis. Kopi Arabika / Beras Organik' : 'e.g. Arabica Coffee / Organic Rice'}
                   value={itemName}
                   onChange={(e) => setItemName(e.target.value)}
                   required
@@ -6761,7 +6809,7 @@ const ShoppingView = ({
               </div>
               <div className="sm:col-span-2">
                 <Input
-                  label="Qty"
+                  label={lang === 'id' ? 'Jumlah' : 'Qty'}
                   type="number"
                   min="1"
                   value={itemQty}
@@ -6785,11 +6833,11 @@ const ShoppingView = ({
                   value={itemCategory}
                   onChange={(e) => setItemCategory(e.target.value)}
                 >
-                  <option value="Pantry">Pantry</option>
-                  <option value="Produce">Produce</option>
-                  <option value="Household">Household</option>
-                  <option value="Electronics">Electronics</option>
-                  <option value="Personal">Personal</option>
+                  <option value="Pantry">{enumLabel('shopCategory', 'Pantry', lang)}</option>
+                  <option value="Produce">{enumLabel('shopCategory', 'Produce', lang)}</option>
+                  <option value="Household">{enumLabel('shopCategory', 'Household', lang)}</option>
+                  <option value="Electronics">{enumLabel('shopCategory', 'Electronics', lang)}</option>
+                  <option value="Personal">{enumLabel('taskCategory', 'Personal', lang)}</option>
                 </Select>
               </div>
               <div className="sm:col-span-1">
@@ -6871,7 +6919,7 @@ const ShoppingView = ({
         <form onSubmit={handleCreateList} className="space-y-4">
           <Input
             label={lang === 'id' ? 'Nama Daftar Belanja' : 'List Name'}
-            placeholder="e.g. Belanja Bulanan / Perlengkapan Rumah"
+            placeholder={lang === 'id' ? 'mis. Belanja Bulanan / Perlengkapan Rumah' : 'e.g. Monthly Groceries / Household Supplies'}
             value={newListName}
             onChange={(e) => setNewListName(e.target.value)}
             required
@@ -7170,7 +7218,7 @@ const SplitBillModal = ({ open, onClose, data, t, lang, onExecuteSplitBill }) =>
       <form onSubmit={handleSubmit} className="space-y-4">
         <Input
           label={lang === 'id' ? 'Judul Patungan / Makan Bersama' : 'Bill Description'}
-          placeholder="e.g. Makan Malam Klien & Tim"
+          placeholder={lang === 'id' ? 'mis. Makan Malam Klien & Tim' : 'e.g. Client & Team Dinner'}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required
@@ -7401,7 +7449,7 @@ const PaydaySplitterModal = ({ open, onClose, data, t, lang, onExecuteSplit }) =
         </div>
 
         <div className="flex items-center justify-between text-xs pt-1">
-          <span className="text-life-muted">Total Allocation</span>
+          <span className="text-life-muted">{lang === 'id' ? 'Total Alokasi' : 'Total Allocation'}</span>
           <span className={totalPct === 100 ? 'text-[#87B082] font-semibold' : 'text-[#D96B52] font-semibold'}>
             {totalPct}% {totalPct !== 100 && (lang === 'id' ? '(Harus 100%)' : '(Must equal 100%)')}
           </span>
@@ -7819,7 +7867,7 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
                 <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                   <div className="w-56 h-36 sm:w-64 sm:h-40 border-2 border-life-accent/80 rounded-2xl shadow-[0_0_0_9999px_rgba(23,20,18,0.45)] flex items-end justify-center pb-2">
                     <span className="text-[10px] uppercase tracking-widest px-2 py-0.5 rounded bg-life-bg/80 text-life-soft">
-                      QRIS • Barcode • Struk
+                      {lang === 'id' ? 'QRIS • Barcode • Struk' : 'QRIS • Barcode • Receipt'}
                     </span>
                   </div>
                 </div>
@@ -7911,7 +7959,7 @@ const ReceiptScannerModal = ({ open, onClose, data, t, lang, onSaveExtractedTx }
           <div className="flex items-center gap-3 p-2 rounded-xl bg-life-bg/80 border border-life-border/40">
             <img
               src={capturedPreview}
-              alt="Scanned preview"
+              alt={lang === 'id' ? 'Pratinjau hasil pindai' : 'Scanned preview'}
               className="w-14 h-14 rounded-lg object-cover shrink-0"
             />
             <span className="text-xs text-life-muted">
@@ -8173,6 +8221,7 @@ const DailyBriefingModal = ({ open, onClose, data, derived, t, lang, onCopied })
 const withItemIds = (list) => (list || []).map((it, i) => ({ ...it, id: it.id || `ti-${i}-${Math.random().toString(36).slice(2, 6)}` }));
 
 const TransactionModal = ({ open, onClose, editingTx, data, t, lang, onSave, accountBalances = {} }) => {
+  const tr = useMemo(() => makeTr(lang), [lang]);
   const [fundVaultId, setFundVaultId] = useState('');
   const [type, setType] = useState(editingTx?.type || 'expense');
   const [amount, setAmount] = useState(editingTx ? String(editingTx.amount) : '');
@@ -8186,9 +8235,15 @@ const TransactionModal = ({ open, onClose, editingTx, data, t, lang, onSave, acc
   const [paymentMethod, setPaymentMethod] = useState(editingTx?.paymentMethod || 'Card / Digital');
   const [notes, setNotes] = useState(editingTx?.notes || '');
   const [txItems, setTxItems] = useState(withItemIds(editingTx?.items));
+  const [favName, setFavName] = useState('');
+  const [saveFav, setSaveFav] = useState(false);
+  const [repeatMonthly, setRepeatMonthly] = useState(false);
 
   useEffect(() => {
     if (open) {
+      setFavName('');
+      setSaveFav(false);
+      setRepeatMonthly(false);
       const nextType = editingTx?.type || 'expense';
       setTxItems(withItemIds(editingTx?.items));
       setType(nextType);
@@ -8272,6 +8327,8 @@ const TransactionModal = ({ open, onClose, editingTx, data, t, lang, onSave, acc
       toAccountId: type === 'transfer' ? toAccountId : undefined,
       paymentMethod: type === 'transfer' ? 'Internal Ledger Transfer' : paymentMethod,
       notes: notes.trim(),
+      saveAsTemplate: saveFav && type !== 'transfer' ? favName.trim() || title : undefined,
+      makeRecurring: repeatMonthly && !editingTx && type !== 'transfer',
     });
     onClose();
   };
@@ -8347,7 +8404,7 @@ const TransactionModal = ({ open, onClose, editingTx, data, t, lang, onSave, acc
               <>
                 <div className="grid grid-cols-[1fr_3.2rem_5.5rem_1.5rem] gap-1.5 px-0.5 text-[10px] uppercase tracking-wider text-life-muted">
                   <span>{lang === 'id' ? 'Menu' : 'Item'}</span>
-                  <span className="text-center">Qty</span>
+                  <span className="text-center">{lang === 'id' ? 'Jml' : 'Qty'}</span>
                   <span>{lang === 'id' ? 'Harga' : 'Price'}</span>
                   <span />
                 </div>
@@ -8383,7 +8440,7 @@ const TransactionModal = ({ open, onClose, editingTx, data, t, lang, onSave, acc
                       }}
                       className="min-w-0 rounded-lg bg-life-surface border border-life-border/60 px-2 py-2 text-sm text-life-text outline-none focus:border-life-accent"
                     />
-                    <button type="button" onClick={() => removeTxItem(it.id)} className="text-life-muted hover:text-[#F29B87]" aria-label="Hapus">
+                    <button type="button" onClick={() => removeTxItem(it.id)} className="text-life-muted hover:text-[#F29B87]" aria-label={lang === 'id' ? 'Hapus' : 'Delete'}>
                       <X className="w-4 h-4" />
                     </button>
                   </div>
@@ -8405,7 +8462,7 @@ const TransactionModal = ({ open, onClose, editingTx, data, t, lang, onSave, acc
           <Select label={t('category')} value={category} onChange={(e) => setCategory(e.target.value)}>
             {categories.map((c) => (
               <option key={c} value={c}>
-                {c}
+                {type === 'transfer' ? enumLabel('transferCategory', c, lang) : catName(c, lang)}
               </option>
             ))}
           </Select>
@@ -8448,7 +8505,7 @@ const TransactionModal = ({ open, onClose, editingTx, data, t, lang, onSave, acc
         ) : (
           <Input
             label={lang === 'id' ? 'Metode Pembayaran' : 'Payment Method'}
-            placeholder="e.g. QRIS, Transfer Bank, Tunai"
+            placeholder={lang === 'id' ? 'mis. QRIS, Transfer Bank, Tunai' : 'e.g. Card, Bank Transfer, Cash'}
             value={paymentMethod}
             onChange={(e) => setPaymentMethod(e.target.value)}
           />
@@ -8483,6 +8540,28 @@ const TransactionModal = ({ open, onClose, editingTx, data, t, lang, onSave, acc
         )}
 
         <Input label={t('notes')} value={notes} onChange={(e) => setNotes(e.target.value)} />
+
+        {type !== 'transfer' && (
+          <div className="rounded-2xl border border-life-border/50 bg-life-bg/60 p-3 space-y-2.5">
+            <label className="flex items-center gap-2.5 text-xs text-life-text">
+              <input type="checkbox" checked={saveFav} onChange={(e) => setSaveFav(e.target.checked)} />
+              {tr('fav_save_checkbox')}
+            </label>
+            {saveFav && (
+              <Input
+                placeholder={tr('fav_save_name_ph')}
+                value={favName}
+                onChange={(e) => setFavName(e.target.value)}
+              />
+            )}
+            {!editingTx && (
+              <label className="flex items-center gap-2.5 text-xs text-life-text">
+                <input type="checkbox" checked={repeatMonthly} onChange={(e) => setRepeatMonthly(e.target.checked)} />
+                {tr('tx_make_recurring')}
+              </label>
+            )}
+          </div>
+        )}
 
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="secondary" onClick={onClose}>
@@ -8548,20 +8627,20 @@ const TaskModal = ({ open, onClose, editingTask, defaultDate, t, lang, onSave })
         />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Select label={t('priority')} value={priority} onChange={(e) => setPriority(e.target.value)}>
-            <option value="Urgent">Urgent</option>
-            <option value="High">High</option>
-            <option value="Medium">Medium</option>
-            <option value="Low">Low</option>
+            <option value="Urgent">{enumLabel('priority', 'Urgent', lang)}</option>
+            <option value="High">{enumLabel('priority', 'High', lang)}</option>
+            <option value="Medium">{enumLabel('priority', 'Medium', lang)}</option>
+            <option value="Low">{enumLabel('priority', 'Low', lang)}</option>
           </Select>
           <Input label={t('date')} type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} required />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Select label={t('category')} value={category} onChange={(e) => setCategory(e.target.value)}>
-            <option value="Work">Work</option>
-            <option value="Finance">Finance</option>
-            <option value="Health">Health</option>
-            <option value="Personal">Personal</option>
-            <option value="Learning">Learning</option>
+            <option value="Work">{enumLabel('taskCategory', 'Work', lang)}</option>
+            <option value="Finance">{enumLabel('taskCategory', 'Finance', lang)}</option>
+            <option value="Health">{enumLabel('taskCategory', 'Health', lang)}</option>
+            <option value="Personal">{enumLabel('taskCategory', 'Personal', lang)}</option>
+            <option value="Learning">{enumLabel('taskCategory', 'Learning', lang)}</option>
           </Select>
           <Select label={t('status')} value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="todo">{t('todo')}</option>
@@ -8657,16 +8736,16 @@ const EventModal = ({ open, onClose, editingEvent, defaultDate, t, lang, onSave 
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Select label={t('category')} value={category} onChange={(e) => setCategory(e.target.value)}>
-            <option value="Work">Work</option>
-            <option value="Finance">Finance</option>
-            <option value="Personal">Personal</option>
-            <option value="Health">Health</option>
+            <option value="Work">{enumLabel('taskCategory', 'Work', lang)}</option>
+            <option value="Finance">{enumLabel('taskCategory', 'Finance', lang)}</option>
+            <option value="Personal">{enumLabel('taskCategory', 'Personal', lang)}</option>
+            <option value="Health">{enumLabel('taskCategory', 'Health', lang)}</option>
           </Select>
-          <Select label="Reminder" value={reminder} onChange={(e) => setReminder(e.target.value)}>
-            <option value="None">None</option>
-            <option value="15 min before">15 min before</option>
-            <option value="1 hour before">1 hour before</option>
-            <option value="1 day before">1 day before</option>
+          <Select label={lang === 'id' ? 'Pengingat' : 'Reminder'} value={reminder} onChange={(e) => setReminder(e.target.value)}>
+            <option value="None">{enumLabel('reminder', 'None', lang)}</option>
+            <option value="15 min before">{enumLabel('reminder', '15 min before', lang)}</option>
+            <option value="1 hour before">{enumLabel('reminder', '1 hour before', lang)}</option>
+            <option value="1 day before">{enumLabel('reminder', '1 day before', lang)}</option>
           </Select>
         </div>
         <Input
@@ -8743,7 +8822,7 @@ const SettingsModal = ({
             <div className="min-w-0">
               <p className="text-xs font-semibold text-life-text truncate">{currentUser.email}</p>
               <p className="text-[11px] text-life-accent font-mono truncate">
-                Vault ID: {currentUser.workspaceKey}
+                {(data.profile.language || 'id') === 'id' ? 'ID Brankas' : 'Vault ID'}: {currentUser.workspaceKey}
               </p>
             </div>
             <Button size="sm" variant="danger" onClick={onLogout}>
@@ -8910,11 +8989,12 @@ function LifeOsWorkspace() {
   const lang = data.profile.language || 'id';
   const t = useCallback((key) => I18N[lang]?.[key] || I18N.en[key] || key, [lang]);
 
-  const notify = useCallback((message) => {
-    setToast(message);
+  const notify = useCallback((message, action) => {
+    const entry = { message, action };
+    setToast(entry);
     setTimeout(() => {
-      setToast((prev) => (prev === message ? null : prev));
-    }, 3200);
+      setToast((prev) => (prev === entry ? null : prev));
+    }, action ? 6000 : 3200);
   }, []);
 
   const navigateTab = useCallback(
@@ -9093,7 +9173,56 @@ function LifeOsWorkspace() {
   }, [data, lang]);
 
   // --- CRUD HANDLERS ---
-  const handleSaveTx = (txPayload) => {
+  const handleSaveTx = (rawPayload) => {
+    const { saveAsTemplate, makeRecurring, ...txPayload } = rawPayload;
+    if (saveAsTemplate && txPayload.type !== 'transfer') {
+      setData((prev) => ({
+        ...prev,
+        templates: [
+          ...(prev.templates || []),
+          {
+            id: newId('tpl'),
+            name: saveAsTemplate,
+            type: txPayload.type,
+            category: txPayload.category,
+            accountId: txPayload.accountId,
+            paymentMethod: txPayload.paymentMethod,
+            description: txPayload.description,
+            amount: txPayload.amount,
+            items: txPayload.items || [],
+            notes: txPayload.notes || '',
+            useCount: 0,
+            lastUsed: '',
+          },
+        ],
+      }));
+    }
+    if (makeRecurring && !txPayload.id && txPayload.type !== 'transfer') {
+      const day = Number(String(txPayload.date).slice(8, 10)) || 1;
+      setData((prev) => ({
+        ...prev,
+        recurring: [
+          ...(prev.recurring || []),
+          {
+            id: newId('rec'),
+            active: true,
+            type: txPayload.type,
+            name: txPayload.description,
+            amount: txPayload.amount,
+            category: txPayload.category,
+            accountId: txPayload.accountId,
+            frequency: 'monthly',
+            dayOfMonth: day,
+            startDate: txPayload.date,
+            endDate: '',
+            paymentMethod: 'Auto / Recurring',
+            notes: txPayload.notes || '',
+            // kejadian pada tanggal ini sudah dicatat manual; mulai dari bulan berikutnya
+            lastRun: txPayload.date,
+          },
+        ],
+      }));
+    }
     setData((prev) => {
       if (txPayload.id) {
         const old = prev.transactions.find((tx) => tx.id === txPayload.id);
@@ -9249,7 +9378,7 @@ function LifeOsWorkspace() {
   const handleExecuteSplitBill = ({ title, totalAmount, accountId, logTotalExpense, participants }) => {
     const newReceivables = participants.map((p, idx) => ({
       id: `dbt-split-${Date.now()}-${idx}`,
-      title: `Split Bill: ${title} (${p.name})`,
+      title: `${lang === 'id' ? 'Bagi Tagihan' : 'Split Bill'}: ${title} (${p.name})`,
       counterparty: p.name,
       kind: 'receivable',
       totalAmount: p.amount,
@@ -9258,7 +9387,7 @@ function LifeOsWorkspace() {
       tenorMonths: 1,
       dueDate: TODAY_STR,
       accountId,
-      notes: `Auto-generated from Split Bill: ${title}`,
+      notes: `${lang === 'id' ? 'Dibuat otomatis dari Bagi Tagihan' : 'Auto-generated from Split Bill'}: ${title}`,
     }));
 
     setData((prev) => ({
@@ -9272,10 +9401,10 @@ function LifeOsWorkspace() {
               amount: totalAmount,
               date: TODAY_STR,
               category: 'Dining & Coffee',
-              description: `Split Bill: ${title}`,
+              description: `${lang === 'id' ? 'Bagi Tagihan' : 'Split Bill'}: ${title}`,
               accountId,
               paymentMethod: 'Split Bill / Card',
-              notes: `Shared with ${participants.map((p) => p.name).join(', ')}`,
+              notes: `${lang === 'id' ? 'Dibagi dengan' : 'Shared with'} ${participants.map((p) => p.name).join(', ')}`,
             },
             ...prev.transactions,
           ]
@@ -9284,7 +9413,7 @@ function LifeOsWorkspace() {
 
     notify(
       lang === 'id'
-        ? `Split bill dicatat & ${participants.length} piutang teman dibuat`
+        ? `Bagi tagihan dicatat & ${participants.length} piutang teman dibuat`
         : `Split bill logged & ${participants.length} receivables created`
     );
   };
@@ -9591,7 +9720,12 @@ function LifeOsWorkspace() {
       ...prev,
       debts: (prev.debts || []).map((d) =>
         d.id === debtItem.id
-          ? { ...d, paidAmount: Math.min(d.totalAmount, d.paidAmount + stepAmount) }
+          ? {
+              ...d,
+              paidAmount: Math.min(d.totalAmount, d.paidAmount + stepAmount),
+              dueDate:
+                d.totalAmount - d.paidAmount - stepAmount > 0 && d.dueDate ? advanceMonth(d.dueDate) : d.dueDate,
+            }
           : d
       ),
       transactions: [
@@ -9988,6 +10122,275 @@ function LifeOsWorkspace() {
     notify(lang === 'id' ? 'Data referensi dipulihkan' : 'Reference dataset restored');
   };
 
+  // =========================================================================
+  // FITUR BARU: berulang, anggaran, pengingat, kunci, cadangan otomatis, favorit
+  // =========================================================================
+  const tr = useMemo(() => makeTr(lang), [lang]);
+  const dataRef = useRef(data);
+  dataRef.current = data;
+
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [weeklyOpen, setWeeklyOpen] = useState(false);
+  const [notifPrefs, setNotifPrefs] = useState(loadNotifPrefs);
+  const [lockCfg, setLockCfg] = useState(loadLock);
+  const [locked, setLocked] = useState(() => loadLock().enabled);
+  const [covered, setCovered] = useState(false);
+  const hiddenAtRef = useRef(0);
+
+  const updateNotifPrefs = useCallback((next) => {
+    setNotifPrefs(next);
+    saveNotifPrefs(next);
+    if (!next.enabled) cancelAllReminders();
+  }, []);
+
+  // 1) Transaksi berulang: catat semua yang jatuh tempo (saat dibuka, kembali aktif, dan tiap 30 menit)
+  useEffect(() => {
+    if (!currentUser) return undefined;
+    const run = () => {
+      const res = applyRecurring(dataRef.current, todayYmd());
+      if (res.created.length) {
+        setData(res.data);
+        notify(makeTr(dataRef.current.profile.language || 'id')('rec_auto_logged', { n: res.created.length }));
+      }
+    };
+    run();
+    const id = setInterval(run, 30 * 60 * 1000);
+    const onVis = () => !document.hidden && run();
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, [currentUser, data.recurring, notify]);
+
+  // 2) Peringatan anggaran 80% / 100%
+  useEffect(() => {
+    if (!currentUser) return;
+    const month = todayYmd().slice(0, 7);
+    const budgets = effectiveBudgets(data.budgets, month);
+    if (!budgets.length) return;
+    const pruned = pruneAlertLog(data.alertLog || {}, month);
+    const res = computeBudgetAlerts({ transactions: data.transactions, budgets, month, log: pruned });
+    const prunedChanged = Object.keys(pruned).length !== Object.keys(data.alertLog || {}).length;
+    if (!res.changed && !prunedChanged) return;
+    setData((prev) => ({ ...prev, alertLog: res.log }));
+    if (res.alerts.length) {
+      const T = makeTr(data.profile.language || 'id');
+      const first = res.alerts[0];
+      notify(
+        res.alerts.length > 1
+          ? `${T('budget_alert_toast', { cat: catName(first.category, lang), pct: first.pct })} (+${res.alerts.length - 1})`
+          : T('budget_alert_toast', { cat: catName(first.category, lang), pct: first.pct })
+      );
+      if (notifPrefs.enabled && notifPrefs.budget) {
+        const money = (n) => formatMoney(n, data.profile.currency);
+        res.alerts.slice(0, 3).forEach((a) => {
+          notifyNow(
+            {
+              key: a.key,
+              title: T(a.threshold >= 100 ? 'n_budget_title_100' : 'n_budget_title_80', { cat: catName(a.category, lang) }),
+              body: T('n_budget_body', { spent: money(a.spent), limit: money(a.limit), pct: a.pct }),
+              route: 'budgets',
+            },
+            { channelDesc: T('ns_channel_desc') }
+          );
+        });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser, data.transactions, data.budgets]);
+
+  // 3) Jadwal pengingat (diperbarui setelah data berhenti berubah)
+  useEffect(() => {
+    if (!currentUser || !notifPrefs.enabled) return undefined;
+    const doSync = () => {
+      const d = dataRef.current;
+      const T = makeTr(d.profile.language || 'id');
+      syncReminders(buildReminders({ data: d, prefs: notifPrefs, tr: T }), { channelDesc: T('ns_channel_desc') }).catch(() => {});
+    };
+    const timer = setTimeout(doSync, 1500);
+    const onVis = () => !document.hidden && doSync();
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, [currentUser, notifPrefs, data, lang]);
+
+  // Ketuk notifikasi -> buka layar terkait
+  useEffect(() => onNotificationTap((route) => navigateTab(route)), [navigateTab]);
+
+  // 4) Kunci aplikasi: kunci saat ditinggalkan, tutup tampilan di layar multitugas
+  useEffect(() => {
+    const onVis = () => {
+      const cfg = loadLock();
+      if (!cfg.enabled) return;
+      if (document.hidden) {
+        hiddenAtRef.current = Date.now();
+        setCovered(true);
+        if (cfg.timeout === 0) setLocked(true);
+      } else {
+        const away = (Date.now() - (hiddenAtRef.current || Date.now())) / 1000;
+        if (away >= cfg.timeout) setLocked(true);
+        setCovered(false);
+      }
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
+
+  const verifyAccountPassword = useCallback(
+    async (pw) => {
+      if (!currentUser?.workspaceKey) return false;
+      const stored = readStoredJson(acctStoreKey(currentUser.workspaceKey));
+      return !!stored?.passwordHash && stored.passwordHash === hashPasswordClient(pw);
+    },
+    [currentUser]
+  );
+
+  // 5) Cadangan otomatis ke Google Drive (saat aplikasi aktif)
+  useEffect(() => {
+    if (!currentUser) return undefined;
+    const run = async () => {
+      const res = await runAutoBackup(dataRef.current);
+      if (res.status === 'needs_auth') {
+        const day = todayYmd();
+        let seen = '';
+        try {
+          seen = localStorage.getItem('lifeos:backup:ping') || '';
+        } catch {
+          /* abaikan */
+        }
+        if (seen !== day) {
+          try {
+            localStorage.setItem('lifeos:backup:ping', day);
+          } catch {
+            /* abaikan */
+          }
+          const T = makeTr(dataRef.current.profile.language || 'id');
+          notify(T('n_backup_title'));
+          if (loadNotifPrefs().enabled) notifyNow({ key: 'backup-auth', title: T('n_backup_title'), body: T('n_backup_body'), route: 'profile' }, { channelDesc: T('ns_channel_desc') });
+        }
+      }
+    };
+    const first = setTimeout(run, 6000);
+    const id = setInterval(run, 30 * 60 * 1000);
+    const onVis = () => !document.hidden && run();
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      clearTimeout(first);
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, [currentUser, notify]);
+
+  // --- Menu favorit (template) ---
+  const handleUseTemplate = (tpl) => {
+    const items = (tpl.items || []).map((it) => ({ name: it.name, qty: it.qty, price: it.price }));
+    const amount = items.length ? items.reduce((s, it) => s + (Number(it.qty) || 1) * (Number(it.price) || 0), 0) : Number(tpl.amount) || 0;
+    if (!(amount > 0)) return;
+    const txId = `tx-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const accountId = data.accounts.find((a) => a.id === tpl.accountId)?.id || data.accounts[0]?.id;
+    const tx = {
+      id: txId,
+      type: tpl.type === 'income' ? 'income' : 'expense',
+      amount,
+      date: todayYmd(),
+      category: tpl.category,
+      description: tpl.description || tpl.name,
+      accountId,
+      paymentMethod: tpl.paymentMethod || 'QRIS',
+      notes: tpl.notes || '',
+      templateId: tpl.id,
+      ...(items.length ? { items } : {}),
+    };
+    setData((prev) => ({
+      ...prev,
+      transactions: [tx, ...prev.transactions],
+      templates: (prev.templates || []).map((x) => (x.id === tpl.id ? { ...x, useCount: (x.useCount || 0) + 1, lastUsed: todayYmd() } : x)),
+    }));
+    notify(tr('fav_logged', { name: tpl.name, amount: formatMoney(amount, data.profile.currency) }), {
+      label: tr('fav_undo'),
+      run: () =>
+        setData((prev) => ({
+          ...prev,
+          transactions: prev.transactions.filter((x) => x.id !== txId),
+          templates: (prev.templates || []).map((x) => (x.id === tpl.id ? { ...x, useCount: Math.max(0, (x.useCount || 1) - 1) } : x)),
+        })),
+    });
+  };
+  const handleSaveTemplate = (tpl) => {
+    setData((prev) => {
+      const list = prev.templates || [];
+      return {
+        ...prev,
+        templates: tpl.id ? list.map((x) => (x.id === tpl.id ? { ...x, ...tpl } : x)) : [...list, { ...tpl, id: newId('tpl'), useCount: 0, lastUsed: '' }],
+      };
+    });
+    notify(tr('fav_saved'));
+  };
+  const handleDeleteTemplate = (tpl) =>
+    askConfirm(tr('delete'), `${tpl.name}?`, () => {
+      setData((prev) => ({ ...prev, templates: (prev.templates || []).filter((x) => x.id !== tpl.id) }));
+      notify(tr('fav_deleted'));
+    }, tr('delete'));
+
+  // --- Transaksi berulang ---
+  const handleSaveRecurring = (rule) => {
+    setData((prev) => {
+      const list = prev.recurring || [];
+      return { ...prev, recurring: list.some((r) => r.id === rule.id) ? list.map((r) => (r.id === rule.id ? rule : r)) : [...list, rule] };
+    });
+    notify(tr('rec_saved'));
+  };
+  const handleDeleteRecurring = (rule) =>
+    askConfirm(tr('delete'), `${rule.name}?`, () => {
+      setData((prev) => ({ ...prev, recurring: (prev.recurring || []).filter((r) => r.id !== rule.id) }));
+      notify(tr('rec_deleted'));
+    }, tr('delete'));
+  const handleToggleRecurring = (rule) =>
+    setData((prev) => ({
+      ...prev,
+      recurring: (prev.recurring || []).map((r) => (r.id === rule.id ? { ...r, active: r.active === false } : r)),
+    }));
+
+  const handlePickSearch = (it) => {
+    setSearchOpen(false);
+    if (it.kind === 'transaction') setTxModal({ open: true, tx: it.tx });
+    else if (it.kind === 'task') setTaskModal({ open: true, task: it.task, defaultDate: TODAY_STR });
+    else if (it.kind === 'event') setEventModal({ open: true, event: it.event, defaultDate: TODAY_STR });
+    else if (it.tab) navigateTab(it.tab);
+  };
+
+  const sendTestNotification = async () => {
+    const T = makeTr(lang);
+    const perm = await requestPermission();
+    if (perm === 'granted') await notifyNow({ key: 'test', title: T('ns_test_title'), body: T('ns_test_body'), route: 'notifications' }, { channelDesc: T('ns_channel_desc') });
+  };
+  const reminderPreview = useMemo(
+    () =>
+      activeTab === 'notifications'
+        ? buildReminders({ data, prefs: notifPrefs, tr: makeTr(lang) }).slice(0, 12)
+        : [],
+    [activeTab, data, notifPrefs, lang]
+  );
+
+  const expenseCategoryList = useMemo(() => [...new Set([...DEFAULT_EXPENSE_CATEGORIES, ...(data.customExpenseCategories || [])])], [data.customExpenseCategories]);
+  const incomeCategoryList = useMemo(() => [...new Set([...DEFAULT_INCOME_CATEGORIES, ...(data.customIncomeCategories || [])])], [data.customIncomeCategories]);
+
+  // Pintasan klaviatur: Ctrl/Cmd + K = cari
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   if (!currentUser) {
     return (
       <AuthPortalScreen
@@ -10021,6 +10424,58 @@ function LifeOsWorkspace() {
             onOpenPayday={() => setPaydayModalOpen(true)}
             onOpenBriefing={() => setBriefingModalOpen(true)}
             onOpenMenu={() => setMenuOpen(true)}
+            onOpenSearch={() => setSearchOpen(true)}
+            onOpenWeekly={() => setWeeklyOpen(true)}
+            onUseTemplate={handleUseTemplate}
+          />
+        );
+      case 'recurring':
+        return (
+          <RecurringView
+            data={data}
+            lang={lang}
+            maskBalances={maskBalances}
+            expenseCategories={expenseCategoryList}
+            incomeCategories={incomeCategoryList}
+            onSave={handleSaveRecurring}
+            onDelete={handleDeleteRecurring}
+            onToggle={handleToggleRecurring}
+            onBack={() => navigateTab('dashboard')}
+          />
+        );
+      case 'templates':
+        return (
+          <TemplatesView
+            data={data}
+            lang={lang}
+            maskBalances={maskBalances}
+            expenseCategories={expenseCategoryList}
+            incomeCategories={incomeCategoryList}
+            onUse={handleUseTemplate}
+            onSave={handleSaveTemplate}
+            onDelete={handleDeleteTemplate}
+            onBack={() => navigateTab('dashboard')}
+          />
+        );
+      case 'notifications':
+        return (
+          <NotificationSettings
+            lang={lang}
+            prefs={notifPrefs}
+            onChange={updateNotifPrefs}
+            preview={reminderPreview}
+            onTest={sendTestNotification}
+            onBack={() => navigateTab('profile')}
+          />
+        );
+      case 'security':
+        return (
+          <SecuritySettings
+            lang={lang}
+            cfg={lockCfg}
+            onChange={setLockCfg}
+            onLockNow={() => setLocked(true)}
+            onBack={() => navigateTab('profile')}
           />
         );
       case 'activity':
@@ -10054,6 +10509,8 @@ function LifeOsWorkspace() {
             onAddCategory={handleAddCustomCategory}
             onDeleteCategory={handleDeleteCustomCategory}
             onRenameCategory={handleRenameCustomCategory}
+            lockEnabled={lockCfg.enabled}
+            onExportReport={() => setExportOpen(true)}
           />
         );
       case 'overview':
@@ -10189,6 +10646,8 @@ function LifeOsWorkspace() {
               setEventModal({ open: true, event, defaultDate: d })
             }
             onDeleteEvent={handleDeleteEvent}
+            onNavigate={navigateTab}
+            maskBalances={maskBalances}
           />
         );
       case 'habits':
@@ -10303,7 +10762,7 @@ function LifeOsWorkspace() {
             <div>
               <span className="text-base font-bold tracking-wider text-life-text block">LIFE OS</span>
               <span className="text-[10px] uppercase tracking-widest text-life-accent">
-                Private Edition
+                {lang === 'id' ? 'Edisi Pribadi' : 'Private Edition'}
               </span>
             </div>
           </div>
@@ -10396,6 +10855,15 @@ function LifeOsWorkspace() {
             </span>
 
             <button
+              onClick={() => setSearchOpen(true)}
+              className="p-2 sm:p-2.5 rounded-xl bg-life-surface border border-life-border/50 text-life-muted hover:text-life-soft"
+              title={tr('search_title')}
+              aria-label={tr('search_title')}
+            >
+              <Search className="w-4 h-4" />
+            </button>
+
+            <button
               onClick={() => setBriefingModalOpen(true)}
               className="p-2 sm:p-2.5 rounded-xl bg-life-surface border border-life-border/50 text-life-muted hover:text-life-soft"
               title={t('daily_briefing')}
@@ -10415,7 +10883,7 @@ function LifeOsWorkspace() {
             <button
               onClick={() => setMaskBalances((prev) => !prev)}
               className="p-2 sm:p-2.5 rounded-xl bg-life-surface border border-life-border/50 text-life-muted hover:text-life-soft"
-              aria-label="Toggle balance privacy"
+              aria-label={lang === 'id' ? 'Sembunyikan/tampilkan saldo' : 'Toggle balance privacy'}
             >
               {maskBalances ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
@@ -10466,6 +10934,9 @@ function LifeOsWorkspace() {
           split: () => setSplitBillModalOpen(true),
           payday: () => setPaydayModalOpen(true),
           briefing: () => setBriefingModalOpen(true),
+          search: () => setSearchOpen(true),
+          exportReport: () => setExportOpen(true),
+          weekly: () => setWeeklyOpen(true),
         }}
       />
 
@@ -10558,6 +11029,17 @@ function LifeOsWorkspace() {
         }}
       />
 
+      <SearchModal
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        data={data}
+        lang={lang}
+        maskBalances={maskBalances}
+        onPick={handlePickSearch}
+      />
+      <ExportModal open={exportOpen} onClose={() => setExportOpen(false)} data={data} lang={lang} onDone={notify} />
+      <WeeklyModal open={weeklyOpen} onClose={() => setWeeklyOpen(false)} data={data} lang={lang} maskBalances={maskBalances} />
+
       <ConfirmDialog
         open={confirmState.open}
         title={confirmState.title}
@@ -10568,11 +11050,43 @@ function LifeOsWorkspace() {
         onCancel={() => setConfirmState((prev) => ({ ...prev, open: false }))}
       />
 
+      {/* KUNCI APLIKASI */}
+      {lockCfg.enabled && covered && !locked && <div className="fixed inset-0 z-[99] bg-life-bg" aria-hidden="true" />}
+      {lockCfg.enabled && locked && (
+        <LockScreen
+          lang={lang}
+          cfg={lockCfg}
+          userName={currentUser.name}
+          verifyPassword={verifyAccountPassword}
+          onUnlock={() => {
+            setLockCfg(loadLock());
+            setLocked(false);
+          }}
+          onReset={() => {
+            const off = { ...DEFAULT_LOCK };
+            saveLock(off);
+            setLockCfg(off);
+            setLocked(false);
+          }}
+        />
+      )}
+
       {/* TOAST NOTIFICATION */}
       {toast && (
         <div className="fixed bottom-28 lg:bottom-6 right-4 sm:right-6 z-50 px-4 py-3 rounded-2xl bg-life-surface2 border border-life-accent/70 text-xs font-medium text-life-text shadow-2xl flex items-center gap-2.5 max-w-[90vw] life-motion-enter">
           <CheckCircle2 className="w-4 h-4 text-life-accent shrink-0" />
-          <span className="truncate">{toast}</span>
+          <span className="truncate">{toast.message}</span>
+          {toast.action && (
+            <button
+              onClick={() => {
+                toast.action.run();
+                setToast(null);
+              }}
+              className="ml-1 shrink-0 font-bold text-life-accent underline"
+            >
+              {toast.action.label}
+            </button>
+          )}
         </div>
       )}
     </div>
