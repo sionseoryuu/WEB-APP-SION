@@ -72,7 +72,7 @@ export default function HomeView({
   const pinned = PINNED_SERVICE_IDS.map((id) => ALL_SERVICES.find((s) => s.id === id)).filter(Boolean);
 
   const checklist = [
-    { done: data.transactions.length > 0, label: L('Catat transaksi pertama (Menu → Scan QRIS/Struk)', 'Log your first transaction (Menu → Scan QRIS/Receipt)'), onClick: onOpenReceipt },
+    { done: data.transactions.length > 0, label: L('Catat transaksi pertama', 'Log your first transaction'), onClick: onOpenTx },
     { done: data.accounts.length > 1, label: L('Tambah dompet / rekening lain', 'Add another wallet / account'), onClick: () => onNavigate('wallet') },
     { done: (data.budgets || []).length > 0, label: L('Atur anggaran bulanan', 'Set a monthly budget'), onClick: () => onNavigate('budgets') },
     { done: Boolean(profile.avatar), label: L('Pasang foto profil', 'Add a profile photo'), onClick: () => onNavigate('profile') },

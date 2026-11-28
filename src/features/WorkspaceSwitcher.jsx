@@ -85,8 +85,8 @@ export default function WorkspaceSheet({ open, onClose, lang, list, currentId, e
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end lg:items-center lg:justify-center" role="dialog" aria-modal="true">
-      <button aria-label={L('Tutup', 'Close')} className="absolute inset-0 bg-black/60" onClick={close} />
+    <div className="fixed inset-0 z-50 flex items-end lg:items-center lg:justify-center" role="dialog" aria-modal="true" aria-labelledby="lifeos-workspace-title">
+      <button type="button" aria-label={L('Tutup', 'Close')} className="absolute inset-0 bg-black/60" onClick={close} />
       <div
         className="relative w-full lg:max-w-md max-h-[85vh] overflow-y-auto rounded-t-3xl lg:rounded-3xl bg-life-surface border-t border-life-border/60 px-4 pt-3 life-motion-enter"
         style={{ paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))' }}
@@ -94,7 +94,7 @@ export default function WorkspaceSheet({ open, onClose, lang, list, currentId, e
         <div className="mx-auto w-10 h-1 rounded-full bg-life-border mb-3" />
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="min-w-0">
-            <h2 className="text-base font-bold text-life-text">{adding ? L('Tambah akun baru', 'Add a new account') : delTarget ? L('Hapus akun', 'Delete account') : L('Beralih akun', 'Switch account')}</h2>
+            <h2 id="lifeos-workspace-title" className="text-base font-bold text-life-text">{adding ? L('Tambah akun baru', 'Add a new account') : delTarget ? L('Hapus akun', 'Delete account') : L('Beralih akun', 'Switch account')}</h2>
             {email && <p className="text-[11px] text-life-muted truncate">{L('Masuk sebagai', 'Signed in as')} {email}</p>}
           </div>
           <button onClick={close} className="p-2 rounded-xl bg-life-bg text-life-muted" aria-label={L('Tutup', 'Close')}>

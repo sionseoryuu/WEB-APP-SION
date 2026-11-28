@@ -106,8 +106,10 @@ export const BottomNav = ({ active, onNavigate, onMenu, menuOpen, lang, bizMode 
           it ? (
             <button
               key={it.id}
+              type="button"
               onClick={() => onNavigate(it.id)}
-              className={`flex flex-col items-center justify-center py-1.5 rounded-xl ${active === it.id ? 'text-life-accent' : 'text-life-muted'}`}
+              aria-current={active === it.id ? 'page' : undefined}
+              className={`min-h-12 flex flex-col items-center justify-center py-1.5 rounded-xl ${active === it.id ? 'text-life-accent' : 'text-life-muted'}`}
             >
               <it.icon className="w-5 h-5" strokeWidth={active === it.id ? 2.4 : 1.8} />
               <span className="text-[10px] font-medium mt-1">{it.label}</span>
@@ -115,6 +117,7 @@ export const BottomNav = ({ active, onNavigate, onMenu, menuOpen, lang, bizMode 
           ) : (
             <div key="menu" className="flex flex-col items-center">
               <button
+                type="button"
                 onClick={onMenu}
                 aria-label={id ? 'Buka menu' : 'Open menu'}
                 aria-expanded={!!menuOpen}
@@ -159,16 +162,16 @@ export const MenuSheet = ({ open, onClose, onNavigate, actions, lang, bizMode = 
   const groups = bizMode ? [BIZ_GROUP, ...SERVICE_GROUPS] : SERVICE_GROUPS;
   const go = (fn) => () => { onClose(); fn(); };
   return (
-    <div className="fixed inset-0 z-40 flex items-end lg:items-center lg:justify-center" role="dialog" aria-modal="true">
-      <button aria-label={L('Tutup', 'Close')} className="absolute inset-0 bg-black/60" onClick={onClose} />
+    <div className="fixed inset-0 z-40 flex items-end lg:items-center lg:justify-center" role="dialog" aria-modal="true" aria-labelledby="lifeos-menu-title">
+      <button type="button" aria-label={L('Tutup', 'Close')} className="absolute inset-0 bg-black/60" onClick={onClose} />
       <div
         className="relative w-full lg:max-w-lg max-h-[85vh] overflow-y-auto rounded-t-3xl lg:rounded-3xl bg-life-surface border-t border-life-border/60 px-4 pt-3 pb-6 life-motion-enter"
         style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
       >
         <div className="flex items-center justify-between mb-3">
           <div className="mx-auto w-10 h-1 rounded-full bg-life-border absolute left-1/2 -translate-x-1/2 top-2" />
-          <h2 className="text-base font-bold text-life-text pt-2">{L('Semua Menu', 'All Menu')}</h2>
-          <button onClick={onClose} className="p-2 rounded-xl bg-life-bg text-life-muted" aria-label={L('Tutup', 'Close')}>
+          <h2 id="lifeos-menu-title" className="text-base font-bold text-life-text pt-2">{L('Semua Menu', 'All Menu')}</h2>
+          <button type="button" onClick={onClose} className="p-2 rounded-xl bg-life-bg text-life-muted" aria-label={L('Tutup', 'Close')}>
             <X className="w-4 h-4" />
           </button>
         </div>

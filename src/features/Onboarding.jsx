@@ -21,9 +21,9 @@ const TXT = {
     ph_per: 'mis. Budi Santoso',
     lbl_biz: 'Nama usaha',
     lbl_per: 'Nama profil',
-    priv_title: 'Privasi aman & terenkripsi',
+    priv_title: 'Privasi & penyimpanan data',
     priv_body:
-      'Data Anda disimpan di perangkat ini dan di Google Drive pribadi Anda (hanya file yang dibuat aplikasi), dikirim lewat koneksi terenkripsi (HTTPS). Tidak ada server kami yang menyimpan data Anda.',
+      'Data disimpan di perangkat ini dan, jika sinkronisasi diaktifkan, di Google Drive pribadi Anda. Koneksi memakai HTTPS, tetapi data lokal dan file cadangan Drive belum dienkripsi oleh aplikasi saat tersimpan. Lindungi perangkat dan akun Google Anda.',
     priv_check: 'Saya mengerti dan setuju',
     s3_title: 'Sinkron dengan Google',
     s3_sub: 'Masuk dengan akun Google agar data tercadang otomatis dan bisa dibuka di perangkat lain.',
@@ -54,9 +54,9 @@ const TXT = {
     ph_per: 'e.g. Jane Smith',
     lbl_biz: 'Business name',
     lbl_per: 'Profile name',
-    priv_title: 'Private & encrypted in transit',
+    priv_title: 'Privacy & data storage',
     priv_body:
-      'Your data is stored on this device and in your own Google Drive (only files this app creates), sent over an encrypted connection (HTTPS). No server of ours stores your data.',
+      'Your data is stored on this device and, if sync is enabled, in your own Google Drive. Connections use HTTPS, but local data and Drive backup files are not encrypted by the app at rest. Protect your device and Google account.',
     priv_check: 'I understand and agree',
     s3_title: 'Sync with Google',
     s3_sub: 'Sign in with Google to back up automatically and open your data on other devices.',
@@ -81,8 +81,8 @@ const GoogleG = () => (
   </svg>
 );
 
-const Stepper = ({ step }) => (
-  <div className="flex items-center justify-center gap-2" aria-label={`Langkah ${step} dari 3`}>
+const Stepper = ({ step, lang }) => (
+  <div className="flex items-center justify-center gap-2" aria-label={lang === 'en' ? `Step ${step} of 3` : `Langkah ${step} dari 3`}>
     {[1, 2, 3].map((n, i) => (
       <React.Fragment key={n}>
         <div
@@ -196,7 +196,7 @@ export default function OnboardingFlow({ lang = 'id', onToggleLang, tr, onGoogle
         <p className="mt-1 text-sm text-life-muted text-center">{L.tagline}</p>
 
         <div className="mt-6">
-          <Stepper step={step} />
+          <Stepper step={step} lang={lang} />
         </div>
 
         <div className="mt-6 w-full rounded-[28px] bg-life-surface border border-life-border/40 p-5 shadow-xl">
@@ -250,11 +250,11 @@ export default function OnboardingFlow({ lang = 'id', onToggleLang, tr, onGoogle
                 </div>
                 <p className="text-xs text-life-muted mt-2 leading-relaxed">{L.priv_body}</p>
                 <label className="mt-3 flex items-center gap-3 cursor-pointer select-none">
-                  <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="sr-only" />
+                  <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="sr-only peer" />
                   <span
                     className={`w-6 h-6 shrink-0 rounded-md border-2 flex items-center justify-center transition-all ${
                       agree ? 'bg-life-accent border-life-accent text-life-bg' : 'border-life-border'
-                    }`}
+                    } peer-focus-visible:ring-2 peer-focus-visible:ring-life-accent peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-life-bg`}
                     aria-hidden="true"
                   >
                     {agree && <Check className="w-4 h-4" />}
