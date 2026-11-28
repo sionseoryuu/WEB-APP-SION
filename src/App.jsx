@@ -116,6 +116,7 @@ import OnboardingFlow from './features/Onboarding.jsx';
 import BusinessView from './business/BusinessView.jsx';
 import { withBizCategories, DEFAULT_POS } from './business/bizLogic.js';
 import RecurringView from './features/RecurringView.jsx';
+import FinanceOverview from './features/FinanceOverview.jsx';
 import TemplatesView from './features/TemplatesView.jsx';
 import NotificationSettings from './features/NotificationSettings.jsx';
 import SecuritySettings from './features/SecuritySettings.jsx';
@@ -132,6 +133,8 @@ import {
   MAIN_WS, keyFor, baseOf, newWsId, typeOf, entryFromData, readRegistry, writeRegistry, upsert, mergeRegistry, pickWorkspace, lastWsKey, wsRegKey, planDelete,
 } from './features/workspaces.js';
 import { hashData } from './features/autoBackup.js';
+import { encryptBackup, decryptBackup, isEncryptedBackup } from './features/vaultCrypto.js';
+import { isValidBackup, impactSummary, impactText } from './features/restoreGuard.js';
 
 // Persistensi lokal (offline-first)
 const STORAGE_KEY = 'lifeos:workspace:v1';
@@ -165,7 +168,9 @@ function deriveWorkspaceKey(email) {
   return `ws_${Math.abs(hash).toString(36)}_${normalized.replace(/[^a-z0-9]/g, '_')}`;
 }
 
-function hashPasswordClient(raw) {
+// Local-only password verifier. PBKDF2 slows offline guessing; this is NOT
+// server authentication or a security boundary (the app and data remain client-side).
+function legacyPasswordHash(raw) {
   let h = 2166136261;
   const str = String(raw || '');
   for (let i = 0; i < str.length; i += 1) {
@@ -173,6 +178,50 @@ function hashPasswordClient(raw) {
     h = Math.imul(h, 16777619);
   }
   return (h >>> 0).toString(16);
+}
+
+const PASSWORD_KDF_ITERATIONS = 310000;
+const toBase64 = (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes)));
+const fromBase64 = (value) => Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
+
+async function hashPasswordClient(raw) {
+  if (!globalThis.crypto?.subtle || !globalThis.crypto?.getRandomValues) {
+    throw new Error('secure_password_storage_unavailable');
+  }
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const material = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(String(raw)), 'PBKDF2', false, ['deriveBits']
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt, iterations: PASSWORD_KDF_ITERATIONS, hash: 'SHA-256' },
+    material, 256
+  );
+  return `pbkdf2-sha256$${PASSWORD_KDF_ITERATIONS}$${toBase64(salt)}$${toBase64(bits)}`;
+}
+
+async function verifyPasswordClient(raw, encoded) {
+  if (!encoded) return false;
+  if (!String(encoded).startsWith('pbkdf2-sha256$')) {
+    return legacyPasswordHash(raw) === encoded;
+  }
+  if (!globalThis.crypto?.subtle) return false;
+  try {
+    const [, iterationsText, saltText, expectedText] = String(encoded).split('$');
+    const iterations = Number(iterationsText);
+    if (!Number.isInteger(iterations) || iterations < 100000 || iterations > 1000000) return false;
+    const material = await crypto.subtle.importKey(
+      'raw', new TextEncoder().encode(String(raw)), 'PBKDF2', false, ['deriveBits']
+    );
+    const actual = await crypto.subtle.deriveBits(
+      { name: 'PBKDF2', salt: fromBase64(saltText), iterations, hash: 'SHA-256' },
+      material, 256
+    );
+    const a = new Uint8Array(actual);
+    const b = fromBase64(expectedText);
+    return a.length === b.length && a.every((value, index) => value === b[index]);
+  } catch {
+    return false;
+  }
 }
 
 // ============================================================================
@@ -764,7 +813,7 @@ const I18N = {
 // 2. CONSTANTS & NAVIGATION CONFIG
 // ============================================================================
 
-['nav_recurring', 'nav_templates', 'nav_notifications', 'nav_security'].forEach((k) => {
+['nav_overview', 'nav_recurring', 'nav_templates', 'nav_notifications', 'nav_security'].forEach((k) => {
   I18N.id[k] = makeTr('id')(k);
   I18N.en[k] = makeTr('en')(k);
 });
@@ -825,6 +874,7 @@ const NAV_GROUPS = [
   {
     labelKey: 'grp_wealth',
     items: [
+      { id: 'overview', labelKey: 'nav_overview', icon: Landmark },
       { id: 'wallet', labelKey: 'nav_wallet', icon: Wallet },
       { id: 'budgets', labelKey: 'nav_budgets', icon: PieChart },
       { id: 'savings', labelKey: 'nav_savings', icon: PiggyBank },
@@ -2051,7 +2101,16 @@ const AuthPortalScreen = ({ lang, onToggleLang, t, onAuthenticateSuccess }) => {
 
     setSubmitting(true);
     const workspaceKey = deriveWorkspaceKey(cleanEmail);
-    const pwHash = hashPasswordClient(password);
+    let pwHash;
+    try {
+      pwHash = await hashPasswordClient(password);
+    } catch {
+      setErrorMsg(lang === 'id'
+        ? 'Penyimpanan kata sandi aman tidak tersedia. Buka aplikasi melalui HTTPS atau localhost.'
+        : 'Secure password storage is unavailable. Open the app over HTTPS or localhost.');
+      setSubmitting(false);
+      return;
+    }
 
     // Mode lokal (tanpa cloud): akun disimpan di perangkat ini
     const stored = readStoredJson(acctStoreKey(workspaceKey));
@@ -2079,7 +2138,19 @@ const AuthPortalScreen = ({ lang, onToggleLang, t, onAuthenticateSuccess }) => {
         );
         localStorage.setItem(wsStoreKey(workspaceKey), JSON.stringify(initialWorkspace));
       } catch (err) {
+        // Avoid leaving a half-created account if browser storage is full/blocked.
+        try {
+          localStorage.removeItem(acctStoreKey(workspaceKey));
+          localStorage.removeItem(wsStoreKey(workspaceKey));
+        } catch {
+          /* storage may be unavailable */
+        }
         console.error('Local account save failed:', err);
+        setErrorMsg(lang === 'id'
+          ? 'Akun tidak dapat disimpan di perangkat. Periksa ruang penyimpanan browser dan coba lagi.'
+          : 'The account could not be saved on this device. Check browser storage and try again.');
+        setSubmitting(false);
+        return;
       }
     } else {
       if (!stored) {
@@ -2091,12 +2162,21 @@ const AuthPortalScreen = ({ lang, onToggleLang, t, onAuthenticateSuccess }) => {
         setSubmitting(false);
         return;
       }
-      if (stored.passwordHash && stored.passwordHash !== pwHash) {
+      if (stored.passwordHash && !(await verifyPasswordClient(password, stored.passwordHash))) {
         setErrorMsg(lang === 'id' ? 'Kata sandi tidak sesuai.' : 'Incorrect password.');
         setSubmitting(false);
         return;
       }
       ownerName = stored.name || cleanEmail.split('@')[0];
+      if (stored.passwordHash && !String(stored.passwordHash).startsWith('pbkdf2-sha256$')) {
+        try {
+          localStorage.setItem(acctStoreKey(workspaceKey), JSON.stringify({
+            ...stored, passwordHash: await hashPasswordClient(password),
+          }));
+        } catch (err) {
+          console.warn('Password verifier migration skipped:', err);
+        }
+      }
       initialWorkspace = readStoredJson(wsStoreKey(workspaceKey)) || createEmptyState(lang, ownerName);
     }
 
@@ -8781,7 +8861,7 @@ const SettingsModal = ({
         const parsed = JSON.parse(String(ev.target?.result || '{}'));
         onImportJson(parsed);
       } catch {
-        // Handled in parent
+        onImportJson(null); // bukan JSON valid → parent menampilkan pesan error
       }
     };
     reader.readAsText(file);
@@ -10157,26 +10237,54 @@ function LifeOsWorkspace() {
     });
   };
 
-  const handleExportJson = () => {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `life-os-backup-${TODAY_STR}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    notify(lang === 'id' ? 'Cadangan JSON diekspor' : 'JSON backup exported');
+  const handleExportJson = async () => {
+    const id = lang === 'id';
+    try {
+      const pass = window.prompt(id
+        ? 'Passphrase untuk enkripsi backup (min. 8 karakter).\nKosongkan = TANPA enkripsi. Jika lupa passphrase, backup tidak bisa dipulihkan.'
+        : 'Passphrase to encrypt backup (min. 8 chars).\nLeave empty = NOT encrypted. If forgotten, the backup cannot be recovered.');
+      if (pass === null) return;
+      const payload = pass ? await encryptBackup(data, pass) : data;
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `life-os-backup-${TODAY_STR}${pass ? '.enc' : ''}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      notify(id ? (pass ? 'Cadangan terenkripsi diekspor' : 'Cadangan JSON diekspor (tanpa enkripsi)') : (pass ? 'Encrypted backup exported' : 'JSON backup exported (not encrypted)'));
+    } catch (e) {
+      notify((id ? 'Ekspor gagal: ' : 'Export failed: ') + (e?.message || ''));
+    }
   };
 
-  const handleImportJson = (parsed) => {
-    if (parsed && Array.isArray(parsed.accounts) && Array.isArray(parsed.transactions)) {
-      const base = createEmptyState(lang, parsed.profile?.name || '');
-      setData({ ...base, ...parsed, profile: { ...base.profile, ...(parsed.profile || {}) } });
-      setSettingsOpen(false);
-      notify(lang === 'id' ? 'Data berhasil dipulihkan dari JSON' : 'Workspace restored from JSON');
-    } else {
-      notify(lang === 'id' ? 'Format file JSON tidak valid' : 'Invalid JSON backup format');
+  const handleImportJson = async (input) => {
+    const id = lang === 'id';
+    let parsed = input;
+    try {
+      if (isEncryptedBackup(parsed)) {
+        const pass = window.prompt(id ? 'Backup ini terenkripsi. Masukkan passphrase:' : 'This backup is encrypted. Enter passphrase:');
+        if (!pass) return;
+        parsed = await decryptBackup(parsed, pass);
+      }
+    } catch (e) {
+      notify(e?.message || (id ? 'Gagal membuka backup' : 'Could not open backup'));
+      return;
     }
+    if (!isValidBackup(parsed)) {
+      notify(id ? 'Format file JSON tidak valid' : 'Invalid JSON backup format');
+      return;
+    }
+    if (!window.confirm(impactText(impactSummary(data, parsed), lang))) return;
+    try {
+      localStorage.setItem(`lifeos:prerestore:${currentUser?.workspaceKey || 'local'}`, JSON.stringify({ at: new Date().toISOString(), data }));
+    } catch {
+      if (!window.confirm(id ? 'Gagal menyimpan salinan pra-restore (penyimpanan penuh). Tetap timpa data?' : 'Could not save a pre-restore copy (storage full). Overwrite anyway?')) return;
+    }
+    const base = createEmptyState(lang, parsed.profile?.name || '');
+    setData({ ...base, ...parsed, profile: { ...base.profile, ...(parsed.profile || {}) } });
+    setSettingsOpen(false);
+    notify(id ? 'Data dipulihkan. Data sebelumnya tersimpan sebagai cadangan pra-restore.' : 'Restored. Previous data kept as pre-restore copy.');
   };
 
   const handleExportCsv = () => {
@@ -10357,7 +10465,7 @@ function LifeOsWorkspace() {
         }
       }
       const stored = readStoredJson(acctStoreKey(currentUser.workspaceKey));
-      return !!stored?.passwordHash && stored.passwordHash === hashPasswordClient(pw);
+      return !!stored?.passwordHash && verifyPasswordClient(pw, stored.passwordHash);
     },
     [currentUser]
   );
@@ -10801,6 +10909,8 @@ function LifeOsWorkspace() {
             onUseTemplate={handleUseTemplate}
           />
         );
+      case 'overview':
+        return <FinanceOverview data={data} lang={lang} maskBalances={maskBalances} onBack={() => navigateTab('dashboard')} />;
       case 'recurring':
         return (
           <RecurringView

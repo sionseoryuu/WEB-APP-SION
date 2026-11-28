@@ -171,7 +171,7 @@ const S = {
   budget_alert_toast: ['Anggaran {cat}: {pct}% terpakai', '{cat} budget: {pct}% used'],
 
   // navigasi & menu
-  nav_recurring: ['Transaksi Berulang', 'Recurring'], nav_templates: ['Menu Favorit', 'Favorites'], nav_notifications: ['Pengingat', 'Reminders'], nav_security: ['Kunci Aplikasi', 'App Lock'],
+  nav_overview: ['Ikhtisar Keuangan', 'Financial Overview'], nav_recurring: ['Transaksi Berulang', 'Recurring'], nav_templates: ['Menu Favorit', 'Favorites'], nav_notifications: ['Pengingat', 'Reminders'], nav_security: ['Kunci Aplikasi', 'App Lock'],
   menu_search: ['Cari', 'Search'], menu_export: ['Ekspor Laporan', 'Export Report'], menu_weekly: ['Ringkasan Mingguan', 'Weekly Summary'],
   svc_recurring: ['Berulang', 'Recurring'], svc_templates: ['Favorit', 'Favorites'], svc_notifications: ['Pengingat', 'Reminders'], svc_security: ['Kunci', 'Lock'],
   profile_lock_hint_on: ['Aktif', 'On'], profile_lock_hint_off: ['Mati', 'Off'],

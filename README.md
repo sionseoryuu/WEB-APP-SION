@@ -43,3 +43,17 @@ Catatan: login Google berbasis web (popup). Di APK Capacitor, popup ini bisa tid
 terjadi, pakai versi web/PWA atau tambahkan plugin login Google native.
 Kebijakan konflik: bila perangkat lain punya versi lebih baru dan perangkat ini tidak punya perubahan
 tertunda, versi cloud dipakai; bila ada perubahan tertunda, versi perangkat ini yang dikirim.
+
+
+## Catatan keamanan & privasi (penting)
+
+- Mode lokal menyimpan data ruang kerja di `localStorage` browser pada perangkat yang digunakan. Data tersebut **tidak dienkripsi saat tersimpan**; siapa pun yang memiliki akses ke profil browser/perangkat atau menjalankan skrip pada origin aplikasi berpotensi membacanya.
+- Kata sandi lokal disimpan sebagai verifier PBKDF2-SHA-256 (310.000 iterasi) pada pendaftaran baru. Verifier lama bermigrasi setelah login berhasil. Ini memperlambat tebakan kata sandi, tetapi **bukan autentikasi server** dan tidak membuat data lokal menjadi terenkripsi.
+- Login Google memverifikasi identitas melalui Google Identity Services dan file cadangan disimpan di Google Drive pengguna. Data cadangan JSON tidak dienkripsi oleh aplikasi sebelum diunggah; lindungi akun Google dan perangkat Anda.
+- Jangan gunakan mode lokal sebagai sistem multi-pengguna yang memerlukan isolasi/otorisasi kuat, dan jangan menyimpan data sangat sensitif sebelum tersedia enkripsi-at-rest serta model autentikasi/otorisasi server yang sesuai.
+- Gunakan HTTPS untuk deployment publik. Kredensial integrasi tidak boleh ditanam sebagai rahasia di frontend; `VITE_*` adalah konfigurasi build yang dapat dibaca pengguna.
+
+
+---
+## Status V2
+Lihat CHANGELOG.md, SECURITY_REPORT.md, TEST_REPORT.md, ROADMAP.md. V2 baru **parsial** (fondasi logika + enkripsi); UI V2 belum dikerjakan.

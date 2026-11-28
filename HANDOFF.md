@@ -71,3 +71,13 @@ Efeknya: Beranda = ringkasan bisnis, tombol bawah "Dompet" -> "Kasir", Menu puny
 - **Hapus akun**: ikon tempat sampah per akun di lembar Beralih Akun + baris "Hapus akun ini" di Profil; konfirmasi mengetik `hapus akun` (`matchesPhrase`). Urutan: hapus file Drive dulu (`deleteCloudWorkspace`; gagal → batal, tidak ada yang hilang) → salinan lokal → registry. Akun aktif dihapus → buka akun lain lewat `switchWorkspace(id, { skipPush, force })` (agar data lama tidak terkirim ulang ke Drive); akun terakhir → keluar (`planDelete`).
 - Uji: `node tests/t_v71.mjs` (10 uji). Bundling: `esbuild src/main.jsx --bundle --packages=external --format=esm --loader:.js=jsx --outfile=/tmp/x.js`.
 - Catatan: kode v7.1 sempat hilang dari sesi sebelumnya (zip v7 tidak memuatnya) sehingga ditulis ulang dari catatan; BELUM diuji di browser/HP.
+
+
+## Audit & hardening (28 Nov 2026)
+- `App.jsx`: hash kata sandi lokal baru menggunakan PBKDF2-SHA-256 (310.000 iterasi, salt acak 16 byte). Login akun lama tetap kompatibel dan migrasi verifier legacy dilakukan setelah autentikasi berhasil.
+- Verifikasi kata sandi untuk kunci aplikasi menggunakan fungsi verifier asynchronous.
+- Registrasi lokal dibatalkan dengan pesan yang jelas bila Web Crypto tidak tersedia; penyimpanan akun/workspace dibersihkan jika proses simpan gagal.
+- `index.css`: baseline focus-visible, reduced-motion, safe-area utilities, ukuran form mobile, dan touch handling.
+- `README.md`: keterbatasan keamanan localStorage dan backup cloud dijelaskan secara eksplisit.
+- `AUDIT_REPORT.md`: cakupan, temuan, skor sementara dan status pengujian.
+- Validasi: 10/10 tes `t_v71`, pemeriksaan sintaks seluruh 50 file `.js/.jsx`, dan uji PBKDF2 terisolasi lulus. Build belum dapat dijalankan karena dependency Vite tidak tersedia di lingkungan audit. Tidak ada uji browser/HP.

@@ -9,6 +9,7 @@ export const SERVICE_GROUPS = [
     id: 'money',
     label: { id: 'Keuangan', en: 'Money' },
     items: [
+      { id: 'overview', icon: Landmark, label: { id: 'Ikhtisar', en: 'Overview' } },
       { id: 'wallet', icon: Wallet, label: { id: 'Dompet', en: 'Wallets' } },
       { id: 'budgets', icon: PieChart, label: { id: 'Anggaran', en: 'Budgets' } },
       { id: 'savings', icon: PiggyBank, label: { id: 'Tabungan', en: 'Savings' } },
