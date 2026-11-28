@@ -126,7 +126,11 @@ import { WeeklyModal } from './features/WeeklySummary.jsx';
 import { decodeCode, loadImage } from './ewallet/qrScan.js';
 import { ocrReceiptImage, parseReceipt, reconcileRows, receiptToJpeg, OCR_BUILD } from './ewallet/receiptOcr.js';
 import { aiParseReceipt, aiEnabled } from './ewallet/receiptAi.js';
-import { signInWithGoogle, forgetDriveToken, loadCloud, peekCloud, backupToDrive } from './driveSync.js';
+import { signInWithGoogle, forgetDriveToken, loadCloud, peekCloud, backupToDrive, listCloudWorkspaces, setActiveWs } from './driveSync.js';
+import WorkspaceSheet, { WorkspaceChip } from './features/WorkspaceSwitcher.jsx';
+import {
+  MAIN_WS, keyFor, baseOf, newWsId, typeOf, entryFromData, readRegistry, writeRegistry, upsert, mergeRegistry, pickWorkspace, lastWsKey, wsRegKey,
+} from './features/workspaces.js';
 import { hashData } from './features/autoBackup.js';
 
 // Persistensi lokal (offline-first)
@@ -8921,9 +8925,20 @@ function LifeOsWorkspace() {
   const savedRef = useRef(undefined);
   if (savedRef.current === undefined) savedRef.current = loadSavedWorkspace();
   // Pengguna baru langsung melihat layar daftar/masuk (bukan akun demo)
-  const [currentUser, setCurrentUser] = useState(() =>
-    savedRef.current && savedRef.current.user ? savedRef.current.user : null
-  );
+  const [currentUser, setCurrentUser] = useState(() => {
+    const u = savedRef.current && savedRef.current.user ? savedRef.current.user : null;
+    if (!u) return null;
+    const norm = { ...u, baseKey: u.baseKey || baseOf(u.workspaceKey), wsId: u.wsId || MAIN_WS };
+    setActiveWs(norm.wsId);
+    return norm;
+  });
+  // Daftar ruang kerja (akun Pribadi/Bisnis) milik akun yang sedang masuk
+  const [wsList, setWsList] = useState(() => {
+    const u = savedRef.current && savedRef.current.user ? savedRef.current.user : null;
+    return u ? readRegistry(u.baseKey || baseOf(u.workspaceKey)) : [];
+  });
+  const [wsSheetOpen, setWsSheetOpen] = useState(false);
+  const [wsBusy, setWsBusy] = useState(false);
   const [data, setData] = useState(() =>
     savedRef.current && savedRef.current.data ? savedRef.current.data : createInitialState()
   );
@@ -8939,6 +8954,19 @@ function LifeOsWorkspace() {
       console.error('Local save failed:', err);
     }
   }, [data, currentUser]);
+
+  // Pastikan ruang kerja aktif tercatat di daftar (nama/tipe ikut berubah bila diedit)
+  const curType = typeOf(data);
+  const curName = entryFromData(currentUser?.wsId || MAIN_WS, data).name;
+  useEffect(() => {
+    if (!currentUser?.baseKey) return;
+    const entry = { id: currentUser.wsId || MAIN_WS, type: curType, name: curName };
+    setWsList((prev) => {
+      const next = upsert(prev, entry);
+      if (next !== prev) writeRegistry(currentUser.baseKey, next);
+      return next;
+    });
+  }, [currentUser?.baseKey, currentUser?.wsId, curType, curName]);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [maskBalances, setMaskBalances] = useState(false);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
@@ -9000,10 +9028,12 @@ function LifeOsWorkspace() {
   const [cloudNeedsAuth, setCloudNeedsAuth] = useState(false);
   const isGoogle = Boolean(currentUser?.google);
   const cloudMetaKey = currentUser?.workspaceKey ? `lifeos:cloud:${currentUser.workspaceKey}` : '';
-  const saveCloudMeta = useCallback(() => {
+  const wsIdRef = useRef(MAIN_WS);
+  wsIdRef.current = currentUser?.wsId || MAIN_WS;
+  const saveCloudMeta = useCallback((c = cloudRef.current) => {
     if (!cloudMetaKey) return;
     try {
-      const { hash, modified } = cloudRef.current;
+      const { hash, modified } = c;
       localStorage.setItem(cloudMetaKey, JSON.stringify({ hash, modified }));
     } catch {
       /* abaikan */
@@ -9019,10 +9049,10 @@ function LifeOsWorkspace() {
       c.busy = true;
       setSyncStatus('syncing');
       try {
-        const when = await backupToDrive(snapshot, { interactive });
+        const when = await backupToDrive(snapshot, { interactive, wsId: wsIdRef.current });
         c.hash = h;
         c.modified = when;
-        saveCloudMeta();
+        saveCloudMeta(c);
         setCloudNeedsAuth(false);
         setSyncStatus('synced');
       } catch (e) {
@@ -9041,14 +9071,15 @@ function LifeOsWorkspace() {
     const c = cloudRef.current;
     if (c.busy) return;
     try {
-      const meta = await peekCloud(false);
+      const wsId = wsIdRef.current;
+      const meta = await peekCloud(false, wsId);
       if (!meta || !c.modified || new Date(meta.modifiedTime) <= new Date(c.modified)) return;
       if (hashData(cloudDataRef.current) !== c.hash) return; // ada perubahan lokal belum terkirim: versi lokal dipakai
-      const res = await loadCloud(false);
-      if (!res?.data?.profile) return;
+      const res = await loadCloud(false, wsId);
+      if (!res?.data?.profile || wsIdRef.current !== wsId) return;
       c.hash = hashData(res.data);
       c.modified = res.modifiedTime;
-      saveCloudMeta();
+      saveCloudMeta(c);
       setData(res.data);
       setSyncStatus('synced');
     } catch {
@@ -9096,20 +9127,36 @@ function LifeOsWorkspace() {
       await cloudPush(false);
       const synced = hashData(cloudDataRef.current) === cloudRef.current.hash;
       if (synced) {
-        // Semua sudah aman di Drive pengguna: hapus salinan di perangkat ini (perangkat bersama)
+        // Semua sudah aman di Drive pengguna: hapus salinan di perangkat ini (perangkat bersama).
+        // Akun lain (mis. Pribadi saat sedang di Bisnis) hanya dihapus bila salinannya sama dengan yang di cloud.
+        let allGone = true;
         try {
-          localStorage.removeItem(wsStoreKey(currentUser.workspaceKey));
-          localStorage.removeItem(cloudMetaKey);
+          wsList.forEach((w) => {
+            const k = keyFor(currentUser.baseKey, w.id);
+            const local = readStoredJson(wsStoreKey(k));
+            const meta = readStoredJson(`lifeos:cloud:${k}`);
+            const safe = k === currentUser.workspaceKey || !local || (meta && hashData(local) === meta.hash);
+            if (safe) {
+              localStorage.removeItem(wsStoreKey(k));
+              localStorage.removeItem(`lifeos:cloud:${k}`);
+            } else allGone = false;
+          });
+          if (allGone) {
+            localStorage.removeItem(wsRegKey(currentUser.baseKey));
+            localStorage.removeItem(lastWsKey(currentUser.baseKey));
+          }
         } catch {
           /* abaikan */
         }
         forgetDriveToken();
         setData(createEmptyState(lang));
+        setWsList([]);
       }
     }
     setSettingsOpen(false);
+    setWsSheetOpen(false);
     setCurrentUser(null);
-  }, [isGoogle, cloudPush, currentUser, cloudMetaKey, lang]);
+  }, [isGoogle, cloudPush, currentUser, wsList, lang]);
   const askConfirm = useCallback(
     (title, message, onConfirm, confirmLabel) => {
       setConfirmState({
@@ -9795,6 +9842,7 @@ function LifeOsWorkspace() {
           accountId: debtItem.accountId || prev.accounts[0]?.id,
           paymentMethod: 'Ledger Settlement',
           notes: debtItem.counterparty,
+          ...(debtItem.saleId ? { biz: 'ar_collect', refId: debtItem.saleId } : {}),
         },
         ...prev.transactions,
       ],
@@ -10455,7 +10503,8 @@ function LifeOsWorkspace() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const handleAuthSuccess = ({ email, name, workspaceKey, initialData, isCloud, google, picture, cloudMeta, returning = true }) => {
+  const handleAuthSuccess = ({ email, name, workspaceKey, initialData, isCloud, google, picture, cloudMeta, returning = true, baseKey, wsId = MAIN_WS, registry }) => {
+    const base = baseKey || baseOf(workspaceKey);
     if (google && cloudMeta) {
       try {
         localStorage.setItem(`lifeos:cloud:${workspaceKey}`, JSON.stringify(cloudMeta));
@@ -10463,7 +10512,17 @@ function LifeOsWorkspace() {
         /* abaikan */
       }
     }
-    setCurrentUser({ email, name, workspaceKey, isCloud, google: Boolean(google), picture: picture || '' });
+    try {
+      localStorage.setItem(lastWsKey(base), wsId);
+    } catch {
+      /* abaikan */
+    }
+    const list = upsert(registry || readRegistry(base), entryFromData(wsId, initialData));
+    writeRegistry(base, list);
+    setWsList(list);
+    setActiveWs(wsId);
+    cloudRef.current = { hash: cloudMeta?.hash || '', modified: cloudMeta?.modified || '', busy: false };
+    setCurrentUser({ email, name, workspaceKey, baseKey: base, wsId, isCloud, google: Boolean(google), picture: picture || '' });
     setData(initialData);
     navigateTab('dashboard');
     notify(
@@ -10473,32 +10532,136 @@ function LifeOsWorkspace() {
     );
   };
 
-  // Registrasi: setup = { type, name } untuk pengguna baru, atau null bila hanya masuk
+  // Registrasi: setup = { type, name } untuk pengguna baru, atau null bila hanya masuk.
+  // Satu akun Google bisa punya beberapa akun (Pribadi, Bisnis). Memilih tipe membuka akun bertipe itu,
+  // atau membuatnya bila belum ada — tidak lagi membuka data lama begitu saja.
   const handleOnboardGoogle = async (setup) => {
     const { profile } = await signInWithGoogle();
-    const workspaceKey = `g_${profile.sub}`;
-    let cloud = null;
+    const base = `g_${profile.sub}`;
+    let cloudList = [];
     try {
-      cloud = await loadCloud(false);
+      cloudList = await listCloudWorkspaces(false);
     } catch (e) {
       if (/drive_http_(401|403)/.test(String(e?.message))) throw new Error('google_drive_denied');
       throw e;
     }
-    const fromCloud = cloud?.data?.profile ? cloud.data : null;
-    const existing = fromCloud || readStoredJson(wsStoreKey(workspaceKey));
-    const initialData = existing || createWorkspaceFromSetup(lang, profile.name, setup);
-    const displayName = existing?.profile?.name || initialData.profile.name || profile.name;
+    const cloudById = Object.fromEntries(cloudList.map((w) => [w.id, w]));
+    const registry = mergeRegistry(readRegistry(base), cloudList);
+    let last = '';
+    try {
+      last = localStorage.getItem(lastWsKey(base)) || '';
+    } catch {
+      /* abaikan */
+    }
+    const { target, create } = pickWorkspace(registry, setup, last);
+    const key = keyFor(base, target.id);
+    const fromCloud = !create ? cloudById[target.id] : null;
+    let initialData;
+    if (create) initialData = createWorkspaceFromSetup(lang, profile.name, setup || { type: 'personal', name: profile.name });
+    else initialData = fromCloud?.data || readStoredJson(wsStoreKey(key)) || createWorkspaceFromSetup(lang, profile.name, { type: target.type, name: target.name });
+    const displayName = create ? initialData.profile.name || profile.name : profile.name;
     handleAuthSuccess({
       email: profile.email,
       name: displayName,
-      workspaceKey,
+      workspaceKey: key,
+      baseKey: base,
+      wsId: target.id,
+      registry,
       initialData,
       isCloud: true,
       google: true,
       picture: profile.picture,
-      cloudMeta: fromCloud ? { hash: hashData(fromCloud), modified: cloud.modifiedTime } : { hash: '', modified: '' },
-      returning: Boolean(existing),
+      cloudMeta: fromCloud ? { hash: hashData(fromCloud.data), modified: fromCloud.modifiedTime } : { hash: '', modified: '' },
+      returning: !create,
     });
+  };
+
+  const waitCloudIdle = async () => {
+    for (let i = 0; i < 60 && cloudRef.current.busy; i += 1) await new Promise((r) => setTimeout(r, 100));
+  };
+
+  // Beralih ke akun lain (Pribadi <-> Bisnis) tanpa keluar. Data akun lama dikirim ke Drive dulu.
+  const switchWorkspace = async (id) => {
+    if (!currentUser || id === currentUser.wsId || wsBusy) return;
+    setWsBusy(true);
+    try {
+      setCloudReady(false); // hentikan pengiriman otomatis selama peralihan
+      await waitCloudIdle();
+      if (isGoogle) await cloudPush(false);
+      const key = keyFor(currentUser.baseKey, id);
+      const local = readStoredJson(wsStoreKey(key));
+      const stored = readStoredJson(`lifeos:cloud:${key}`);
+      const localDirty = local && (!stored || hashData(local) !== stored.hash);
+      let next = null;
+      let meta = stored || { hash: '', modified: '' };
+      if (local && localDirty) next = local; // ada perubahan lokal yang belum terkirim: jangan ditimpa
+      else if (isGoogle) {
+        try {
+          const res = await loadCloud(false, id);
+          if (res?.data?.profile) {
+            next = res.data;
+            meta = { hash: hashData(res.data), modified: res.modifiedTime };
+          }
+        } catch {
+          /* tanpa jaringan: pakai salinan lokal */
+        }
+      }
+      if (!next && local) next = local;
+      if (!next) {
+        notify(lang === 'id' ? 'Data akun itu belum bisa dimuat. Periksa koneksi lalu coba lagi.' : "Couldn't load that account. Check your connection and try again.");
+        if (isGoogle) setCloudReady(true);
+        return;
+      }
+      try {
+        localStorage.setItem(`lifeos:cloud:${key}`, JSON.stringify(meta));
+        localStorage.setItem(lastWsKey(currentUser.baseKey), id);
+      } catch {
+        /* abaikan */
+      }
+      setActiveWs(id);
+      cloudRef.current = { hash: meta.hash || '', modified: meta.modified || '', busy: false };
+      setCurrentUser((u) => ({ ...u, workspaceKey: key, wsId: id }));
+      setData(next);
+      setWsSheetOpen(false);
+      setMenuOpen(false);
+      navigateTab('dashboard');
+      const nm = entryFromData(id, next).name;
+      notify(lang === 'id' ? `Beralih ke ${nm}` : `Switched to ${nm}`);
+    } finally {
+      setWsBusy(false);
+    }
+  };
+
+  // Tambah akun baru (Pribadi atau Bisnis) di bawah login yang sama
+  const createWorkspace = async ({ type, name }) => {
+    if (!currentUser || wsBusy) return false;
+    setWsBusy(true);
+    try {
+      setCloudReady(false);
+      await waitCloudIdle();
+      if (isGoogle) await cloudPush(false);
+      const id = newWsId();
+      const key = keyFor(currentUser.baseKey, id);
+      const fresh = createWorkspaceFromSetup(lang, currentUser.name, { type, name });
+      try {
+        localStorage.setItem(wsStoreKey(key), JSON.stringify(fresh));
+        localStorage.setItem(`lifeos:cloud:${key}`, JSON.stringify({ hash: '', modified: '' }));
+        localStorage.setItem(lastWsKey(currentUser.baseKey), id);
+      } catch {
+        /* abaikan */
+      }
+      setActiveWs(id);
+      cloudRef.current = { hash: '', modified: '', busy: false };
+      setCurrentUser((u) => ({ ...u, workspaceKey: key, wsId: id }));
+      setData(fresh);
+      setWsSheetOpen(false);
+      setMenuOpen(false);
+      navigateTab('dashboard');
+      notify(lang === 'id' ? `Akun ${name} dibuat` : `Account ${name} created`);
+      return true;
+    } finally {
+      setWsBusy(false);
+    }
   };
 
   if (!currentUser) {
@@ -10528,8 +10691,12 @@ function LifeOsWorkspace() {
   }
 
   const bizMode = data.profile.ledgerType === 'business';
+  const currentWs = entryFromData(currentUser.wsId || MAIN_WS, data);
+  const openSwitcher = () => setWsSheetOpen(true);
   const renderBiz = (section) => (
     <BusinessView
+      currentWs={currentWs}
+      onOpenSwitcher={openSwitcher}
       section={section}
       data={data}
       setData={setData}
@@ -10550,12 +10717,15 @@ function LifeOsWorkspace() {
       case 'biz_pos':
       case 'biz_stock':
       case 'biz_payroll':
+      case 'biz_assets':
       case 'biz_reports':
         return renderBiz(activeTab);
       case 'dashboard':
         if (bizMode) return renderBiz('dashboard');
         return (
           <HomeView
+            currentWs={currentWs}
+            onOpenSwitcher={openSwitcher}
             data={data}
             derived={derived}
             lang={lang}
@@ -10636,6 +10806,9 @@ function LifeOsWorkspace() {
       case 'profile':
         return (
           <ProfileView
+            currentWs={currentWs}
+            wsCount={wsList.length}
+            onOpenSwitcher={openSwitcher}
             data={data}
             derived={derived}
             currentUser={currentUser}
@@ -10871,7 +11044,7 @@ function LifeOsWorkspace() {
 
   // Halaman dengan header sendiri (gaya e-wallet) & penanda tab aktif di navigasi bawah
   const PRIMARY_TABS = ['dashboard', 'activity', 'wallet', 'profile', 'biz_pos'];
-  const ownHeader = ['dashboard', 'activity', 'profile', 'biz_pos', 'biz_stock', 'biz_payroll', 'biz_reports'].includes(activeTab);
+  const ownHeader = ['dashboard', 'activity', 'profile', 'biz_pos', 'biz_stock', 'biz_payroll', 'biz_assets', 'biz_reports'].includes(activeTab);
   const navActive = PRIMARY_TABS.includes(activeTab) ? activeTab : 'dashboard';
 
   const allNavItems = NAV_GROUPS.flatMap((g) => g.items);
@@ -11003,6 +11176,7 @@ function LifeOsWorkspace() {
                 {makeTr(lang)('sync_reconnect')}
               </button>
             )}
+            <WorkspaceChip current={currentWs} lang={lang} onClick={openSwitcher} className="hidden lg:inline-flex max-w-[200px]" />
             <span className="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-life-surface border border-life-border/40 text-[11px] text-life-muted">
               <Cloud className={`w-3.5 h-3.5 ${isGoogle && syncStatus !== 'synced' ? 'text-[#D9A441]' : 'text-[#87B082]'}`} />
               {makeTr(lang)(!isGoogle ? 'sync_local' : syncStatus === 'syncing' ? 'sync_syncing' : syncStatus === 'offline' ? 'sync_offline' : syncStatus === 'auth' ? 'sync_auth' : 'sync_google')}
@@ -11084,6 +11258,8 @@ function LifeOsWorkspace() {
         onNavigate={navigateTab}
         lang={lang}
         bizMode={bizMode}
+        currentWs={currentWs}
+        onOpenSwitcher={openSwitcher}
         actions={{
           addTx: () => setTxModal({ open: true, tx: null }),
           scan: () => setReceiptModalOpen(true),
@@ -11094,6 +11270,18 @@ function LifeOsWorkspace() {
           exportReport: () => setExportOpen(true),
           weekly: () => setWeeklyOpen(true),
         }}
+      />
+
+      <WorkspaceSheet
+        open={wsSheetOpen}
+        onClose={() => setWsSheetOpen(false)}
+        lang={lang}
+        list={wsList}
+        currentId={currentUser.wsId || MAIN_WS}
+        email={currentUser.email}
+        busy={wsBusy}
+        onSwitch={switchWorkspace}
+        onCreate={createWorkspace}
       />
 
       {/* GLOBAL MODALS */}

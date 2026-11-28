@@ -6,6 +6,15 @@ const CLIENT_ID =
   '1035980999137-v3rj893bonk7hpfn7358fpommjprn28g.apps.googleusercontent.com';
 const SCOPE = 'https://www.googleapis.com/auth/drive.file openid email profile';
 const FILE_NAME = 'life-os-backup.json';
+// Ruang kerja ganda: 'main' = life-os-backup.json, lainnya = life-os-backup-<id>.json
+const MAIN = 'main';
+const fileNameFor = (id) => (!id || id === MAIN ? FILE_NAME : `life-os-backup-${id}.json`);
+const FILE_RE = /^life-os-backup(?:-([A-Za-z0-9]+))?\.json$/;
+let activeWs = MAIN;
+// Dipakai oleh fitur yang tidak membawa id sendiri (cadangan otomatis, tombol Cadangkan)
+export const setActiveWs = (id) => {
+  activeWs = id || MAIN;
+};
 const TOKEN_KEY = 'lifeos:drive_token';
 const LINKED_KEY = 'lifeos:drive_linked';
 
@@ -93,8 +102,8 @@ async function api(token, url, init = {}) {
   return res;
 }
 
-async function findFile(token) {
-  const q = encodeURIComponent(`name='${FILE_NAME}' and trashed=false`);
+async function findFile(token, wsId = activeWs) {
+  const q = encodeURIComponent(`name='${fileNameFor(wsId)}' and trashed=false`);
   const res = await api(token, `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,modifiedTime)&orderBy=modifiedTime desc`);
   const json = await res.json();
   return json.files?.[0] || null;
@@ -125,24 +134,24 @@ export function forgetDriveToken() {
 }
 
 // Metadata file cloud tanpa mengunduh isinya: { id, modifiedTime } atau null
-export async function peekCloud(interactive = false) {
+export async function peekCloud(interactive = false, wsId = activeWs) {
   const token = await getToken(interactive);
-  return findFile(token);
+  return findFile(token, wsId);
 }
 
 // Unduh data cloud memakai token yang sudah ada (atau minta token bila perlu)
-export async function loadCloud(interactive = false) {
+export async function loadCloud(interactive = false, wsId = activeWs) {
   const token = await getToken(interactive);
-  const file = await findFile(token);
+  const file = await findFile(token, wsId);
   if (!file) return null;
   const res = await api(token, `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`);
   return { data: await res.json(), modifiedTime: file.modifiedTime };
 }
 
-export async function backupToDrive(data, { interactive = true } = {}) {
+export async function backupToDrive(data, { interactive = true, wsId = activeWs } = {}) {
   const token = await getToken(interactive);
   const body = JSON.stringify(data);
-  const existing = await findFile(token);
+  const existing = await findFile(token, wsId);
   if (existing) {
     const up = await api(token, `https://www.googleapis.com/upload/drive/v3/files/${existing.id}?uploadType=media&fields=modifiedTime`, {
       method: 'PATCH',
@@ -152,7 +161,7 @@ export async function backupToDrive(data, { interactive = true } = {}) {
     return up.modifiedTime || new Date().toISOString();
   }
   const boundary = 'lifeos' + Math.random().toString(36).slice(2);
-  const meta = JSON.stringify({ name: FILE_NAME, mimeType: 'application/json' });
+  const meta = JSON.stringify({ name: fileNameFor(wsId), mimeType: 'application/json' });
   const multipart =
     `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n` +
     `--${boundary}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${boundary}--`;
@@ -164,10 +173,41 @@ export async function backupToDrive(data, { interactive = true } = {}) {
   return created.modifiedTime || new Date().toISOString();
 }
 
-export async function restoreFromDrive() {
+export async function restoreFromDrive(wsId = activeWs) {
   const token = await getToken(true);
-  const file = await findFile(token);
+  const file = await findFile(token, wsId);
   if (!file) return null;
   const res = await api(token, `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`);
   return { data: await res.json(), modifiedTime: file.modifiedTime };
+}
+
+// Semua ruang kerja milik pengguna di Drive: [{ id, data, modifiedTime }]
+// (scope drive.file hanya melihat file yang dibuat aplikasi ini, jadi aman dari file lain)
+export async function listCloudWorkspaces(interactive = false) {
+  const token = await getToken(interactive);
+  const q = encodeURIComponent("trashed=false and mimeType='application/json'");
+  const res = await api(token, `https://www.googleapis.com/drive/v3/files?q=${q}&pageSize=100&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc`);
+  const files = (await res.json()).files || [];
+  const seen = new Set();
+  const picked = [];
+  files.forEach((f) => {
+    const m = FILE_RE.exec(f.name || '');
+    if (!m) return;
+    const id = m[1] || MAIN;
+    if (seen.has(id)) return; // salinan ganda: ambil yang terbaru (daftar sudah urut)
+    seen.add(id);
+    picked.push({ id, fileId: f.id, modifiedTime: f.modifiedTime });
+  });
+  const out = [];
+  for (const f of picked.slice(0, 12)) {
+    try {
+      const r = await api(token, `https://www.googleapis.com/drive/v3/files/${f.fileId}?alt=media`);
+      const data = await r.json();
+      if (data?.profile) out.push({ id: f.id, data, modifiedTime: f.modifiedTime });
+    } catch (e) {
+      if (/drive_expired/.test(String(e?.message))) throw e;
+      /* satu file rusak tidak menghentikan yang lain */
+    }
+  }
+  return out;
 }

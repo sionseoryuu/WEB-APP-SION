@@ -132,7 +132,7 @@ export const BottomNav = ({ active, onNavigate, onMenu, menuOpen, lang, bizMode 
 };
 
 // Lembar menu (bottom sheet): aksi cepat + semua modul aplikasi
-export const MenuSheet = ({ open, onClose, onNavigate, actions, lang, bizMode = false }) => {
+export const MenuSheet = ({ open, onClose, onNavigate, actions, lang, bizMode = false, currentWs, onOpenSwitcher }) => {
   if (!open) return null;
   const L = (a, b) => (lang === 'id' ? a : b);
   const personalQuick = [
@@ -173,6 +173,15 @@ export const MenuSheet = ({ open, onClose, onNavigate, actions, lang, bizMode = 
           </button>
         </div>
 
+        {onOpenSwitcher && (
+          <button onClick={go(onOpenSwitcher)} className="w-full flex items-center gap-3 p-3 mb-4 rounded-2xl bg-life-bg border border-life-border/50 text-left active:scale-[0.99]">
+            <span className="w-10 h-10 rounded-2xl bg-life-accent/15 text-life-accent flex items-center justify-center shrink-0"><ArrowLeftRight className="w-5 h-5" /></span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-[11px] text-life-muted">{L('Akun aktif · ketuk untuk beralih', 'Active account · tap to switch')}</span>
+              <span className="block text-sm font-semibold text-life-text truncate">{currentWs?.name} · {bizMode ? L('Bisnis', 'Business') : L('Pribadi', 'Personal')}</span>
+            </span>
+          </button>
+        )}
         <p className="text-[11px] font-semibold uppercase tracking-widest text-life-muted/75 mb-2">{L('Aksi Cepat', 'Quick Actions')}</p>
         <div className="grid grid-cols-4 gap-2 mb-5">
           {quick.map((q) => (

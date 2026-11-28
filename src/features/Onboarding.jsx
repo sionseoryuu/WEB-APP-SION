@@ -7,7 +7,7 @@ const TXT = {
   id: {
     tagline: 'Catat keuangan & hidup, tersinkron di Google Drive Anda',
     s1_title: 'Tipe Pencatatan',
-    s1_sub: 'Pilih yang sesuai kebutuhan Anda. Bisa diubah nanti di Pengaturan.',
+    s1_sub: 'Pilih yang sesuai kebutuhan Anda. Satu akun Google bisa punya akun Pribadi dan Bisnis sekaligus — beralih kapan saja dari Beranda.',
     biz: 'Usaha / Bisnis',
     biz_desc: 'Warung, toko, UMKM, freelance. Kategori: Penjualan, Pembelian Stok, Gaji, dll.',
     per: 'Pribadi / Keluarga',
@@ -40,7 +40,7 @@ const TXT = {
   en: {
     tagline: 'Track money & life, synced to your own Google Drive',
     s1_title: 'Tracking Type',
-    s1_sub: 'Pick what fits your needs. You can change it later in Settings.',
+    s1_sub: 'Pick what fits your needs. One Google account can hold both a Personal and a Business account — switch anytime from Home.',
     biz: 'Business',
     biz_desc: 'Shop, small business, freelance. Categories: Sales, Stock Purchases, Payroll, etc.',
     per: 'Personal / Family',

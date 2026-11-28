@@ -1,4 +1,30 @@
-# HANDOFF — LIFE OS (update 28 Nov 2026, v6: Mode Bisnis)
+# HANDOFF — LIFE OS (update 28 Nov 2026, v7: Akun Ganda Pribadi/Bisnis + fitur bisnis lanjutan)
+
+## Yang berubah di v7
+**Akar masalah "pilih Pribadi/Bisnis hasilnya sama":** akun Google yang sudah punya data langsung membuka data lama (`existing || create...`), sehingga pilihan tipe di registrasi diabaikan; baris "Tipe pencatatan" di Profil juga hanya membalik label tanpa data baru. Sekarang satu login Google = beberapa **ruang kerja** (akun Pribadi / Bisnis), tiap ruang kerja punya data sendiri.
+
+### Ruang kerja ganda
+- `features/workspaces.js` — logika murni: kunci (`g_<sub>` = utama, `g_<sub>~<id>` = lainnya), registry lokal (`lifeos:wslist:<base>`), `pickWorkspace` (pilih/buat ruang kerja sesuai tipe), `mergeRegistry`.
+- `driveSync.js` — file Drive per ruang kerja: utama `life-os-backup.json` (kompatibel data lama), lainnya `life-os-backup-<id>.json`. `listCloudWorkspaces()` memulihkan daftar akun di perangkat baru. `setActiveWs()` untuk fitur yang tak membawa id (cadangan otomatis).
+- `features/WorkspaceSwitcher.jsx` — `WorkspaceChip` (Beranda pribadi), `WorkspaceSheet` (daftar akun + tambah akun baru).
+- `App.jsx` — `handleOnboardGoogle` (pilih tipe → buka akun bertipe itu atau buat baru), `switchWorkspace`, `createWorkspace`, logout membersihkan salinan lokal semua akun yang sudah tersinkron. `currentUser` kini punya `baseKey` & `wsId`.
+- Titik masuk "Beralih akun": chip di Beranda Pribadi, tombol "Beralih" di header Bisnis, kartu di atas Menu, baris di Profil, chip di header desktop.
+- Aturan beralih: akun lama dikirim ke Drive dulu; bila salinan lokal akun tujuan punya perubahan belum terkirim, salinan lokal dipakai (tidak ditimpa cloud).
+
+### Fitur bisnis baru
+- **Penjualan kredit (Bon):** di Kasir pilih "Bon (bayar nanti)" (nama pelanggan wajib). Pendapatan diakui saat bon dibuat (Dr Piutang / Cr Penjualan), masuk modul Utang sebagai piutang (`debts[].saleId`). Tombol "Terima" di Utang/Piutang mencatat transaksi `biz:'ar_collect'` (Dr Kas / Cr Piutang). Bon yang sudah dibayar tidak bisa di-void.
+- **Aset tetap & penyusutan** (`BizAssets.jsx`, `data.assets[]`): garis lurus per bulan, nilai sisa, tanah tidak disusutkan, beli dari kas (`biz:'asset_buy'`, kategori "Pembelian Aset Tetap") atau aset lama/modal. Masuk Laba Rugi (Beban Penyusutan) dan Neraca (Aset Tetap − Akumulasi Penyusutan).
+- **Laporan Arus Kas** (metode langsung) di tab Laporan: kas awal, operasi masuk/keluar, investasi, kas akhir (cocok dengan saldo kas Neraca).
+- Diuji dengan skenario: Neraca Saldo & Neraca seimbang, piutang = bon − pembayaran, kas akhir Arus Kas = saldo kas Neraca.
+
+### Belum diuji / ide lanjut
+- BELUM dijalankan di browser/HP (hanya bundling esbuild + uji logika murni). Uji alur: daftar Pribadi → Beralih → tambah Bisnis → keluar → masuk lagi di perangkat lain.
+- Hapus/ganti nama akun dari daftar (file Drive akun yang dihapus belum ikut dihapus).
+- Bon: cicilan sebagian (tombol Terima saat ini melunasi penuh), PPN keluaran/masukan terpisah, barcode, struk Bluetooth, multi-kasir.
+- Jalur masuk email lama (legacy) tidak punya pilihan tipe; akun tambahan tetap bisa dibuat lewat "Beralih akun".
+
+---
+
 
 ## Status
 Alur registrasi 3 langkah (v5) + **Mode Bisnis lengkap (v6)**. Lolos bundling esbuild penuh; mesin akuntansi diuji dengan skenario contoh (Neraca Saldo & Neraca seimbang, nilai persediaan jurnal = nilai stok fisik). BELUM diuji di HP/browser.

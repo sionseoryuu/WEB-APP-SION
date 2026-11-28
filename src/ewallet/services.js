@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Wallet, PieChart, PiggyBank, TrendingUp, Repeat, HandCoins, CalendarDays, CheckSquare,
-  Calendar, Flame, Target, HeartHandshake, FileText, ShoppingCart, BarChart3, Star, Bell, Lock, Store, Package, Users,
+  Calendar, Flame, Target, HeartHandshake, FileText, ShoppingCart, BarChart3, Star, Bell, Lock, Store, Package, Users, Landmark,
 } from 'lucide-react';
 
 // Semua modul LIFE OS dikelompokkan seperti "layanan" di e-wallet
@@ -66,7 +66,8 @@ export const BIZ_GROUP = {
     { id: 'biz_pos', icon: ShoppingCart, label: { id: 'Kasir', en: 'POS' } },
     { id: 'biz_stock', icon: Package, label: { id: 'Produk & Stok', en: 'Products' } },
     { id: 'biz_payroll', icon: Users, label: { id: 'Gaji', en: 'Payroll' } },
-    { id: 'biz_reports', icon: BarChart3, label: { id: 'Laba Rugi & Neraca', en: 'P&L & Balance' } },
+    { id: 'biz_assets', icon: Landmark, label: { id: 'Aset Tetap', en: 'Fixed Assets' } },
+    { id: 'biz_reports', icon: BarChart3, label: { id: 'Laba Rugi, Arus Kas & Neraca', en: 'P&L, Cash Flow & Balance' } },
   ],
 };
 

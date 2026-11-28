@@ -2,7 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import {
   Camera, UserRound, Tags, Wallet, PieChart, Repeat, HandCoins, Palette, Languages, EyeOff, LayoutGrid,
   CloudUpload, Download, Upload, FileSpreadsheet, RotateCcw, Sparkles, KeyRound, LogOut, ChevronRight,
-  ChevronLeft, MessageCircle, Plus, Trash2, Pencil, Check, X, Lock, BadgeCheck, Info, Mail, Smartphone, Bell, Star, FileText, Store,
+  ChevronLeft, MessageCircle, Plus, Trash2, Pencil, Check, X, Lock, BadgeCheck, Info, Mail, Smartphone, Bell, Star, FileText, Store, ArrowLeftRight,
 } from 'lucide-react';
 import ThemeSettings from '../ThemeSettings.jsx';
 import DriveBackup from '../DriveBackup.jsx';
@@ -235,6 +235,7 @@ export default function ProfileView(props) {
     data, derived, currentUser, lang, maskBalances, onToggleMask, onUpdateProfile, onNavigate,
     onExportJson, onExportCsv, onImportJson, onResetEmpty, onRestoreDemo, onLogout,
     onAddCategory, onDeleteCategory, onRenameCategory, lockEnabled, onExportReport,
+    currentWs, wsCount, onOpenSwitcher,
   } = props;
   const L = (a, b) => (lang === 'id' ? a : b);
   const [page, setPage] = useState('menu');
@@ -344,7 +345,7 @@ export default function ProfileView(props) {
       <Group title={L('Tampilan & Preferensi', 'Appearance & Preferences')}>
         <Row icon={Palette} label={L('Tema & warna', 'Theme & colors')} onClick={() => setPage('theme')} />
         <Row icon={LayoutGrid} label={L('Atur tampilan beranda', 'Customize home')} hint={L('Pilih bagian yang ditampilkan', 'Choose visible sections')} onClick={() => setPage('layout')} />
-        <Row icon={Store} label={L('Tipe pencatatan', 'Ledger type')} hint={data.profile.ledgerType === 'business' ? L('Usaha / Bisnis — ketuk untuk ganti ke Pribadi', 'Business — tap to switch to Personal') : L('Pribadi / Keluarga — ketuk untuk ganti ke Usaha', 'Personal — tap to switch to Business')} onClick={() => onUpdateProfile({ ledgerType: data.profile.ledgerType === 'business' ? 'personal' : 'business' })} />
+        <Row icon={ArrowLeftRight} label={L('Beralih akun (Pribadi / Bisnis)', 'Switch account (Personal / Business)')} hint={`${currentWs?.name || profile.name} • ${data.profile.ledgerType === 'business' ? L('Bisnis', 'Business') : L('Pribadi', 'Personal')}${wsCount > 1 ? ` • ${wsCount} ${L('akun', 'accounts')}` : ''}`} onClick={onOpenSwitcher} />
         <Row icon={Languages} label={L('Bahasa', 'Language')} hint={lang === 'id' ? 'Bahasa Indonesia' : 'English'} onClick={() => onUpdateProfile({ language: lang === 'id' ? 'en' : 'id' })} />
         <Row icon={EyeOff} label={L('Sembunyikan saldo', 'Hide balances')} chevron={false} right={<Switch checked={maskBalances} onChange={onToggleMask} label={L('Sembunyikan saldo', 'Hide balances')} />} />
       </Group>

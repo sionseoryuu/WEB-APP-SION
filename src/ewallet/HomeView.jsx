@@ -6,6 +6,7 @@ import {
 import { FavoritesStrip } from '../features/TemplatesView.jsx';
 import { WeeklyCard, dismissWeeklyToday } from '../features/WeeklySummary.jsx';
 import { Avatar, SectionTitle, TxRow } from './parts.jsx';
+import { WorkspaceChip } from '../features/WorkspaceSwitcher.jsx';
 import { fmt, todayStr, catName } from './helpers.js';
 import { ALL_SERVICES } from './services.js';
 
@@ -15,7 +16,7 @@ const PINNED_SERVICE_IDS = ['budgets', 'savings', 'tasks', 'habits'];
 export default function HomeView({
   data, derived, lang, maskBalances, onToggleMask, onNavigate,
   onOpenTx, onOpenReceipt, onOpenSplit, onOpenPayday, onOpenBriefing, onOpenMenu,
-  onOpenSearch, onOpenWeekly, onUseTemplate,
+  onOpenSearch, onOpenWeekly, onUseTemplate, currentWs, onOpenSwitcher,
 }) {
   const [, forceTick] = React.useState(0);
   const L = (idText, enText) => (lang === 'id' ? idText : enText);
@@ -88,6 +89,7 @@ export default function HomeView({
         <div className="flex-1 min-w-0">
           <p className="text-[11px] text-life-muted">{greet}</p>
           <p className="text-base font-semibold text-life-text truncate">{profile.name}</p>
+          {onOpenSwitcher && <WorkspaceChip current={currentWs} lang={lang} onClick={onOpenSwitcher} className="mt-1" />}
         </div>
         <button onClick={onOpenSearch} className="p-2.5 rounded-xl bg-life-surface border border-life-border/50 text-life-muted" aria-label={L('Cari', 'Search')}>
           <Search className="w-4 h-4" />

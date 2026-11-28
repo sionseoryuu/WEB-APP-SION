@@ -1,10 +1,11 @@
 import React, { useMemo } from 'react';
-import { ChevronLeft, Eye, EyeOff, Store, ShoppingCart, Package, Users, BarChart3, Plus, ScanLine, AlertTriangle, HandCoins } from 'lucide-react';
+import { ArrowLeftRight, ChevronLeft, Eye, EyeOff, Store, ShoppingCart, Package, Users, BarChart3, Plus, ScanLine, AlertTriangle, HandCoins, Landmark } from 'lucide-react';
 import { TxRow } from '../ewallet/parts.jsx';
 import BizPOS from './BizPOS.jsx';
 import BizStock from './BizStock.jsx';
 import BizPayroll from './BizPayroll.jsx';
 import BizReports from './BizReports.jsx';
+import BizAssets from './BizAssets.jsx';
 import { bizData, incomeStatement, lowStock, monthRange, rp, salesSummary, n, thisMonthKey } from './bizLogic.js';
 import { Stat, Row, SectionLabel } from './bizUi.jsx';
 import { todayYmd } from '../features/dates.js';
@@ -14,11 +15,12 @@ export const BIZ_TABS = [
   { id: 'biz_pos', icon: ShoppingCart, id_: 'Kasir', en: 'POS' },
   { id: 'biz_stock', icon: Package, id_: 'Produk', en: 'Products' },
   { id: 'biz_payroll', icon: Users, id_: 'Gaji', en: 'Payroll' },
+  { id: 'biz_assets', icon: Landmark, id_: 'Aset', en: 'Assets' },
   { id: 'biz_reports', icon: BarChart3, id_: 'Laporan', en: 'Reports' },
 ];
 
 export default function BusinessView(props) {
-  const { section, data, setData, derived, lang, maskBalances, onToggleMask, notify, askConfirm, onNavigate, onOpenTx, onOpenReceipt } = props;
+  const { section, data, setData, derived, lang, maskBalances, onToggleMask, notify, askConfirm, onNavigate, onOpenTx, onOpenReceipt, currentWs, onOpenSwitcher } = props;
   const L = (a, e) => (lang === 'id' ? a : e);
   const current = BIZ_TABS.find((t) => t.id === section) || BIZ_TABS[0];
   const shop = data.pos?.shopName || data.profile.name;
@@ -36,6 +38,11 @@ export default function BusinessView(props) {
           <p className="text-[11px] text-life-muted">{L('Mode Bisnis', 'Business Mode')}</p>
           <h1 className="text-lg font-bold text-life-text truncate">{section === 'dashboard' ? shop : L(current.id_, current.en)}</h1>
         </div>
+        {onOpenSwitcher && (
+          <button onClick={onOpenSwitcher} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-life-surface border border-life-border/50 text-[11px] font-semibold text-life-soft" aria-label={L('Beralih akun', 'Switch account')}>
+            <ArrowLeftRight className="w-3.5 h-3.5 text-life-accent" /> {L('Beralih', 'Switch')}
+          </button>
+        )}
         <button onClick={onToggleMask} className="p-2.5 rounded-xl bg-life-surface border border-life-border/50 text-life-muted" aria-label={L('Sembunyikan saldo', 'Hide balances')}>
           {maskBalances ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
         </button>
@@ -59,6 +66,7 @@ export default function BusinessView(props) {
       {section === 'biz_pos' && <BizPOS {...shared} />}
       {section === 'biz_stock' && <BizStock {...shared} />}
       {section === 'biz_payroll' && <BizPayroll {...shared} />}
+      {section === 'biz_assets' && <BizAssets {...shared} />}
       {section === 'biz_reports' && <BizReports data={data} notify={notify} lang={lang} maskBalances={maskBalances} />}
     </div>
   );
@@ -87,6 +95,7 @@ function BizHome({ data, derived, lang, maskBalances, onNavigate, onOpenTx, onOp
     { icon: Plus, label: L('Catat Biaya', 'Add Expense'), go: () => onOpenTx() },
     { icon: Package, label: L('Produk', 'Products'), go: () => onNavigate('biz_stock') },
     { icon: Users, label: L('Gaji', 'Payroll'), go: () => onNavigate('biz_payroll') },
+    { icon: Landmark, label: L('Aset', 'Assets'), go: () => onNavigate('biz_assets') },
     { icon: BarChart3, label: L('Laporan', 'Reports'), go: () => onNavigate('biz_reports') },
     { icon: ScanLine, label: L('Scan Struk', 'Scan'), go: onOpenReceipt },
     { icon: HandCoins, label: L('Utang/Piutang', 'Debts'), go: () => onNavigate('debts') },

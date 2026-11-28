@@ -12,6 +12,7 @@ export const CAT = {
   ops: 'Sewa & Operasional',
   remit: 'Setoran Potongan Gaji',
   stockLoss: 'Selisih Stok',
+  asset: 'Pembelian Aset Tetap',
 };
 
 export const n = (v) => Number(v) || 0;
@@ -40,6 +41,7 @@ export const bizData = (data) => ({
   employees: data.employees || [],
   payrolls: data.payrolls || [],
   stockMoves: data.stockMoves || [],
+  assets: data.assets || [],
   pos: { ...DEFAULT_POS, ...(data.pos || {}), methods: data.pos?.methods?.length ? data.pos.methods : DEFAULT_POS.methods },
 });
 
@@ -48,7 +50,7 @@ export const withBizCategories = (d) => {
   const inc = new Set(d.customIncomeCategories || []);
   const exp = new Set(d.customExpenseCategories || []);
   [CAT.sale, CAT.service].forEach((c) => inc.add(c));
-  [CAT.stock, CAT.payroll, CAT.ops, CAT.remit, CAT.stockLoss].forEach((c) => exp.add(c));
+  [CAT.stock, CAT.payroll, CAT.ops, CAT.remit, CAT.stockLoss, CAT.asset].forEach((c) => exp.add(c));
   return { ...d, customIncomeCategories: [...inc], customExpenseCategories: [...exp] };
 };
 
@@ -104,12 +106,16 @@ export function buildLedger(data, lang = 'id') {
   data.transactions.forEach((tx) => {
     const amt = n(tx.amount);
     if (!amt) return;
-    if (tx.type === 'income') {
+    if (tx.type === 'income' && tx.biz === 'ar_collect') {
+      // Penerimaan piutang dari penjualan kredit: kas bertambah, piutang berkurang (pendapatan sudah diakui saat bon dibuat)
+      J(tx.date, tx.description, [kas(tx.accountId), amt, 0], [ensure('ar', 'Piutang Usaha', 'asset'), 0, amt]);
+    } else if (tx.type === 'income') {
       const id = ensure(`rev:${tx.category}`, tx.category === CAT.sale ? 'Penjualan' : `Pendapatan — ${catName(tx.category, lang)}`, 'rev');
       J(tx.date, tx.description, [kas(tx.accountId), amt, 0], [id, 0, amt]);
     } else if (tx.type === 'expense') {
       let dr;
       if (tx.biz === 'stock_buy') dr = inv();
+      else if (tx.biz === 'asset_buy') dr = ensure('fa', 'Aset Tetap (Harga Perolehan)', 'asset');
       else if (tx.biz === 'payroll') dr = ensure(`exp:${CAT.payroll}`, 'Beban Gaji Karyawan', 'exp');
       else if (tx.category === CAT.remit) dr = wh();
       else if (tx.category === CAT.stock) dr = ensure('purch', 'Pembelian Barang Dagang', 'cogs');
@@ -125,7 +131,10 @@ export function buildLedger(data, lang = 'id') {
 
   // HPP dari penjualan kasir (hanya barang yang stoknya dilacak)
   b.sales.forEach((s) => {
-    if (!txIds.has(s.txId)) return;
+    if (s.credit) {
+      // Penjualan kredit (bon): pendapatan diakui sekarang, kas diterima nanti
+      J(s.date, `Penjualan kredit ${s.no}`, [ensure('ar', 'Piutang Usaha', 'asset'), n(s.total), 0], [ensure(`rev:${CAT.sale}`, 'Penjualan', 'rev'), 0, n(s.total)]);
+    } else if (!txIds.has(s.txId)) return;
     const cost = (s.items || []).reduce((a, it) => a + (it.tracked ? n(it.cost) * n(it.qty) : 0), 0);
     J(s.date, `HPP ${s.no}`, [ensure('cogs', 'Harga Pokok Penjualan (HPP)', 'cogs'), cost, 0], [inv(), 0, cost]);
   });
@@ -147,9 +156,20 @@ export function buildLedger(data, lang = 'id') {
     J(p.date, `Potongan gaji ${p.employeeName}`, [ensure(`exp:${CAT.payroll}`, 'Beban Gaji Karyawan', 'exp'), d, 0], [wh(), 0, d]);
   });
 
+  // Aset tetap: perolehan (bila bukan dibeli lewat transaksi kas) + penyusutan garis lurus per bulan
+  b.assets.forEach((a) => {
+    const cost = n(a.cost);
+    if (!cost) return;
+    if (!a.txId || !txIds.has(a.txId)) J(a.date, `Aset ${a.name}`, [ensure('fa', 'Aset Tetap (Harga Perolehan)', 'asset'), cost, 0], [cap(), 0, cost]);
+    depreciationSchedule(a, today0()).forEach((d) =>
+      J(d.date, `Penyusutan ${a.name}`, [ensure('exp:depr', 'Beban Penyusutan', 'exp'), d.amount, 0], [ensure('accdep', 'Akumulasi Penyusutan', 'asset'), 0, d.amount])
+    );
+  });
+
   // Piutang & utang berjalan dari modul Utang (hanya bila laporan sampai hari ini)
   const today = todayYmd();
   (data.debts || []).forEach((d) => {
+    if (d.saleId) return; // piutang dari penjualan kredit sudah dijurnal lewat penjualan & penerimaannya
     const left = Math.max(0, n(d.totalAmount) - n(d.paidAmount));
     if (!left) return;
     if (d.kind === 'receivable') J(OPEN, `Piutang ${d.counterparty || d.title}`, [ensure('ar', 'Piutang Usaha', 'asset'), left, 0], [cap(), 0, left], );
@@ -248,7 +268,7 @@ export function balanceSheet(data, { to, lang = 'id' }) {
 export function salesSummary(data, { from, to }) {
   const b = bizData(data);
   const txIds = new Set(data.transactions.map((t) => t.id));
-  const list = b.sales.filter((s) => txIds.has(s.txId) && s.date >= from && s.date <= to);
+  const list = b.sales.filter((s) => (s.credit || txIds.has(s.txId)) && s.date >= from && s.date <= to);
   const byProduct = {};
   const byMethod = {};
   const byDay = {};
@@ -326,7 +346,8 @@ export function receiptText(sale, pos, shopFallback = '') {
   if (n(sale.discount)) L.push(`Diskon    -${rp(sale.discount)}`);
   if (n(sale.tax)) L.push(`${pos.taxLabel || 'Pajak'} ${n(sale.taxPct)}%  ${rp(sale.tax)}`);
   L.push(`TOTAL      ${rp(sale.total)}`);
-  L.push(`Bayar (${sale.method})  ${rp(sale.paid)}`);
+  if (sale.credit) L.push('BON — BELUM LUNAS');
+  else L.push(`Bayar (${sale.method})  ${rp(sale.paid)}`);
   if (n(sale.change)) L.push(`Kembali    ${rp(sale.change)}`);
   L.push('--------------------------------');
   if (pos.footer) L.push(pos.footer);
@@ -361,3 +382,99 @@ export const csvEscape = (v) => {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 export const toCsv = (rows) => rows.map((r) => r.map(csvEscape).join(',')).join('\n');
+
+// ---------- Aset tetap & penyusutan ----------
+const today0 = () => todayYmd();
+const lastDayOf = (ym) => {
+  const [y, m] = ym.split('-').map(Number);
+  return `${ym}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
+};
+const addMonths = (ym, k) => {
+  const [y, m] = ym.split('-').map(Number);
+  const d = new Date(y, m - 1 + k, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
+// Jadwal penyusutan garis lurus: bulan perolehan dihitung penuh, berhenti saat umur manfaat habis
+// atau nilai buku mencapai nilai sisa. life=0 berarti tidak disusutkan (mis. tanah).
+export function depreciationSchedule(a, untilYmd) {
+  const life = Math.floor(n(a.lifeMonths));
+  const cost = n(a.cost);
+  const base = cost - n(a.salvage);
+  if (!(life > 0) || !(base > 0) || !a.date) return [];
+  const start = a.date.slice(0, 7);
+  const lastMonth = untilYmd.slice(0, 7);
+  const monthly = base / life;
+  const out = [];
+  let acc = 0;
+  for (let i = 0; i < life; i += 1) {
+    const ym = addMonths(start, i);
+    if (ym > lastMonth) break;
+    const amt = i === life - 1 ? Math.round(base - acc) : Math.round(monthly);
+    acc += amt;
+    out.push({ date: lastDayOf(ym), amount: amt });
+  }
+  return out;
+}
+
+export function assetSummary(a, asOf = todayYmd()) {
+  const sched = depreciationSchedule(a, asOf);
+  const accumulated = sched.filter((d) => d.date <= lastDayOf(asOf.slice(0, 7))).reduce((s, d) => s + d.amount, 0);
+  const life = Math.floor(n(a.lifeMonths));
+  return {
+    accumulated,
+    bookValue: n(a.cost) - accumulated,
+    monthly: life > 0 ? Math.round((n(a.cost) - n(a.salvage)) / life) : 0,
+    monthsLeft: life > 0 ? Math.max(0, life - sched.length) : 0,
+    fullyDepreciated: life > 0 && sched.length >= life,
+  };
+}
+
+// ---------- Arus kas (metode langsung) ----------
+// Hanya kas yang benar-benar bergerak: penjualan tunai, penerimaan piutang, biaya, gaji, pembelian aset, dll.
+// Pindah antar-rekening sendiri (transfer) tidak dihitung karena tidak mengubah total kas.
+export function cashFlow(data, { from, to, lang = 'id' }) {
+  const opening0 = data.accounts.reduce((s, a) => s + n(a.initialBalance), 0);
+  const delta = (tx) => {
+    const amt = n(tx.amount);
+    if (tx.type === 'income') return amt;
+    if (tx.type === 'expense') return -amt;
+    if (tx.type === 'transfer' && !tx.toAccountId) return -amt; // ke dana cadangan
+    return 0;
+  };
+  let opening = opening0;
+  const groups = { opIn: {}, opOut: {}, invOut: {}, invIn: {} };
+  const add = (g, label, v) => {
+    g[label] = (g[label] || 0) + v;
+  };
+  data.transactions.forEach((tx) => {
+    const d = delta(tx);
+    if (!d) return;
+    if (tx.date < from) {
+      opening += d;
+      return;
+    }
+    if (tx.date > to) return;
+    if (tx.type === 'income') {
+      add(groups.opIn, tx.biz === 'ar_collect' ? 'Penerimaan piutang' : tx.category === CAT.sale ? 'Penjualan' : `Pendapatan — ${catName(tx.category, lang)}`, d);
+    } else if (tx.type === 'expense') {
+      if (tx.biz === 'asset_buy') add(groups.invOut, 'Pembelian aset tetap', -d);
+      else if (tx.category === 'Investments') add(groups.invOut, 'Investasi', -d);
+      else if (tx.biz === 'stock_buy' || tx.category === CAT.stock) add(groups.opOut, 'Pembelian stok / barang dagang', -d);
+      else if (tx.biz === 'payroll') add(groups.opOut, 'Gaji karyawan (bersih)', -d);
+      else if (tx.category === CAT.remit) add(groups.opOut, 'Setoran potongan gaji (BPJS/pajak)', -d);
+      else add(groups.opOut, `Beban — ${catName(tx.category, lang)}`, -d);
+    } else {
+      add(groups.invOut, 'Dana cadangan / tabungan', -d);
+    }
+  });
+  const rows = (g) => Object.entries(g).map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount);
+  const sum = (g) => Object.values(g).reduce((s, v) => s + v, 0);
+  const operatingIn = rows(groups.opIn);
+  const operatingOut = rows(groups.opOut);
+  const investingOut = rows(groups.invOut);
+  const netOperating = sum(groups.opIn) - sum(groups.opOut);
+  const netInvesting = -sum(groups.invOut);
+  const net = netOperating + netInvesting;
+  return { opening, operatingIn, operatingOut, investingOut, netOperating, netInvesting, net, closing: opening + net };
+}

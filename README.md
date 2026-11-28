@@ -5,6 +5,9 @@ Satu aplikasi untuk semua kebutuhan: keuangan (dompet, anggaran, tabungan, inves
 ## Navigasi
 Bawah: **Beranda · Aktivitas · [MENU] · Dompet · Profil**. Tombol **Menu** di tengah membuka lembar berisi aksi cepat (Catat, Scan QRIS/Struk, Split Bill, Bagi Gaji, Briefing) dan semua modul.
 
+## Akun Pribadi & Bisnis (satu login Google)
+Satu akun Google bisa punya beberapa akun terpisah: **Pribadi** dan **Bisnis** (bahkan lebih dari satu usaha). Ketuk nama akun di Beranda (atau tombol *Beralih*) untuk berpindah; tambah akun baru dari lembar yang sama. Tiap akun tersimpan di file Drive sendiri. Akun Bisnis berisi Kasir (termasuk bon), Produk & Stok, Gaji, Aset Tetap & penyusutan, serta Laba Rugi, Arus Kas, Neraca Saldo, dan Neraca.
+
 ## Jadi APK (Android)
 1. Buat repo GitHub, push semua isi folder ini ke branch `main`.
 2. Tab **Actions → Build APK** jalan otomatis (atau *Run workflow*).

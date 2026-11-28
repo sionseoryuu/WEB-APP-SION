@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Share2, FileSpreadsheet, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Btn, Chip, TextField } from '../features/ui.jsx';
-import { balanceSheet, incomeStatement, monthRange, reportText, rp, salesSummary, toCsv, trialBalance } from './bizLogic.js';
+import { balanceSheet, cashFlow, incomeStatement, monthRange, reportText, rp, salesSummary, toCsv, trialBalance } from './bizLogic.js';
 import { Row, SectionLabel, Stat, notifyShare, shareText } from './bizUi.jsx';
 import { addMonthsKey, todayYmd } from '../features/dates.js';
 import { saveAndShare, MIME } from '../features/files.js';
@@ -33,6 +33,7 @@ export default function BizReports({ data, notify, lang, maskBalances }) {
   const tb = useMemo(() => trialBalance(data, { to: period.to, lang }), [data, period, lang]);
   const bs = useMemo(() => balanceSheet(data, { to: period.to, lang }), [data, period, lang]);
   const ss = useMemo(() => salesSummary(data, period), [data, period]);
+  const cf = useMemo(() => cashFlow(data, { ...period, lang }), [data, period, lang]);
   const m = (v) => (maskBalances ? 'Rp ••••' : rp(v));
   const neg = (v) => (v < 0 ? 'neg' : undefined);
 
@@ -45,6 +46,11 @@ export default function BizReports({ data, notify, lang, maskBalances }) {
       const lines = [...tb.rows.map((r) => `${r.name}\n   D ${rp(r.debit)}   K ${rp(r.credit)}`), '', `TOTAL  D ${rp(tb.totalDebit)}   K ${rp(tb.totalCredit)}`];
       return reportText({ title: 'NERACA SALDO', shop, period: `Per ${period.to}`, lines });
     }
+    if (tab === 'cf') {
+      const sec = (title, rows) => [title, ...rows.map((r) => `  ${r.name}  ${rp(r.amount)}`)];
+      const lines = [`Kas awal  ${rp(cf.opening)}`, '', ...sec('KAS MASUK OPERASIONAL', cf.operatingIn), ...sec('KAS KELUAR OPERASIONAL', cf.operatingOut), `Arus kas operasi  ${rp(cf.netOperating)}`, '', ...sec('INVESTASI (KELUAR)', cf.investingOut), `Arus kas investasi  ${rp(cf.netInvesting)}`, '', `KENAIKAN (PENURUNAN) KAS  ${rp(cf.net)}`, `KAS AKHIR  ${rp(cf.closing)}`];
+      return reportText({ title: 'LAPORAN ARUS KAS', shop, period: period.label, lines });
+    }
     if (tab === 'bs') {
       const lines = ['ASET', ...bs.assets.map((r) => `  ${r.name}  ${rp(r.amount)}`), `Total Aset  ${rp(bs.totalAssets)}`, '', 'KEWAJIBAN', ...bs.liabilities.map((r) => `  ${r.name}  ${rp(r.amount)}`), `Total Kewajiban  ${rp(bs.totalLiab)}`, '', 'EKUITAS', ...bs.equity.map((r) => `  ${r.name}  ${rp(r.amount)}`), `Total Ekuitas  ${rp(bs.totalEquity)}`];
       return reportText({ title: 'NERACA', shop, period: `Per ${period.to}`, lines });
@@ -56,11 +62,12 @@ export default function BizReports({ data, notify, lang, maskBalances }) {
   const buildCsv = () => {
     if (tab === 'pl') return toCsv([['Bagian', 'Akun', 'Jumlah'], ...pl.revenue.map((r) => ['Pendapatan', r.name, Math.round(r.amount)]), ...pl.cogs.map((r) => ['HPP', r.name, Math.round(r.amount)]), ...pl.expenses.map((r) => ['Beban', r.name, Math.round(r.amount)]), ['', 'Laba Kotor', Math.round(pl.grossProfit)], ['', 'Laba Bersih', Math.round(pl.netProfit)]]);
     if (tab === 'tb') return toCsv([['Akun', 'Debit', 'Kredit'], ...tb.rows.map((r) => [r.name, Math.round(r.debit), Math.round(r.credit)]), ['TOTAL', Math.round(tb.totalDebit), Math.round(tb.totalCredit)]]);
+    if (tab === 'cf') return toCsv([['Bagian', 'Uraian', 'Jumlah'], ['', 'Kas awal', Math.round(cf.opening)], ...cf.operatingIn.map((r) => ['Operasi masuk', r.name, Math.round(r.amount)]), ...cf.operatingOut.map((r) => ['Operasi keluar', r.name, -Math.round(r.amount)]), ...cf.investingOut.map((r) => ['Investasi keluar', r.name, -Math.round(r.amount)]), ['', 'Kenaikan kas', Math.round(cf.net)], ['', 'Kas akhir', Math.round(cf.closing)]]);
     if (tab === 'bs') return toCsv([['Bagian', 'Akun', 'Jumlah'], ...bs.assets.map((r) => ['Aset', r.name, Math.round(r.amount)]), ...bs.liabilities.map((r) => ['Kewajiban', r.name, Math.round(r.amount)]), ...bs.equity.map((r) => ['Ekuitas', r.name, Math.round(r.amount)])]);
     return toCsv([['No', 'Tanggal', 'Metode', 'Pelanggan', 'Total'], ...ss.list.map((s) => [s.no, s.date, s.method, s.customer || '', Math.round(s.total)])]);
   };
 
-  const names = { pl: 'laba-rugi', tb: 'neraca-saldo', bs: 'neraca', sales: 'penjualan' };
+  const names = { pl: 'laba-rugi', cf: 'arus-kas', tb: 'neraca-saldo', bs: 'neraca', sales: 'penjualan' };
   const exportCsv = async () => {
     try {
       await saveAndShare({ filename: `${names[tab]}-${period.to}.csv`, content: '\ufeff' + buildCsv(), mime: MIME.csv, dialogTitle: names[tab] });
@@ -75,7 +82,7 @@ export default function BizReports({ data, notify, lang, maskBalances }) {
   return (
     <div className="space-y-4">
       <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
-        {[['pl', L('Laba Rugi', 'P&L')], ['tb', L('Neraca Saldo', 'Trial Balance')], ['bs', L('Neraca', 'Balance Sheet')], ['sales', L('Penjualan', 'Sales')]].map(([id, label]) => (
+        {[['pl', L('Laba Rugi', 'P&L')], ['cf', L('Arus Kas', 'Cash Flow')], ['tb', L('Neraca Saldo', 'Trial Balance')], ['bs', L('Neraca', 'Balance Sheet')], ['sales', L('Penjualan', 'Sales')]].map(([id, label]) => (
           <Chip key={id} active={tab === id} onClick={() => setTab(id)}>{label}</Chip>
         ))}
       </div>
@@ -124,6 +131,35 @@ export default function BizReports({ data, notify, lang, maskBalances }) {
               <Row label={L('LABA (RUGI) BERSIH', 'NET PROFIT (LOSS)')} value={m(pl.netProfit)} bold tone={pl.netProfit >= 0 ? 'pos' : 'neg'} />
             </div>
           </div>
+        </div>
+      )}
+
+      {tab === 'cf' && (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-2.5">
+            <Stat label={L('Kas awal', 'Opening cash')} value={cf.opening} masked={maskBalances} />
+            <Stat label={L('Kas akhir', 'Closing cash')} value={cf.closing} tone={cf.net >= 0 ? 'pos' : 'neg'} sub={`${cf.net >= 0 ? '+' : ''}${maskBalances ? '••••' : rp(cf.net)}`} masked={maskBalances} />
+          </div>
+          <div className="rounded-2xl bg-life-surface border border-life-border/40 p-4">
+            <SectionLabel>{L('Kas masuk dari operasi', 'Operating inflows')}</SectionLabel>
+            {cf.operatingIn.length === 0 && <p className="text-xs text-life-muted py-1">—</p>}
+            {cf.operatingIn.map((r) => <Row key={r.name} label={r.name} value={m(r.amount)} indent />)}
+            <SectionLabel>{L('Kas keluar untuk operasi', 'Operating outflows')}</SectionLabel>
+            {cf.operatingOut.length === 0 && <p className="text-xs text-life-muted py-1">—</p>}
+            {cf.operatingOut.map((r) => <Row key={r.name} label={r.name} value={`-${m(r.amount)}`} indent />)}
+            <div className="border-t border-life-border/40 mt-2 pt-1">
+              <Row label={L('Arus kas dari operasi', 'Net operating cash')} value={m(cf.netOperating)} bold tone={neg(cf.netOperating) || 'pos'} />
+            </div>
+            <SectionLabel>{L('Investasi & dana cadangan', 'Investing')}</SectionLabel>
+            {cf.investingOut.length === 0 && <p className="text-xs text-life-muted py-1">—</p>}
+            {cf.investingOut.map((r) => <Row key={r.name} label={r.name} value={`-${m(r.amount)}`} indent />)}
+            <Row label={L('Arus kas dari investasi', 'Net investing cash')} value={m(cf.netInvesting)} bold tone={neg(cf.netInvesting)} />
+            <div className="border-t border-life-border/40 mt-2 pt-1">
+              <Row label={L('Kenaikan (penurunan) kas', 'Net change in cash')} value={m(cf.net)} bold tone={neg(cf.net) || 'pos'} />
+              <Row label={L('Kas akhir periode', 'Closing cash')} value={m(cf.closing)} bold />
+            </div>
+          </div>
+          <p className="text-[11px] text-life-muted">{L('Hanya uang yang benar-benar masuk/keluar. Penjualan bon baru masuk saat dibayar; penyusutan tidak memengaruhi kas.', 'Only real cash movements. Tab sales count when paid; depreciation does not affect cash.')}</p>
         </div>
       )}
 

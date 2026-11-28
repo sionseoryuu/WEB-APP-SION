@@ -22,6 +22,7 @@ export default function BizPOS({ data, setData, notify, askConfirm, lang }) {
   const [customer, setCustomer] = useState('');
   const [method, setMethod] = useState('');
   const [paid, setPaid] = useState('');
+  const [credit, setCredit] = useState(false); // bon / jual kredit: bayar nanti
   const shop = b.pos.shopName || data.profile.name;
 
   const products = b.products.filter((p) => p.active !== false);
@@ -67,10 +68,10 @@ export default function BizPOS({ data, setData, notify, askConfirm, lang }) {
   const tax = Math.round(((subtotal - discount) * taxPct) / 100);
   const total = subtotal - discount + tax;
   const curMethod = method || b.pos.methods[0]?.name || 'Tunai';
-  const cash = isCash(curMethod);
-  const paidNum = cash ? (paid === '' ? 0 : n(paid)) : total;
+  const cash = !credit && isCash(curMethod);
+  const paidNum = credit ? 0 : cash ? (paid === '' ? 0 : n(paid)) : total;
   const change = Math.max(0, paidNum - total);
-  const canPay = cart.length > 0 && paidNum >= total;
+  const canPay = cart.length > 0 && (credit ? customer.trim().length > 0 : paidNum >= total);
 
   const resetCart = () => {
     setCart([]);
@@ -78,6 +79,7 @@ export default function BizPOS({ data, setData, notify, askConfirm, lang }) {
     setCustomer('');
     setPaid('');
     setMethod('');
+    setCredit(false);
   };
 
   const finalize = () => {
@@ -89,10 +91,15 @@ export default function BizPOS({ data, setData, notify, askConfirm, lang }) {
     const txId = newId('tx');
     const accountId = methodAccount(data, curMethod);
     const items = cart.map((c) => ({ productId: c.productId, name: c.name, price: c.price, cost: c.cost, qty: c.qty, tracked: c.tracked }));
+    const debtId = newId('dbt');
     const sale = {
       id: saleId, no, date, time, items, subtotal, discount, taxPct, tax, total,
-      method: curMethod, accountId, paid: paidNum, change, customer: customer.trim(), txId,
+      method: credit ? 'Bon' : curMethod, accountId, paid: paidNum, change: credit ? 0 : change, customer: customer.trim(),
+      txId: credit ? null : txId, ...(credit ? { credit: true, debtId } : {}),
     };
+    const debt = credit
+      ? { id: debtId, saleId, kind: 'receivable', title: `Bon ${no}`, counterparty: customer.trim(), totalAmount: total, paidAmount: 0, monthlyAmount: total, tenorMonths: 1, dueDate: '', accountId, notes: `Penjualan kredit ${no}` }
+      : null;
     const tx = {
       id: txId, type: 'income', amount: total, date, category: CAT.sale, description: `Penjualan ${no}`,
       accountId, paymentMethod: curMethod, notes: customer.trim() ? `Pelanggan: ${customer.trim()}` : '',
@@ -109,7 +116,8 @@ export default function BizPOS({ data, setData, notify, askConfirm, lang }) {
       });
       return withBizCategories({
         ...prev,
-        transactions: [tx, ...prev.transactions],
+        transactions: credit ? prev.transactions : [tx, ...prev.transactions],
+        debts: credit ? [...(prev.debts || []), debt] : prev.debts,
         sales: [sale, ...pb.sales],
         products: products2,
         stockMoves: [...pb.stockMoves, ...moves],
@@ -120,7 +128,14 @@ export default function BizPOS({ data, setData, notify, askConfirm, lang }) {
     resetCart();
   };
 
-  const voidSale = (s) =>
+  const voidSale = (s) => {
+    if (s.credit) {
+      const d = (data.debts || []).find((x) => x.id === s.debtId);
+      if (d && n(d.paidAmount) > 0) {
+        notify(lang === 'id' ? 'Bon ini sudah dicicil/dibayar, tidak bisa dibatalkan. Hubungi pelanggan atau catat retur manual.' : 'This tab already has payments and cannot be voided.');
+        return;
+      }
+    }
     askConfirm(lang === 'id' ? 'Batalkan Penjualan' : 'Void Sale', lang === 'id' ? `Batalkan ${s.no} (${rp(s.total)})? Stok dikembalikan dan transaksi dihapus.` : `Void ${s.no}?`, () => {
       setData((prev) => {
         const pb = bizData(prev);
@@ -131,6 +146,7 @@ export default function BizPOS({ data, setData, notify, askConfirm, lang }) {
         return {
           ...prev,
           transactions: prev.transactions.filter((t) => t.id !== s.txId),
+          debts: s.credit ? (prev.debts || []).filter((d) => d.id !== s.debtId) : prev.debts,
           sales: pb.sales.filter((x) => x.id !== s.id),
           products: pb.products.map((p) => (back[p.id] ? { ...p, stock: n(p.stock) + back[p.id] } : p)),
           stockMoves: pb.stockMoves.filter((m) => m.refId !== s.id),
@@ -139,6 +155,7 @@ export default function BizPOS({ data, setData, notify, askConfirm, lang }) {
       setReceipt(null);
       notify(lang === 'id' ? 'Penjualan dibatalkan' : 'Sale voided');
     });
+  };
 
   return (
     <div className="space-y-3 pb-24">
@@ -239,15 +256,21 @@ export default function BizPOS({ data, setData, notify, askConfirm, lang }) {
             <Chip active={discType === 'pct'} onClick={() => setDiscType('pct')}>%</Chip>
           </div>
         </div>
-        <TextField label={lang === 'id' ? 'Nama pelanggan (opsional)' : 'Customer (optional)'} value={customer} onChange={(e) => setCustomer(e.target.value)} />
+        <TextField label={credit ? (lang === 'id' ? 'Nama pelanggan (wajib untuk bon)' : 'Customer (required for tab)') : (lang === 'id' ? 'Nama pelanggan (opsional)' : 'Customer (optional)')} value={customer} onChange={(e) => setCustomer(e.target.value)} />
 
         <div>
           <p className="text-xs font-medium uppercase tracking-wider text-life-muted mb-1.5">{lang === 'id' ? 'Metode bayar' : 'Payment'}</p>
           <div className="flex flex-wrap gap-2">
             {b.pos.methods.map((m) => (
-              <Chip key={m.name} active={curMethod === m.name} onClick={() => setMethod(m.name)}>{m.name}</Chip>
+              <Chip key={m.name} active={!credit && curMethod === m.name} onClick={() => { setCredit(false); setMethod(m.name); }}>{m.name}</Chip>
             ))}
+            <Chip active={credit} onClick={() => setCredit(true)}>{lang === 'id' ? 'Bon (bayar nanti)' : 'On tab (pay later)'}</Chip>
           </div>
+          {credit && (
+            <p className="text-[11px] text-life-muted mt-1.5">
+              {lang === 'id' ? 'Penjualan dicatat sebagai pendapatan & piutang pelanggan. Saat pelanggan membayar, catat di Utang/Piutang → Terima.' : 'Recorded as revenue + customer receivable. Record the payment later in Debts → Receive.'}
+            </p>
+          )}
         </div>
 
         {cash && (
@@ -274,7 +297,7 @@ export default function BizPOS({ data, setData, notify, askConfirm, lang }) {
             </div>
           )}
         </div>
-        <Btn className="w-full" disabled={!canPay} onClick={finalize}>{lang === 'id' ? 'Selesaikan & Buat Struk' : 'Complete & Receipt'}</Btn>
+        <Btn className="w-full" disabled={!canPay} onClick={finalize}>{credit ? (lang === 'id' ? 'Simpan sebagai Bon' : 'Save on tab') : (lang === 'id' ? 'Selesaikan & Buat Struk' : 'Complete & Receipt')}</Btn>
       </Sheet>
 
       <CustomItemSheet open={custom} onClose={() => setCustom(false)} lang={lang} onAdd={(it) => { setCart((c) => [...c, { key: newId('ci'), productId: null, tracked: false, cost: 0, ...it }]); setCustom(false); }} />
