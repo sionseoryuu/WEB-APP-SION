@@ -70,3 +70,17 @@ export function pickWorkspace(list, setup, lastId) {
   if (found) return { target: found, create: false };
   return { target: { id: MAIN_WS, type: 'personal' }, create: true };
 }
+
+// Konfirmasi hapus akun: pengguna harus mengetik "hapus akun" (huruf besar/spasi ganda diabaikan)
+export const DELETE_PHRASE = 'hapus akun';
+export const matchesPhrase = (input, phrase = DELETE_PHRASE) =>
+  String(input || '').trim().replace(/\s+/g, ' ').toLowerCase() === phrase;
+
+// Rencana setelah menghapus satu akun:
+//  { list: sisa daftar, open: id akun yang dibuka (atau null), signOut: true bila tidak ada akun tersisa }
+export function planDelete(list, deleteId, currentId) {
+  const rest = sortList(list.filter((w) => w.id !== deleteId));
+  if (rest.length === 0) return { list: rest, open: null, signOut: true };
+  if (deleteId === currentId) return { list: rest, open: rest[0].id, signOut: false };
+  return { list: rest, open: currentId, signOut: false };
+}

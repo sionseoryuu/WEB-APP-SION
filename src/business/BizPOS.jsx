@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, Plus, Minus, ShoppingCart, History, Settings2, Trash2, Share2, PackageX, X } from 'lucide-react';
 import { Btn, Card, Chip, Empty, SelectField, Sheet, TextField } from '../features/ui.jsx';
-import { CAT, bizData, methodAccount, n, newId, nextInvoiceNo, receiptText, rp, withBizCategories, DEFAULT_POS } from './bizLogic.js';
+import { CAT, bizData, methodAccount, n, newId, nextInvoiceNo, receiptText, rp, DEFAULT_POS, applySale, applyVoid, voidBlocked, clampQty } from './bizLogic.js';
 import { notifyShare, shareText } from './bizUi.jsx';
 import { todayYmd } from '../features/dates.js';
 
@@ -61,6 +62,18 @@ export default function BizPOS({ data, setData, notify, askConfirm, lang }) {
         .filter((x) => x.qty > 0)
     );
 
+  // Qty diketik langsung: dibatasi stok, minimal 1
+  const setQtyTo = (key, raw) =>
+    setCart((c) =>
+      c.map((x) => {
+        if (x.key !== key) return x;
+        const p = x.tracked ? b.products.find((pp) => pp.id === x.productId) : null;
+        const { qty, capped } = clampQty(raw, p ? p.stock : null);
+        if (capped) notify(lang === 'id' ? `Stok hanya ${qty}` : `Only ${qty} in stock`);
+        return { ...x, qty };
+      })
+    );
+
   const subtotal = cart.reduce((s, c) => s + c.price * c.qty, 0);
   const itemCount = cart.reduce((s, c) => s + c.qty, 0);
   const discount = Math.min(subtotal, discType === 'pct' ? Math.round((subtotal * n(discVal)) / 100) : n(discVal));
@@ -105,62 +118,28 @@ export default function BizPOS({ data, setData, notify, askConfirm, lang }) {
       accountId, paymentMethod: curMethod, notes: customer.trim() ? `Pelanggan: ${customer.trim()}` : '',
       biz: 'sale', refId: saleId, items: items.map((i) => ({ name: i.name, qty: i.qty, price: i.price })),
     };
-    setData((prev) => {
-      const pb = bizData(prev);
-      const moves = [];
-      const products2 = pb.products.map((p) => {
-        const sold = items.filter((i) => i.productId === p.id && i.tracked).reduce((s, i) => s + i.qty, 0);
-        if (!sold) return p;
-        moves.push({ id: newId('mv'), date, productId: p.id, name: p.name, qty: -sold, unitCost: n(p.cost), kind: 'sale', refId: saleId });
-        return { ...p, stock: n(p.stock) - sold };
-      });
-      return withBizCategories({
-        ...prev,
-        transactions: credit ? prev.transactions : [tx, ...prev.transactions],
-        debts: credit ? [...(prev.debts || []), debt] : prev.debts,
-        sales: [sale, ...pb.sales],
-        products: products2,
-        stockMoves: [...pb.stockMoves, ...moves],
-      });
-    });
+    setData((prev) => applySale(prev, { sale, tx, debt }));
     setCheckout(false);
     setReceipt(sale);
     resetCart();
   };
 
   const voidSale = (s) => {
-    if (s.credit) {
-      const d = (data.debts || []).find((x) => x.id === s.debtId);
-      if (d && n(d.paidAmount) > 0) {
-        notify(lang === 'id' ? 'Bon ini sudah dicicil/dibayar, tidak bisa dibatalkan. Hubungi pelanggan atau catat retur manual.' : 'This tab already has payments and cannot be voided.');
-        return;
-      }
+    if (voidBlocked(data, s)) {
+      notify(lang === 'id' ? 'Bon ini sudah dicicil/dibayar, tidak bisa dibatalkan. Hubungi pelanggan atau catat retur manual.' : 'This tab already has payments and cannot be voided.');
+      return;
     }
     askConfirm(lang === 'id' ? 'Batalkan Penjualan' : 'Void Sale', lang === 'id' ? `Batalkan ${s.no} (${rp(s.total)})? Stok dikembalikan dan transaksi dihapus.` : `Void ${s.no}?`, () => {
-      setData((prev) => {
-        const pb = bizData(prev);
-        const back = {};
-        (s.items || []).forEach((i) => {
-          if (i.tracked && i.productId) back[i.productId] = (back[i.productId] || 0) + n(i.qty);
-        });
-        return {
-          ...prev,
-          transactions: prev.transactions.filter((t) => t.id !== s.txId),
-          debts: s.credit ? (prev.debts || []).filter((d) => d.id !== s.debtId) : prev.debts,
-          sales: pb.sales.filter((x) => x.id !== s.id),
-          products: pb.products.map((p) => (back[p.id] ? { ...p, stock: n(p.stock) + back[p.id] } : p)),
-          stockMoves: pb.stockMoves.filter((m) => m.refId !== s.id),
-        };
-      });
+      setData((prev) => applyVoid(prev, s));
       setReceipt(null);
       notify(lang === 'id' ? 'Penjualan dibatalkan' : 'Sale voided');
     });
   };
 
   return (
-    <div className="space-y-3 pb-24">
-      <div className="flex gap-2">
-        <div className="relative flex-1">
+    <div className="space-y-3 pb-28">
+      <div className="flex gap-2 items-center">
+        <div className="relative flex-1 min-w-0">
           <Search className="w-4 h-4 text-life-muted absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             value={query}
@@ -169,13 +148,13 @@ export default function BizPOS({ data, setData, notify, askConfirm, lang }) {
             className="w-full rounded-xl bg-life-surface border border-life-border/50 pl-9 pr-3 py-2.5 text-sm text-life-text placeholder-life-muted/60 focus:outline-none focus:border-life-accent min-h-[44px]"
           />
         </div>
-        <button onClick={() => setCustom(true)} className="px-3 rounded-xl bg-life-accent/15 border border-life-accent/40 text-life-accent" aria-label="Item bebas">
+        <button onClick={() => setCustom(true)} className="w-11 h-11 shrink-0 rounded-xl bg-life-accent/15 border border-life-accent/40 text-life-accent flex items-center justify-center" aria-label="Item bebas">
           <Plus className="w-5 h-5" />
         </button>
-        <button onClick={() => setHistory(true)} className="px-3 rounded-xl bg-life-surface border border-life-border/50 text-life-soft" aria-label="Riwayat">
+        <button onClick={() => setHistory(true)} className="w-11 h-11 shrink-0 rounded-xl bg-life-surface border border-life-border/50 text-life-soft flex items-center justify-center" aria-label="Riwayat">
           <History className="w-5 h-5" />
         </button>
-        <button onClick={() => setSettings(true)} className="px-3 rounded-xl bg-life-surface border border-life-border/50 text-life-soft" aria-label="Pengaturan kasir">
+        <button onClick={() => setSettings(true)} className="w-11 h-11 shrink-0 rounded-xl bg-life-surface border border-life-border/50 text-life-soft flex items-center justify-center" aria-label="Pengaturan kasir">
           <Settings2 className="w-5 h-5" />
         </button>
       </div>
@@ -202,12 +181,12 @@ export default function BizPOS({ data, setData, notify, askConfirm, lang }) {
               <button
                 key={p.id}
                 onClick={() => add(p)}
-                className={`relative text-left rounded-2xl border p-3 min-h-[84px] active:scale-[0.98] transition ${out ? 'opacity-45 border-life-border/30 bg-life-surface' : 'border-life-border/45 bg-life-surface hover:border-life-accent/60'}`}
+                className={`relative text-left rounded-2xl border p-3 min-h-[96px] flex flex-col justify-between active:scale-[0.98] transition ${out ? 'opacity-45 border-life-border/30 bg-life-surface' : 'border-life-border/45 bg-life-surface hover:border-life-accent/60'}`}
               >
                 {inCart > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] px-1 rounded-full bg-life-accent text-life-bg text-[11px] font-bold flex items-center justify-center">{inCart}</span>
+                  <span className="absolute top-2 right-2 min-w-[22px] h-[22px] px-1 rounded-full bg-life-accent text-life-bg text-[11px] font-bold flex items-center justify-center">{inCart}</span>
                 )}
-                <p className="text-sm font-semibold text-life-text line-clamp-2">{p.name}</p>
+                <p className={`text-sm font-semibold text-life-text line-clamp-2 ${inCart > 0 ? 'pr-7' : ''}`}>{p.name}</p>
                 <p className="text-sm text-life-accent font-bold tabular-nums mt-1">{rp(p.price)}</p>
                 {p.track !== false && (
                   <p className={`text-[10px] mt-0.5 ${n(p.stock) <= n(p.minStock) ? 'text-[#F29B87]' : 'text-life-muted'}`}>
@@ -220,17 +199,19 @@ export default function BizPOS({ data, setData, notify, askConfirm, lang }) {
         </div>
       )}
 
-      {cart.length > 0 && (
-        <div className="fixed inset-x-0 z-30 px-3" style={{ bottom: 'calc(84px + env(safe-area-inset-bottom))' }}>
-          <button
-            onClick={() => setCheckout(true)}
-            className="w-full max-w-xl mx-auto flex items-center justify-between gap-3 px-4 py-3.5 rounded-2xl bg-gradient-to-r from-life-accent to-life-accent-dark text-life-bg shadow-2xl active:scale-[0.99]"
-          >
-            <span className="flex items-center gap-2 font-semibold"><ShoppingCart className="w-5 h-5" /> {itemCount} {lang === 'id' ? 'item' : 'items'}</span>
-            <span className="font-bold tabular-nums">{rp(subtotal)} · {lang === 'id' ? 'Bayar' : 'Pay'}</span>
-          </button>
-        </div>
-      )}
+      {cart.length > 0 && !checkout &&
+        createPortal(
+          <div className="fixed inset-x-0 z-30 px-3 pointer-events-none" style={{ bottom: 'calc(84px + env(safe-area-inset-bottom))' }}>
+            <button
+              onClick={() => setCheckout(true)}
+              className="pointer-events-auto w-full max-w-xl mx-auto flex items-center justify-between gap-3 px-4 py-3.5 rounded-2xl bg-gradient-to-r from-life-accent to-life-accent-dark text-life-bg shadow-2xl active:scale-[0.99]"
+            >
+              <span className="flex items-center gap-2 font-semibold"><ShoppingCart className="w-5 h-5" /> {itemCount} {lang === 'id' ? 'item' : 'items'}</span>
+              <span className="font-bold tabular-nums">{rp(subtotal)} · {lang === 'id' ? 'Bayar' : 'Pay'}</span>
+            </button>
+          </div>,
+          document.body
+        )}
 
       {/* Checkout */}
       <Sheet open={checkout} onClose={() => setCheckout(false)} title={lang === 'id' ? 'Pembayaran' : 'Checkout'} closeLabel="Tutup">
@@ -242,7 +223,7 @@ export default function BizPOS({ data, setData, notify, askConfirm, lang }) {
                 <p className="text-[11px] text-life-muted tabular-nums">{rp(c.price)}</p>
               </div>
               <button onClick={() => changeQty(c.key, -1)} className="w-9 h-9 rounded-xl bg-life-bg border border-life-border/50 flex items-center justify-center" aria-label="Kurangi"><Minus className="w-4 h-4" /></button>
-              <span className="w-7 text-center text-sm font-semibold tabular-nums">{c.qty}</span>
+              <QtyInput value={c.qty} onCommit={(v) => setQtyTo(c.key, v)} />
               <button onClick={() => changeQty(c.key, 1)} className="w-9 h-9 rounded-xl bg-life-bg border border-life-border/50 flex items-center justify-center" aria-label="Tambah"><Plus className="w-4 h-4" /></button>
               <button onClick={() => setCart((x) => x.filter((i) => i.key !== c.key))} className="w-9 h-9 rounded-xl text-[#F29B87] flex items-center justify-center" aria-label="Hapus"><Trash2 className="w-4 h-4" /></button>
             </div>
@@ -337,6 +318,32 @@ export default function BizPOS({ data, setData, notify, askConfirm, lang }) {
 
       <PosSettings open={settings} onClose={() => setSettings(false)} data={data} setData={setData} lang={lang} notify={notify} />
     </div>
+  );
+}
+
+// Kolom qty yang bisa diketik. Kosong lalu keluar fokus → kembali ke jumlah sebelumnya.
+function QtyInput({ value, onCommit }) {
+  const [txt, setTxt] = useState(null); // null = tampilkan nilai asli
+  const commit = () => {
+    if (txt !== null && txt.trim() !== '') onCommit(txt);
+    setTxt(null);
+  };
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      aria-label="Qty"
+      value={txt === null ? String(value) : txt}
+      onFocus={(e) => e.target.select()}
+      onChange={(e) => {
+        const v = e.target.value.replace(/[^0-9]/g, '');
+        setTxt(v);
+        if (v !== '' && Number(v) >= 1) onCommit(v);
+        else if (v !== '' && Number(v) < 1) { onCommit(v); setTxt(null); }
+      }}
+      onBlur={commit}
+      className="w-12 h-9 text-center text-sm font-semibold tabular-nums rounded-xl bg-life-bg border border-life-border/50 text-life-text focus:outline-none focus:border-life-accent"
+    />
   );
 }
 

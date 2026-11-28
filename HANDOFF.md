@@ -63,3 +63,11 @@ Efeknya: Beranda = ringkasan bisnis, tombol bawah "Dompet" -> "Kasir", Menu puny
 - Sidebar desktop belum memuat menu bisnis (mobile via Menu sudah).
 - Enkripsi data-at-rest (teks privasi hanya klaim "terenkripsi saat dikirim/HTTPS").
 - Ikon lucide baru (PackagePlus, PackageX, Landmark, ClipboardCheck, Settings2, UserPlus) belum diverifikasi di build asli.
+
+## v7.1 (v8 zip) — Kasir & manajemen akun
+- **Kasir (`business/BizPOS.jsx`)**: bar keranjang dirender lewat `createPortal` ke `document.body` (induk ber-`transform` membuat `fixed` salah acuan) dan disembunyikan saat lembar Pembayaran terbuka; qty bisa diketik (`QtyInput`, dibatasi stok, minimal 1); toolbar seragam 44px; kartu produk `min-h-[96px]` dengan badge di dalam kartu.
+- **Logika kasir murni** di `business/bizLogic.js`: `applySale`, `applyVoid`, `voidBlocked`, `clampQty` (diuji, lihat `tests/t_v71.mjs`).
+- **Tombol beralih akun** sama di Pribadi & Bisnis: header Bisnis memakai `WorkspaceChip`.
+- **Hapus akun**: ikon tempat sampah per akun di lembar Beralih Akun + baris "Hapus akun ini" di Profil; konfirmasi mengetik `hapus akun` (`matchesPhrase`). Urutan: hapus file Drive dulu (`deleteCloudWorkspace`; gagal → batal, tidak ada yang hilang) → salinan lokal → registry. Akun aktif dihapus → buka akun lain lewat `switchWorkspace(id, { skipPush, force })` (agar data lama tidak terkirim ulang ke Drive); akun terakhir → keluar (`planDelete`).
+- Uji: `node tests/t_v71.mjs` (10 uji). Bundling: `esbuild src/main.jsx --bundle --packages=external --format=esm --loader:.js=jsx --outfile=/tmp/x.js`.
+- Catatan: kode v7.1 sempat hilang dari sesi sebelumnya (zip v7 tidak memuatnya) sehingga ditulis ulang dari catatan; BELUM diuji di browser/HP.

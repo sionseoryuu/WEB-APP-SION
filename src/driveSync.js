@@ -211,3 +211,15 @@ export async function listCloudWorkspaces(interactive = false) {
   }
   return out;
 }
+
+// Hapus file Drive satu akun (semua salinan bernama sama). Scope drive.file cukup: file dibuat oleh aplikasi ini.
+export async function deleteCloudWorkspace(wsId, interactive = true) {
+  const token = await getToken(interactive);
+  const q = encodeURIComponent(`name='${fileNameFor(wsId)}' and trashed=false`);
+  const res = await api(token, `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`);
+  const files = (await res.json()).files || [];
+  for (const f of files) {
+    await api(token, `https://www.googleapis.com/drive/v3/files/${f.id}`, { method: 'DELETE' });
+  }
+  return files.length;
+}

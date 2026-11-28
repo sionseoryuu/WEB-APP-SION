@@ -235,7 +235,7 @@ export default function ProfileView(props) {
     data, derived, currentUser, lang, maskBalances, onToggleMask, onUpdateProfile, onNavigate,
     onExportJson, onExportCsv, onImportJson, onResetEmpty, onRestoreDemo, onLogout,
     onAddCategory, onDeleteCategory, onRenameCategory, lockEnabled, onExportReport,
-    currentWs, wsCount, onOpenSwitcher,
+    currentWs, wsCount, onOpenSwitcher, onOpenDelete,
   } = props;
   const L = (a, b) => (lang === 'id' ? a : b);
   const [page, setPage] = useState('menu');
@@ -346,6 +346,7 @@ export default function ProfileView(props) {
         <Row icon={Palette} label={L('Tema & warna', 'Theme & colors')} onClick={() => setPage('theme')} />
         <Row icon={LayoutGrid} label={L('Atur tampilan beranda', 'Customize home')} hint={L('Pilih bagian yang ditampilkan', 'Choose visible sections')} onClick={() => setPage('layout')} />
         <Row icon={ArrowLeftRight} label={L('Beralih akun (Pribadi / Bisnis)', 'Switch account (Personal / Business)')} hint={`${currentWs?.name || profile.name} • ${data.profile.ledgerType === 'business' ? L('Bisnis', 'Business') : L('Pribadi', 'Personal')}${wsCount > 1 ? ` • ${wsCount} ${L('akun', 'accounts')}` : ''}`} onClick={onOpenSwitcher} />
+        {onOpenDelete && <Row icon={Trash2} label={L('Hapus akun ini', 'Delete this account')} hint={L('Hapus permanen akun & datanya', 'Permanently delete this account & data')} danger onClick={onOpenDelete} />}
         <Row icon={Languages} label={L('Bahasa', 'Language')} hint={lang === 'id' ? 'Bahasa Indonesia' : 'English'} onClick={() => onUpdateProfile({ language: lang === 'id' ? 'en' : 'id' })} />
         <Row icon={EyeOff} label={L('Sembunyikan saldo', 'Hide balances')} chevron={false} right={<Switch checked={maskBalances} onChange={onToggleMask} label={L('Sembunyikan saldo', 'Hide balances')} />} />
       </Group>

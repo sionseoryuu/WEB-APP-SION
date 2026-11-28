@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ArrowLeftRight, ChevronLeft, Eye, EyeOff, Store, ShoppingCart, Package, Users, BarChart3, Plus, ScanLine, AlertTriangle, HandCoins, Landmark } from 'lucide-react';
+import { ChevronLeft, Eye, EyeOff, Store, ShoppingCart, Package, Users, BarChart3, Plus, ScanLine, AlertTriangle, HandCoins, Landmark } from 'lucide-react';
 import { TxRow } from '../ewallet/parts.jsx';
 import BizPOS from './BizPOS.jsx';
 import BizStock from './BizStock.jsx';
@@ -9,6 +9,7 @@ import BizAssets from './BizAssets.jsx';
 import { bizData, incomeStatement, lowStock, monthRange, rp, salesSummary, n, thisMonthKey } from './bizLogic.js';
 import { Stat, Row, SectionLabel } from './bizUi.jsx';
 import { todayYmd } from '../features/dates.js';
+import { WorkspaceChip } from '../features/WorkspaceSwitcher.jsx';
 
 export const BIZ_TABS = [
   { id: 'dashboard', icon: Store, id_: 'Ringkasan', en: 'Overview' },
@@ -38,11 +39,7 @@ export default function BusinessView(props) {
           <p className="text-[11px] text-life-muted">{L('Mode Bisnis', 'Business Mode')}</p>
           <h1 className="text-lg font-bold text-life-text truncate">{section === 'dashboard' ? shop : L(current.id_, current.en)}</h1>
         </div>
-        {onOpenSwitcher && (
-          <button onClick={onOpenSwitcher} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-life-surface border border-life-border/50 text-[11px] font-semibold text-life-soft" aria-label={L('Beralih akun', 'Switch account')}>
-            <ArrowLeftRight className="w-3.5 h-3.5 text-life-accent" /> {L('Beralih', 'Switch')}
-          </button>
-        )}
+        {onOpenSwitcher && <WorkspaceChip current={currentWs} lang={lang} onClick={onOpenSwitcher} className="max-w-[120px] shrink" />}
         <button onClick={onToggleMask} className="p-2.5 rounded-xl bg-life-surface border border-life-border/50 text-life-muted" aria-label={L('Sembunyikan saldo', 'Hide balances')}>
           {maskBalances ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
         </button>

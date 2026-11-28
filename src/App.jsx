@@ -126,10 +126,10 @@ import { WeeklyModal } from './features/WeeklySummary.jsx';
 import { decodeCode, loadImage } from './ewallet/qrScan.js';
 import { ocrReceiptImage, parseReceipt, reconcileRows, receiptToJpeg, OCR_BUILD } from './ewallet/receiptOcr.js';
 import { aiParseReceipt, aiEnabled } from './ewallet/receiptAi.js';
-import { signInWithGoogle, forgetDriveToken, loadCloud, peekCloud, backupToDrive, listCloudWorkspaces, setActiveWs } from './driveSync.js';
+import { signInWithGoogle, forgetDriveToken, loadCloud, peekCloud, backupToDrive, listCloudWorkspaces, setActiveWs, deleteCloudWorkspace } from './driveSync.js';
 import WorkspaceSheet, { WorkspaceChip } from './features/WorkspaceSwitcher.jsx';
 import {
-  MAIN_WS, keyFor, baseOf, newWsId, typeOf, entryFromData, readRegistry, writeRegistry, upsert, mergeRegistry, pickWorkspace, lastWsKey, wsRegKey,
+  MAIN_WS, keyFor, baseOf, newWsId, typeOf, entryFromData, readRegistry, writeRegistry, upsert, mergeRegistry, pickWorkspace, lastWsKey, wsRegKey, planDelete,
 } from './features/workspaces.js';
 import { hashData } from './features/autoBackup.js';
 
@@ -8939,6 +8939,7 @@ function LifeOsWorkspace() {
   });
   const [wsSheetOpen, setWsSheetOpen] = useState(false);
   const [wsBusy, setWsBusy] = useState(false);
+  const [wsDeleteId, setWsDeleteId] = useState(null); // id akun yang langsung masuk mode hapus
   const [data, setData] = useState(() =>
     savedRef.current && savedRef.current.data ? savedRef.current.data : createInitialState()
   );
@@ -10581,13 +10582,15 @@ function LifeOsWorkspace() {
   };
 
   // Beralih ke akun lain (Pribadi <-> Bisnis) tanpa keluar. Data akun lama dikirim ke Drive dulu.
-  const switchWorkspace = async (id) => {
-    if (!currentUser || id === currentUser.wsId || wsBusy) return;
+  // opts.skipPush: jangan kirim data akun lama ke Drive (dipakai saat akun lama baru dihapus)
+  // opts.force: abaikan penjaga wsBusy (dipanggil dari dalam operasi yang sudah menandai sibuk)
+  const switchWorkspace = async (id, opts = {}) => {
+    if (!currentUser || id === currentUser.wsId || (wsBusy && !opts.force)) return;
     setWsBusy(true);
     try {
       setCloudReady(false); // hentikan pengiriman otomatis selama peralihan
       await waitCloudIdle();
-      if (isGoogle) await cloudPush(false);
+      if (isGoogle && !opts.skipPush) await cloudPush(false);
       const key = keyFor(currentUser.baseKey, id);
       const local = readStoredJson(wsStoreKey(key));
       const stored = readStoredJson(`lifeos:cloud:${key}`);
@@ -10627,6 +10630,61 @@ function LifeOsWorkspace() {
       navigateTab('dashboard');
       const nm = entryFromData(id, next).name;
       notify(lang === 'id' ? `Beralih ke ${nm}` : `Switched to ${nm}`);
+    } finally {
+      setWsBusy(false);
+    }
+  };
+
+  // Hapus satu akun: file Drive dulu (gagal → batal, tidak ada yang hilang), lalu salinan lokal & daftar.
+  const deleteWorkspace = async (id) => {
+    if (!currentUser || wsBusy) return { ok: false };
+    const L = (a, b) => (lang === 'id' ? a : b);
+    setWsBusy(true);
+    try {
+      setCloudReady(false);
+      await waitCloudIdle();
+      if (isGoogle) {
+        try {
+          await deleteCloudWorkspace(id, true);
+        } catch (e) {
+          if (isGoogle) setCloudReady(true);
+          const expired = /drive_expired|drive_timeout|drive_cancelled|access_denied/.test(String(e?.message));
+          return { ok: false, message: expired ? L('Masuk ulang ke Google lalu coba lagi. Akun belum dihapus.', 'Sign in to Google again and retry. The account was not deleted.') : L('Gagal menghapus di Google Drive. Periksa koneksi lalu coba lagi. Akun belum dihapus.', 'Could not delete from Google Drive. Check your connection and retry. The account was not deleted.') };
+        }
+      }
+      const base = currentUser.baseKey;
+      const key = keyFor(base, id);
+      try {
+        localStorage.removeItem(wsStoreKey(key));
+        localStorage.removeItem(`lifeos:cloud:${key}`);
+      } catch {
+        /* abaikan */
+      }
+      const plan = planDelete(wsList, id, currentUser.wsId || MAIN_WS);
+      writeRegistry(base, plan.list);
+      setWsList(plan.list);
+      const name = wsList.find((w) => w.id === id)?.name || '';
+      if (plan.signOut) {
+        try {
+          localStorage.removeItem(wsRegKey(base));
+          localStorage.removeItem(lastWsKey(base));
+        } catch {
+          /* abaikan */
+        }
+        forgetDriveToken();
+        setData(createEmptyState(lang));
+        setWsSheetOpen(false);
+        setWsDeleteId(null);
+        setSettingsOpen(false);
+        setCurrentUser(null);
+        return { ok: true };
+      }
+      if (id === (currentUser.wsId || MAIN_WS)) {
+        await switchWorkspace(plan.open, { skipPush: true, force: true });
+      } else if (isGoogle) setCloudReady(true);
+      setWsDeleteId(null);
+      notify(L(`Akun ${name} dihapus`, `Account ${name} deleted`));
+      return { ok: true };
     } finally {
       setWsBusy(false);
     }
@@ -10809,6 +10867,7 @@ function LifeOsWorkspace() {
             currentWs={currentWs}
             wsCount={wsList.length}
             onOpenSwitcher={openSwitcher}
+            onOpenDelete={() => { setWsDeleteId(currentUser.wsId || MAIN_WS); setWsSheetOpen(true); }}
             data={data}
             derived={derived}
             currentUser={currentUser}
@@ -11274,7 +11333,7 @@ function LifeOsWorkspace() {
 
       <WorkspaceSheet
         open={wsSheetOpen}
-        onClose={() => setWsSheetOpen(false)}
+        onClose={() => { setWsSheetOpen(false); setWsDeleteId(null); }}
         lang={lang}
         list={wsList}
         currentId={currentUser.wsId || MAIN_WS}
@@ -11282,6 +11341,8 @@ function LifeOsWorkspace() {
         busy={wsBusy}
         onSwitch={switchWorkspace}
         onCreate={createWorkspace}
+        onDelete={deleteWorkspace}
+        deleteId={wsDeleteId}
       />
 
       {/* GLOBAL MODALS */}

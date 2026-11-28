@@ -478,3 +478,63 @@ export function cashFlow(data, { from, to, lang = 'id' }) {
   const net = netOperating + netInvesting;
   return { opening, operatingIn, operatingOut, investingOut, netOperating, netInvesting, net, closing: opening + net };
 }
+
+// ───────── Logika kasir murni (diuji tanpa React) ─────────
+
+// Batasi qty hasil ketikan: bulat, minimal 1, tidak melebihi stok untuk barang berstok.
+// stock = null/undefined → tanpa batas (barang non-stok / item bebas).
+export function clampQty(raw, stock = null) {
+  let q = Math.round(Number(String(raw).replace(',', '.')));
+  if (!Number.isFinite(q) || q < 1) q = 1;
+  if (stock !== null && stock !== undefined && q > n(stock)) {
+    return { qty: Math.max(1, n(stock)), capped: true };
+  }
+  return { qty: q, capped: false };
+}
+
+// Terapkan satu penjualan ke data: kembalikan data baru.
+// sale = objek penjualan (items, total, credit, debtId, txId, id, date ...); debt/tx dibuat oleh pemanggil.
+export function applySale(prev, { sale, tx, debt }) {
+  const pb = bizData(prev);
+  const moves = [];
+  const products = pb.products.map((p) => {
+    const sold = (sale.items || []).filter((i) => i.productId === p.id && i.tracked).reduce((s, i) => s + n(i.qty), 0);
+    if (!sold) return p;
+    moves.push({ id: newId('mv'), date: sale.date, productId: p.id, name: p.name, qty: -sold, unitCost: n(p.cost), kind: 'sale', refId: sale.id });
+    return { ...p, stock: n(p.stock) - sold };
+  });
+  return withBizCategories({
+    ...prev,
+    transactions: sale.credit ? prev.transactions : [tx, ...prev.transactions],
+    debts: sale.credit ? [...(prev.debts || []), debt] : prev.debts,
+    sales: [sale, ...pb.sales],
+    products,
+    stockMoves: [...pb.stockMoves, ...moves],
+  });
+}
+
+// Bon yang sudah dicicil/dibayar tidak boleh dibatalkan.
+export function voidBlocked(data, sale) {
+  if (!sale?.credit) return false;
+  const d = (data.debts || []).find((x) => x.id === sale.debtId);
+  if (d && n(d.paidAmount) > 0) return true;
+  // pelunasan lewat transaksi 'ar_collect' yang menunjuk bon ini
+  return (data.transactions || []).some((t) => t.biz === 'ar_collect' && t.refId === sale.id);
+}
+
+// Batalkan penjualan: stok kembali, transaksi/utang dihapus.
+export function applyVoid(prev, sale) {
+  const pb = bizData(prev);
+  const back = {};
+  (sale.items || []).forEach((i) => {
+    if (i.tracked && i.productId) back[i.productId] = (back[i.productId] || 0) + n(i.qty);
+  });
+  return {
+    ...prev,
+    transactions: prev.transactions.filter((t) => t.id !== sale.txId),
+    debts: sale.credit ? (prev.debts || []).filter((d) => d.id !== sale.debtId) : prev.debts,
+    sales: pb.sales.filter((x) => x.id !== sale.id),
+    products: pb.products.map((p) => (back[p.id] ? { ...p, stock: n(p.stock) + back[p.id] } : p)),
+    stockMoves: pb.stockMoves.filter((m) => m.refId !== sale.id),
+  };
+}
