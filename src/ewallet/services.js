@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Wallet, PieChart, PiggyBank, TrendingUp, Repeat, HandCoins, CalendarDays, CheckSquare,
-  Calendar, Flame, Target, HeartHandshake, FileText, ShoppingCart, BarChart3, Star, Bell, Lock,
+  Calendar, Flame, Target, HeartHandshake, FileText, ShoppingCart, BarChart3, Star, Bell, Lock, Store, Package, Users,
 } from 'lucide-react';
 
 // Semua modul LIFE OS dikelompokkan seperti "layanan" di e-wallet
@@ -56,5 +56,18 @@ export const SERVICE_GROUPS = [
     ],
   },
 ];
+
+// Grup khusus mode Bisnis (tampil paling atas di Menu)
+export const BIZ_GROUP = {
+  id: 'biz',
+  label: { id: 'Bisnis', en: 'Business' },
+  items: [
+    { id: 'dashboard', icon: Store, label: { id: 'Ringkasan', en: 'Overview' } },
+    { id: 'biz_pos', icon: ShoppingCart, label: { id: 'Kasir', en: 'POS' } },
+    { id: 'biz_stock', icon: Package, label: { id: 'Produk & Stok', en: 'Products' } },
+    { id: 'biz_payroll', icon: Users, label: { id: 'Gaji', en: 'Payroll' } },
+    { id: 'biz_reports', icon: BarChart3, label: { id: 'Laba Rugi & Neraca', en: 'P&L & Balance' } },
+  ],
+};
 
 export const ALL_SERVICES = SERVICE_GROUPS.flatMap((g) => g.items);

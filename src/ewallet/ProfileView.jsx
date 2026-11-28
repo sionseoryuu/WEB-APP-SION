@@ -2,7 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import {
   Camera, UserRound, Tags, Wallet, PieChart, Repeat, HandCoins, Palette, Languages, EyeOff, LayoutGrid,
   CloudUpload, Download, Upload, FileSpreadsheet, RotateCcw, Sparkles, KeyRound, LogOut, ChevronRight,
-  ChevronLeft, MessageCircle, Plus, Trash2, Pencil, Check, X, Lock, BadgeCheck, Info, Mail, Smartphone, Bell, Star, FileText,
+  ChevronLeft, MessageCircle, Plus, Trash2, Pencil, Check, X, Lock, BadgeCheck, Info, Mail, Smartphone, Bell, Star, FileText, Store,
 } from 'lucide-react';
 import ThemeSettings from '../ThemeSettings.jsx';
 import DriveBackup from '../DriveBackup.jsx';
@@ -344,6 +344,7 @@ export default function ProfileView(props) {
       <Group title={L('Tampilan & Preferensi', 'Appearance & Preferences')}>
         <Row icon={Palette} label={L('Tema & warna', 'Theme & colors')} onClick={() => setPage('theme')} />
         <Row icon={LayoutGrid} label={L('Atur tampilan beranda', 'Customize home')} hint={L('Pilih bagian yang ditampilkan', 'Choose visible sections')} onClick={() => setPage('layout')} />
+        <Row icon={Store} label={L('Tipe pencatatan', 'Ledger type')} hint={data.profile.ledgerType === 'business' ? L('Usaha / Bisnis — ketuk untuk ganti ke Pribadi', 'Business — tap to switch to Personal') : L('Pribadi / Keluarga — ketuk untuk ganti ke Usaha', 'Personal — tap to switch to Business')} onClick={() => onUpdateProfile({ ledgerType: data.profile.ledgerType === 'business' ? 'personal' : 'business' })} />
         <Row icon={Languages} label={L('Bahasa', 'Language')} hint={lang === 'id' ? 'Bahasa Indonesia' : 'English'} onClick={() => onUpdateProfile({ language: lang === 'id' ? 'en' : 'id' })} />
         <Row icon={EyeOff} label={L('Sembunyikan saldo', 'Hide balances')} chevron={false} right={<Switch checked={maskBalances} onChange={onToggleMask} label={L('Sembunyikan saldo', 'Hide balances')} />} />
       </Group>

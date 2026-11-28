@@ -113,6 +113,8 @@ import { loadLock, saveLock, DEFAULT_LOCK } from './features/appLock.js';
 import { loadAutoPrefs, runAutoBackup } from './features/autoBackup.js';
 import LockScreen from './features/LockScreen.jsx';
 import OnboardingFlow from './features/Onboarding.jsx';
+import BusinessView from './business/BusinessView.jsx';
+import { withBizCategories, DEFAULT_POS } from './business/bizLogic.js';
 import RecurringView from './features/RecurringView.jsx';
 import TemplatesView from './features/TemplatesView.jsx';
 import NotificationSettings from './features/NotificationSettings.jsx';
@@ -1520,24 +1522,20 @@ const createEmptyState = (lang = 'id', ownerName = '') => ({
 const createWorkspaceFromSetup = (lang, fallbackName, setup) => {
   const business = setup?.type === 'business';
   const id = lang === 'id';
-  const base = createEmptyState(lang, (setup?.name || '').trim() || fallbackName);
-  return {
+  const name = (setup?.name || '').trim() || fallbackName;
+  const base = createEmptyState(lang, name);
+  if (!business) return { ...base, profile: { ...base.profile, ledgerType: 'personal' } };
+  return withBizCategories({
     ...base,
-    profile: {
-      ...base.profile,
-      role: business ? (id ? 'Pencatatan Usaha' : 'Business Ledger') : 'Personal Life OS',
-      ledgerType: business ? 'business' : 'personal',
-    },
-    accounts: business
-      ? [{ ...base.accounts[0], name: id ? 'Kas Usaha' : 'Business Cash' }]
-      : base.accounts,
-    customIncomeCategories: business ? (id ? ['Penjualan', 'Jasa / Freelance'] : ['Sales', 'Services / Freelance']) : [],
-    customExpenseCategories: business
-      ? id
-        ? ['Pembelian Stok', 'Gaji Karyawan', 'Sewa & Operasional']
-        : ['Stock Purchases', 'Payroll', 'Rent & Operations']
-      : [],
-  };
+    profile: { ...base.profile, role: id ? 'Pencatatan Usaha' : 'Business Ledger', ledgerType: 'business' },
+    accounts: [{ ...base.accounts[0], name: id ? 'Kas Usaha' : 'Business Cash' }],
+    products: [],
+    sales: [],
+    employees: [],
+    payrolls: [],
+    stockMoves: [],
+    pos: { ...DEFAULT_POS, shopName: name },
+  });
 };
 
 // ============================================================================
@@ -10163,7 +10161,7 @@ function LifeOsWorkspace() {
         ? 'Seluruh akun, transaksi, anggaran, tugas, kebiasaan, dan catatan akan dihapus untuk memulai dari nol.'
         : 'All accounts, transactions, budgets, tasks, habits, and notes will be cleared.',
       () => {
-        setData(createEmptyState(lang, data.profile.name));
+        setData(createWorkspaceFromSetup(lang, data.profile.name, { type: data.profile.ledgerType, name: data.profile.name }));
         setSettingsOpen(false);
         notify(lang === 'id' ? 'Ruang kerja dikosongkan' : 'Workspace cleared');
       },
@@ -10529,9 +10527,33 @@ function LifeOsWorkspace() {
     );
   }
 
+  const bizMode = data.profile.ledgerType === 'business';
+  const renderBiz = (section) => (
+    <BusinessView
+      section={section}
+      data={data}
+      setData={setData}
+      derived={derived}
+      lang={lang}
+      maskBalances={maskBalances}
+      onToggleMask={() => setMaskBalances((prev) => !prev)}
+      notify={notify}
+      askConfirm={askConfirm}
+      onNavigate={navigateTab}
+      onOpenTx={(tx = null) => setTxModal({ open: true, tx })}
+      onOpenReceipt={() => setReceiptModalOpen(true)}
+    />
+  );
+
   const renderModule = () => {
     switch (activeTab) {
+      case 'biz_pos':
+      case 'biz_stock':
+      case 'biz_payroll':
+      case 'biz_reports':
+        return renderBiz(activeTab);
       case 'dashboard':
+        if (bizMode) return renderBiz('dashboard');
         return (
           <HomeView
             data={data}
@@ -10848,8 +10870,8 @@ function LifeOsWorkspace() {
   };
 
   // Halaman dengan header sendiri (gaya e-wallet) & penanda tab aktif di navigasi bawah
-  const PRIMARY_TABS = ['dashboard', 'activity', 'wallet', 'profile'];
-  const ownHeader = ['dashboard', 'activity', 'profile'].includes(activeTab);
+  const PRIMARY_TABS = ['dashboard', 'activity', 'wallet', 'profile', 'biz_pos'];
+  const ownHeader = ['dashboard', 'activity', 'profile', 'biz_pos', 'biz_stock', 'biz_payroll', 'biz_reports'].includes(activeTab);
   const navActive = PRIMARY_TABS.includes(activeTab) ? activeTab : 'dashboard';
 
   const allNavItems = NAV_GROUPS.flatMap((g) => g.items);
@@ -11054,12 +11076,14 @@ function LifeOsWorkspace() {
         onMenu={() => setMenuOpen(true)}
         menuOpen={menuOpen}
         lang={lang}
+        bizMode={bizMode}
       />
       <MenuSheet
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
         onNavigate={navigateTab}
         lang={lang}
+        bizMode={bizMode}
         actions={{
           addTx: () => setTxModal({ open: true, tx: null }),
           scan: () => setReceiptModalOpen(true),

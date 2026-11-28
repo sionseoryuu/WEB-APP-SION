@@ -1,7 +1,7 @@
 import React from 'react';
-import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, QrCode, Home, History, Wallet, User, LayoutGrid, X, Plus, ScanLine, Split, Banknote, Send, Search, FileText, CalendarRange } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, QrCode, Home, History, Wallet, User, LayoutGrid, X, Plus, ScanLine, Split, Banknote, Send, Search, FileText, CalendarRange, ShoppingCart } from 'lucide-react';
 import { fmt, catName, isQrisTx } from './helpers.js';
-import { SERVICE_GROUPS } from './services.js';
+import { SERVICE_GROUPS, BIZ_GROUP } from './services.js';
 
 export const Avatar = ({ profile, size = 44, className = '' }) => {
   const initials = String(profile?.name || '?')
@@ -87,13 +87,13 @@ export const TxRow = ({ tx, data, lang, masked, onClick, compact = false }) => {
 };
 
 // Navigasi bawah gaya e-wallet: tombol Menu besar di tengah = membuka semua fitur
-export const BottomNav = ({ active, onNavigate, onMenu, menuOpen, lang }) => {
+export const BottomNav = ({ active, onNavigate, onMenu, menuOpen, lang, bizMode = false }) => {
   const id = lang === 'id';
   const items = [
     { id: 'dashboard', label: id ? 'Beranda' : 'Home', icon: Home },
     { id: 'activity', label: id ? 'Aktivitas' : 'Activity', icon: History },
     null,
-    { id: 'wallet', label: id ? 'Dompet' : 'Wallet', icon: Wallet },
+    bizMode ? { id: 'biz_pos', label: id ? 'Kasir' : 'POS', icon: ShoppingCart } : { id: 'wallet', label: id ? 'Dompet' : 'Wallet', icon: Wallet },
     { id: 'profile', label: id ? 'Profil' : 'Profile', icon: User },
   ];
   return (
@@ -132,10 +132,10 @@ export const BottomNav = ({ active, onNavigate, onMenu, menuOpen, lang }) => {
 };
 
 // Lembar menu (bottom sheet): aksi cepat + semua modul aplikasi
-export const MenuSheet = ({ open, onClose, onNavigate, actions, lang }) => {
+export const MenuSheet = ({ open, onClose, onNavigate, actions, lang, bizMode = false }) => {
   if (!open) return null;
   const L = (a, b) => (lang === 'id' ? a : b);
-  const quick = [
+  const personalQuick = [
     { icon: Plus, label: L('Catat', 'Add'), run: actions.addTx },
     { icon: ScanLine, label: L('Scan QRIS/Struk', 'Scan QRIS/Receipt'), run: actions.scan },
     { icon: Split, label: L('Bagi Tagihan', 'Split Bill'), run: actions.split },
@@ -145,6 +145,18 @@ export const MenuSheet = ({ open, onClose, onNavigate, actions, lang }) => {
     { icon: CalendarRange, label: L('Ringkasan Mingguan', 'Weekly Summary'), run: actions.weekly },
     { icon: FileText, label: L('Ekspor Laporan', 'Export Report'), run: actions.exportReport },
   ];
+  const bizQuick = [
+    { icon: ShoppingCart, label: L('Kasir', 'POS'), run: () => onNavigate('biz_pos') },
+    { icon: Plus, label: L('Catat Biaya', 'Add Expense'), run: actions.addTx },
+    { icon: ScanLine, label: L('Scan Struk', 'Scan Receipt'), run: actions.scan },
+    { icon: Banknote, label: L('Gaji', 'Payroll'), run: () => onNavigate('biz_payroll') },
+    { icon: FileText, label: L('Laba Rugi', 'P&L'), run: () => onNavigate('biz_reports') },
+    { icon: Search, label: L('Cari', 'Search'), run: actions.search },
+    { icon: Send, label: L('Ringkasan Harian', 'Daily Briefing'), run: actions.briefing },
+    { icon: FileText, label: L('Ekspor Laporan', 'Export Report'), run: actions.exportReport },
+  ];
+  const quick = bizMode ? bizQuick : personalQuick;
+  const groups = bizMode ? [BIZ_GROUP, ...SERVICE_GROUPS] : SERVICE_GROUPS;
   const go = (fn) => () => { onClose(); fn(); };
   return (
     <div className="fixed inset-0 z-40 flex items-end lg:items-center lg:justify-center" role="dialog" aria-modal="true">
@@ -173,7 +185,7 @@ export const MenuSheet = ({ open, onClose, onNavigate, actions, lang }) => {
           ))}
         </div>
 
-        {SERVICE_GROUPS.map((g) => (
+        {groups.map((g) => (
           <div key={g.id} className="mb-4">
             <p className="text-[11px] font-semibold uppercase tracking-widest text-life-muted/75 mb-2">{g.label[lang === 'id' ? 'id' : 'en']}</p>
             <div className="grid grid-cols-4 gap-2">
