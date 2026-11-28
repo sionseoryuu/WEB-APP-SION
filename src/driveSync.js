@@ -1,10 +1,10 @@
-// Backup & restore ke Google Drive. Scope tunggal: drive.file
-// (app hanya bisa melihat file yang ia buat sendiri).
+// Masuk dengan Google + sinkron/backup ke Google Drive pengguna sendiri.
+// Scope: drive.file (app hanya bisa melihat file yang ia buat sendiri) + profil dasar (nama, email).
 // Kode galat bersifat netral bahasa (mis. 'drive_expired'); teks untuk pengguna diterjemahkan di UI.
 const CLIENT_ID =
   import.meta.env.VITE_GOOGLE_CLIENT_ID ||
   '1035980999137-v3rj893bonk7hpfn7358fpommjprn28g.apps.googleusercontent.com';
-const SCOPE = 'https://www.googleapis.com/auth/drive.file';
+const SCOPE = 'https://www.googleapis.com/auth/drive.file openid email profile';
 const FILE_NAME = 'life-os-backup.json';
 const TOKEN_KEY = 'lifeos:drive_token';
 const LINKED_KEY = 'lifeos:drive_linked';
@@ -100,29 +100,68 @@ async function findFile(token) {
   return json.files?.[0] || null;
 }
 
+// Token lama (sebelum ada scope profil) tidak cukup untuk membaca profil, jadi masuk selalu meminta token baru.
+export async function signInWithGoogle() {
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* abaikan */
+  }
+  const token = await getToken(true);
+  const res = await api(token, 'https://www.googleapis.com/oauth2/v3/userinfo');
+  const p = await res.json();
+  if (!p?.sub) throw new Error('drive_http_0');
+  return { token, profile: { sub: p.sub, email: (p.email || '').toLowerCase(), name: p.name || (p.email || '').split('@')[0], picture: p.picture || '' } };
+}
+
+// Keluar: lupakan token di perangkat ini (data di Drive pengguna tidak disentuh)
+export function forgetDriveToken() {
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(LINKED_KEY);
+  } catch {
+    /* abaikan */
+  }
+}
+
+// Metadata file cloud tanpa mengunduh isinya: { id, modifiedTime } atau null
+export async function peekCloud(interactive = false) {
+  const token = await getToken(interactive);
+  return findFile(token);
+}
+
+// Unduh data cloud memakai token yang sudah ada (atau minta token bila perlu)
+export async function loadCloud(interactive = false) {
+  const token = await getToken(interactive);
+  const file = await findFile(token);
+  if (!file) return null;
+  const res = await api(token, `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`);
+  return { data: await res.json(), modifiedTime: file.modifiedTime };
+}
+
 export async function backupToDrive(data, { interactive = true } = {}) {
   const token = await getToken(interactive);
   const body = JSON.stringify(data);
   const existing = await findFile(token);
   if (existing) {
-    await api(token, `https://www.googleapis.com/upload/drive/v3/files/${existing.id}?uploadType=media`, {
+    const up = await api(token, `https://www.googleapis.com/upload/drive/v3/files/${existing.id}?uploadType=media&fields=modifiedTime`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body,
-    });
-    return new Date().toISOString();
+    }).then((r) => r.json().catch(() => ({})));
+    return up.modifiedTime || new Date().toISOString();
   }
   const boundary = 'lifeos' + Math.random().toString(36).slice(2);
   const meta = JSON.stringify({ name: FILE_NAME, mimeType: 'application/json' });
   const multipart =
     `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n` +
     `--${boundary}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${boundary}--`;
-  await api(token, 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+  const created = await api(token, 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=modifiedTime', {
     method: 'POST',
     headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
     body: multipart,
-  });
-  return new Date().toISOString();
+  }).then((r) => r.json().catch(() => ({})));
+  return created.modifiedTime || new Date().toISOString();
 }
 
 export async function restoreFromDrive() {

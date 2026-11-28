@@ -7,10 +7,6 @@ export default defineConfig(({ mode }) => {
     // './' = path relatif, jadi jalan di https://user.github.io/nama-repo/ maupun domain custom
     base: './',
     plugins: [react()],
-    define: {
-      // Firebase opsional: isi VITE_FIREBASE_CONFIG (JSON satu baris) bila ingin sinkron cloud
-      __firebase_config: JSON.stringify(env.VITE_FIREBASE_CONFIG || ''),
-    },
     build: { chunkSizeWarningLimit: 1500 },
   };
 });

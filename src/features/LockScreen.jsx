@@ -32,7 +32,7 @@ export function PinPad({ onDigit, onBackspace, extra, disabled, lang }) {
 }
 
 // Layar kunci penuh. `verifyPassword(pw)` (opsional) dipakai untuk reset PIN lewat kata sandi akun.
-export default function LockScreen({ lang, cfg, onUnlock, onReset, verifyPassword, userName }) {
+export default function LockScreen({ lang, cfg, onUnlock, onReset, verifyPassword, userName, viaGoogle }) {
   const tr = useTr(lang);
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
@@ -129,7 +129,8 @@ export default function LockScreen({ lang, cfg, onUnlock, onReset, verifyPasswor
         </>
       ) : (
         <form onSubmit={doForgot} className="w-full max-w-xs space-y-3">
-          <p className="text-xs text-life-muted text-center">{tr('lock_forgot_help')}</p>
+          <p className="text-xs text-life-muted text-center">{viaGoogle ? tr('lock_forgot_google') : tr('lock_forgot_help')}</p>
+          {!viaGoogle && (
           <input
             type="password"
             autoFocus
@@ -138,6 +139,7 @@ export default function LockScreen({ lang, cfg, onUnlock, onReset, verifyPasswor
             placeholder={tr('lock_password')}
             className="w-full rounded-xl bg-life-surface border border-life-border/60 px-3.5 py-3 text-sm text-life-text outline-none focus:border-life-accent"
           />
+          )}
           {pwErr && <p className="text-xs text-[#F29B87]" role="alert">{tr('lock_password_wrong')}</p>}
           <div className="flex gap-2">
             <button type="button" onClick={() => { setForgot(false); setPw(''); setPwErr(false); }} className="flex-1 py-3 rounded-xl bg-life-surface2 border border-life-border/60 text-sm">{tr('cancel')}</button>

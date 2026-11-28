@@ -112,6 +112,7 @@ import { buildReminders, loadNotifPrefs, saveNotifPrefs, syncReminders, cancelAl
 import { loadLock, saveLock, DEFAULT_LOCK } from './features/appLock.js';
 import { loadAutoPrefs, runAutoBackup } from './features/autoBackup.js';
 import LockScreen from './features/LockScreen.jsx';
+import OnboardingFlow from './features/Onboarding.jsx';
 import RecurringView from './features/RecurringView.jsx';
 import TemplatesView from './features/TemplatesView.jsx';
 import NotificationSettings from './features/NotificationSettings.jsx';
@@ -123,34 +124,8 @@ import { WeeklyModal } from './features/WeeklySummary.jsx';
 import { decodeCode, loadImage } from './ewallet/qrScan.js';
 import { ocrReceiptImage, parseReceipt, reconcileRows, receiptToJpeg, OCR_BUILD } from './ewallet/receiptOcr.js';
 import { aiParseReceipt, aiEnabled } from './ewallet/receiptAi.js';
-import { initializeApp, getApps } from 'firebase/app';
-import {
-  getAuth,
-  signInAnonymously,
-  signInWithCustomToken,
-} from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
-
-// ============================================================================
-// 0. FIREBASE CLOUD & MULTI-ACCOUNT ISOLATION INITIALIZATION
-// ============================================================================
-
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'life-os';
-let firebaseApp = null;
-let firebaseAuth = null;
-let firebaseDb = null;
-
-try {
-  if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-    const parsedConfig = JSON.parse(__firebase_config);
-    firebaseApp = getApps().length ? getApps()[0] : initializeApp(parsedConfig);
-    firebaseAuth = getAuth(firebaseApp);
-    firebaseDb = getFirestore(firebaseApp);
-  }
-} catch (err) {
-  console.error('Firebase initialization notice:', err);
-}
-
+import { signInWithGoogle, forgetDriveToken, loadCloud, peekCloud, backupToDrive } from './driveSync.js';
+import { hashData } from './features/autoBackup.js';
 
 // Persistensi lokal (offline-first)
 const STORAGE_KEY = 'lifeos:workspace:v1';
@@ -1541,6 +1516,30 @@ const createEmptyState = (lang = 'id', ownerName = '') => ({
   ],
 });
 
+// Ruang kerja baru dari pilihan registrasi (tipe pencatatan + nama)
+const createWorkspaceFromSetup = (lang, fallbackName, setup) => {
+  const business = setup?.type === 'business';
+  const id = lang === 'id';
+  const base = createEmptyState(lang, (setup?.name || '').trim() || fallbackName);
+  return {
+    ...base,
+    profile: {
+      ...base.profile,
+      role: business ? (id ? 'Pencatatan Usaha' : 'Business Ledger') : 'Personal Life OS',
+      ledgerType: business ? 'business' : 'personal',
+    },
+    accounts: business
+      ? [{ ...base.accounts[0], name: id ? 'Kas Usaha' : 'Business Cash' }]
+      : base.accounts,
+    customIncomeCategories: business ? (id ? ['Penjualan', 'Jasa / Freelance'] : ['Sales', 'Services / Freelance']) : [],
+    customExpenseCategories: business
+      ? id
+        ? ['Pembelian Stok', 'Gaji Karyawan', 'Sewa & Operasional']
+        : ['Stock Purchases', 'Payroll', 'Rent & Operations']
+      : [],
+  };
+};
+
 // ============================================================================
 // 4. DETERMINISTIC FINANCIAL, WELLNESS & CRM CALCULATION ENGINE
 // ============================================================================
@@ -2030,6 +2029,7 @@ const EmptyState = ({ icon: Icon, title, description, actionLabel, onAction }) =
 // ============================================================================
 
 const AuthPortalScreen = ({ lang, onToggleLang, t, onAuthenticateSuccess }) => {
+  const tr = makeTr(lang);
   const [mode, setMode] = useState('register');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -2050,86 +2050,6 @@ const AuthPortalScreen = ({ lang, onToggleLang, t, onAuthenticateSuccess }) => {
     setSubmitting(true);
     const workspaceKey = deriveWorkspaceKey(cleanEmail);
     const pwHash = hashPasswordClient(password);
-
-    try {
-      if (firebaseAuth && firebaseDb) {
-        if (!firebaseAuth.currentUser) {
-          if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-            await signInWithCustomToken(firebaseAuth, __initial_auth_token);
-          } else {
-            await signInAnonymously(firebaseAuth);
-          }
-        }
-
-        const accountRef = doc(firebaseDb, 'artifacts', appId, 'public', 'data', 'lifeos_accounts', workspaceKey);
-        const snap = await getDoc(accountRef);
-
-        if (mode === 'register') {
-          if (snap.exists()) {
-            setErrorMsg(
-              lang === 'id'
-                ? 'Email sudah terdaftar. Silakan masuk pada tab Masuk Akun.'
-                : 'Email already registered. Please sign in instead.'
-            );
-            setSubmitting(false);
-            return;
-          }
-          const ownerName = fullName.trim() || cleanEmail.split('@')[0];
-          const initialWorkspace =
-            seedMode === 'demo'
-              ? { ...createInitialState(), profile: { ...createInitialState().profile, name: ownerName, language: lang } }
-              : createEmptyState(lang, ownerName);
-
-          await setDoc(accountRef, {
-            email: cleanEmail,
-            name: ownerName,
-            passwordHash: pwHash,
-            workspaceKey,
-            createdAt: new Date().toISOString(),
-            workspace: initialWorkspace,
-          });
-
-          onAuthenticateSuccess({
-            email: cleanEmail,
-            name: ownerName,
-            workspaceKey,
-            initialData: initialWorkspace,
-            isCloud: true,
-          });
-          setSubmitting(false);
-          return;
-        }
-
-        if (!snap.exists()) {
-          setErrorMsg(
-            lang === 'id'
-              ? 'Akun tidak ditemukan. Silakan buat akun baru terlebih dahulu.'
-              : 'Account not found. Please create an account first.'
-          );
-          setSubmitting(false);
-          return;
-        }
-
-        const accountData = snap.data();
-        if (accountData.passwordHash && accountData.passwordHash !== pwHash) {
-          setErrorMsg(lang === 'id' ? 'Kata sandi tidak sesuai.' : 'Incorrect password.');
-          setSubmitting(false);
-          return;
-        }
-
-        onAuthenticateSuccess({
-          email: cleanEmail,
-          name: accountData.name || cleanEmail.split('@')[0],
-          workspaceKey,
-          initialData: accountData.workspace || createEmptyState(lang, accountData.name),
-          isCloud: true,
-        });
-        setSubmitting(false);
-        return;
-      }
-    } catch (err) {
-      console.error('Cloud auth fallback notice:', err);
-    }
 
     // Mode lokal (tanpa cloud): akun disimpan di perangkat ini
     const stored = readStoredJson(acctStoreKey(workspaceKey));
@@ -2183,9 +2103,45 @@ const AuthPortalScreen = ({ lang, onToggleLang, t, onAuthenticateSuccess }) => {
       name: ownerName,
       workspaceKey,
       initialData: initialWorkspace,
-      isCloud: Boolean(firebaseDb),
+      isCloud: false,
     });
     setSubmitting(false);
+  };
+
+  const handleGoogle = async () => {
+    setErrorMsg('');
+    setSubmitting(true);
+    try {
+      const { profile } = await signInWithGoogle();
+      const workspaceKey = `g_${profile.sub}`;
+      let cloud = null;
+      try {
+        cloud = await loadCloud(false);
+      } catch (e) {
+        if (/drive_http_(401|403)/.test(String(e?.message))) throw new Error('google_drive_denied');
+        throw e;
+      }
+      const fromCloud = cloud?.data?.profile ? cloud.data : null;
+      const initialWorkspace = fromCloud || readStoredJson(wsStoreKey(workspaceKey)) || createEmptyState(lang, profile.name);
+      onAuthenticateSuccess({
+        email: profile.email,
+        name: profile.name,
+        workspaceKey,
+        initialData: initialWorkspace,
+        isCloud: true,
+        google: true,
+        picture: profile.picture,
+        cloudMeta: fromCloud ? { hash: hashData(fromCloud), modified: cloud.modifiedTime } : { hash: '', modified: '' },
+      });
+    } catch (e) {
+      const m = String(e?.message || e);
+      if (/google_drive_denied/.test(m)) setErrorMsg(tr('google_err_drive'));
+      else if (/drive_cancelled|popup_closed|access_denied|drive_timeout/.test(m)) setErrorMsg(tr('google_err_cancel'));
+      else if (/Failed to fetch|network|drive_gis_load/i.test(m)) setErrorMsg(tr('bk_err_network'));
+      else setErrorMsg(tr('google_err_generic'));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleQuickDemoAccess = () => {
@@ -2196,7 +2152,7 @@ const AuthPortalScreen = ({ lang, onToggleLang, t, onAuthenticateSuccess }) => {
       name: demoState.profile.name,
       workspaceKey: deriveWorkspaceKey('alexander@lifeos.app'),
       initialData: demoState,
-      isCloud: Boolean(firebaseDb),
+      isCloud: false,
     });
   };
 
@@ -2241,6 +2197,29 @@ const AuthPortalScreen = ({ lang, onToggleLang, t, onAuthenticateSuccess }) => {
             </div>
             <h1 className="text-xl sm:text-2xl font-semibold text-life-text">{t('auth_title')}</h1>
             <p className="text-xs text-life-muted">{t('auth_subtitle')}</p>
+          </div>
+
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={handleGoogle}
+              disabled={submitting}
+              className="w-full flex items-center justify-center gap-2.5 py-3 rounded-xl bg-white text-[#1f1f1f] text-sm font-semibold border border-life-border/60 disabled:opacity-60"
+            >
+              <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+                <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.5 17.7 9.5 24 9.5z" />
+                <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z" />
+                <path fill="#FBBC05" d="M10.5 28.7a14.5 14.5 0 0 1 0-9.4l-7.9-6.1a24 24 0 0 0 0 21.6l7.9-6.1z" />
+                <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.9 2.3-8.4 2.3-6.3 0-11.6-4-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z" />
+              </svg>
+              {submitting ? '…' : tr('auth_google')}
+            </button>
+            <p className="text-[11px] text-life-muted text-center">{tr('auth_google_note')}</p>
+            <div className="flex items-center gap-3 pt-1">
+              <span className="flex-1 h-px bg-life-border/50" />
+              <span className="text-[11px] text-life-muted">{tr('auth_or_email')}</span>
+              <span className="flex-1 h-px bg-life-border/50" />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-life-bg border border-life-border/50">
@@ -8996,6 +8975,7 @@ function LifeOsWorkspace() {
   }, [lang]);
   const t = useCallback((key) => I18N[lang]?.[key] || I18N.en[key] || key, [lang]);
 
+  const [legacyAuth, setLegacyAuth] = useState(false);
   const notify = useCallback((message, action) => {
     const entry = { message, action };
     setToast(entry);
@@ -9012,55 +8992,126 @@ function LifeOsWorkspace() {
     [scrollToTop]
   );
 
-  // Cloud Firestore synchronization per isolated workspaceKey
-  useEffect(() => {
-    if (!currentUser || !firebaseAuth || !firebaseDb) return undefined;
-    let active = true;
+  // Sinkron ke Google Drive milik pengguna sendiri (hanya akun yang masuk dengan Google).
+  // Kebijakan: perubahan lokal dikirim ~4 dtk setelah berhenti mengetik; bila di perangkat lain
+  // ada versi yang lebih baru dan perangkat ini tidak punya perubahan tertunda, versi cloud dipakai.
+  const cloudRef = useRef({ hash: '', modified: '', busy: false });
+  const cloudDataRef = useRef(data);
+  cloudDataRef.current = data;
+  const [cloudReady, setCloudReady] = useState(false);
+  const [cloudNeedsAuth, setCloudNeedsAuth] = useState(false);
+  const isGoogle = Boolean(currentUser?.google);
+  const cloudMetaKey = currentUser?.workspaceKey ? `lifeos:cloud:${currentUser.workspaceKey}` : '';
+  const saveCloudMeta = useCallback(() => {
+    if (!cloudMetaKey) return;
+    try {
+      const { hash, modified } = cloudRef.current;
+      localStorage.setItem(cloudMetaKey, JSON.stringify({ hash, modified }));
+    } catch {
+      /* abaikan */
+    }
+  }, [cloudMetaKey]);
 
-    const persistWorkspace = async () => {
+  const cloudPush = useCallback(
+    async (interactive = false) => {
+      const c = cloudRef.current;
+      const snapshot = cloudDataRef.current;
+      const h = hashData(snapshot);
+      if (c.busy || h === c.hash) return;
+      c.busy = true;
+      setSyncStatus('syncing');
       try {
-        if (!firebaseAuth.currentUser) {
-          if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-            await signInWithCustomToken(firebaseAuth, __initial_auth_token);
-          } else {
-            await signInAnonymously(firebaseAuth);
-          }
-        }
-        if (!active || !firebaseAuth.currentUser) return;
-        setSyncStatus('syncing');
-        const accountRef = doc(
-          firebaseDb,
-          'artifacts',
-          appId,
-          'public',
-          'data',
-          'lifeos_accounts',
-          currentUser.workspaceKey
-        );
-        await setDoc(
-          accountRef,
-          {
-            email: currentUser.email,
-            name: data.profile.name,
-            workspaceKey: currentUser.workspaceKey,
-            updatedAt: new Date().toISOString(),
-            workspace: data,
-          },
-          { merge: true }
-        );
-        if (active) setSyncStatus('synced');
-      } catch {
-        if (active) setSyncStatus('synced');
+        const when = await backupToDrive(snapshot, { interactive });
+        c.hash = h;
+        c.modified = when;
+        saveCloudMeta();
+        setCloudNeedsAuth(false);
+        setSyncStatus('synced');
+      } catch (e) {
+        const msg = String(e?.message || e);
+        const offline = /Failed to fetch|NetworkError|network|drive_http_5|drive_http_429|drive_gis_load/i.test(msg);
+        setSyncStatus(offline ? 'offline' : 'auth');
+        setCloudNeedsAuth(!offline);
+      } finally {
+        c.busy = false;
       }
-    };
+    },
+    [saveCloudMeta]
+  );
 
-    const timer = setTimeout(persistWorkspace, 600);
+  const cloudPull = useCallback(async () => {
+    const c = cloudRef.current;
+    if (c.busy) return;
+    try {
+      const meta = await peekCloud(false);
+      if (!meta || !c.modified || new Date(meta.modifiedTime) <= new Date(c.modified)) return;
+      if (hashData(cloudDataRef.current) !== c.hash) return; // ada perubahan lokal belum terkirim: versi lokal dipakai
+      const res = await loadCloud(false);
+      if (!res?.data?.profile) return;
+      c.hash = hashData(res.data);
+      c.modified = res.modifiedTime;
+      saveCloudMeta();
+      setData(res.data);
+      setSyncStatus('synced');
+    } catch {
+      /* tanpa jaringan / perlu masuk ulang: dicoba lagi nanti */
+    }
+  }, [saveCloudMeta]);
+
+  useEffect(() => {
+    if (!isGoogle) {
+      setCloudReady(false);
+      return undefined;
+    }
+    let alive = true;
+    try {
+      const m = JSON.parse(localStorage.getItem(cloudMetaKey) || 'null');
+      if (m) {
+        cloudRef.current.hash = m.hash || '';
+        cloudRef.current.modified = m.modified || '';
+      }
+    } catch {
+      /* abaikan */
+    }
+    (async () => {
+      await cloudPull();
+      if (alive) setCloudReady(true);
+    })();
+    const onVis = () => !document.hidden && cloudPull();
+    document.addEventListener('visibilitychange', onVis);
+    const id = setInterval(cloudPull, 2 * 60 * 1000);
     return () => {
-      active = false;
-      clearTimeout(timer);
+      alive = false;
+      document.removeEventListener('visibilitychange', onVis);
+      clearInterval(id);
     };
-  }, [data, currentUser]);
+  }, [isGoogle, cloudMetaKey, cloudPull]);
 
+  useEffect(() => {
+    if (!isGoogle || !cloudReady) return undefined;
+    const timer = setTimeout(() => cloudPush(false), 4000);
+    return () => clearTimeout(timer);
+  }, [data, isGoogle, cloudReady, cloudPush]);
+
+  const handleLogout = useCallback(async () => {
+    if (isGoogle) {
+      await cloudPush(false);
+      const synced = hashData(cloudDataRef.current) === cloudRef.current.hash;
+      if (synced) {
+        // Semua sudah aman di Drive pengguna: hapus salinan di perangkat ini (perangkat bersama)
+        try {
+          localStorage.removeItem(wsStoreKey(currentUser.workspaceKey));
+          localStorage.removeItem(cloudMetaKey);
+        } catch {
+          /* abaikan */
+        }
+        forgetDriveToken();
+        setData(createEmptyState(lang));
+      }
+    }
+    setSettingsOpen(false);
+    setCurrentUser(null);
+  }, [isGoogle, cloudPush, currentUser, cloudMetaKey, lang]);
   const askConfirm = useCallback(
     (title, message, onConfirm, confirmLabel) => {
       setConfirmState({
@@ -10250,6 +10301,14 @@ function LifeOsWorkspace() {
   const verifyAccountPassword = useCallback(
     async (pw) => {
       if (!currentUser?.workspaceKey) return false;
+      if (currentUser.google) {
+        try {
+          const { profile } = await signInWithGoogle();
+          return `g_${profile.sub}` === currentUser.workspaceKey;
+        } catch {
+          return false;
+        }
+      }
       const stored = readStoredJson(acctStoreKey(currentUser.workspaceKey));
       return !!stored?.passwordHash && stored.passwordHash === hashPasswordClient(pw);
     },
@@ -10398,18 +10457,74 @@ function LifeOsWorkspace() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  const handleAuthSuccess = ({ email, name, workspaceKey, initialData, isCloud, google, picture, cloudMeta, returning = true }) => {
+    if (google && cloudMeta) {
+      try {
+        localStorage.setItem(`lifeos:cloud:${workspaceKey}`, JSON.stringify(cloudMeta));
+      } catch {
+        /* abaikan */
+      }
+    }
+    setCurrentUser({ email, name, workspaceKey, isCloud, google: Boolean(google), picture: picture || '' });
+    setData(initialData);
+    navigateTab('dashboard');
+    notify(
+      returning
+        ? lang === 'id' ? `Selamat datang kembali, ${name}` : `Welcome back, ${name}`
+        : lang === 'id' ? `Selamat datang, ${name}` : `Welcome, ${name}`
+    );
+  };
+
+  // Registrasi: setup = { type, name } untuk pengguna baru, atau null bila hanya masuk
+  const handleOnboardGoogle = async (setup) => {
+    const { profile } = await signInWithGoogle();
+    const workspaceKey = `g_${profile.sub}`;
+    let cloud = null;
+    try {
+      cloud = await loadCloud(false);
+    } catch (e) {
+      if (/drive_http_(401|403)/.test(String(e?.message))) throw new Error('google_drive_denied');
+      throw e;
+    }
+    const fromCloud = cloud?.data?.profile ? cloud.data : null;
+    const existing = fromCloud || readStoredJson(wsStoreKey(workspaceKey));
+    const initialData = existing || createWorkspaceFromSetup(lang, profile.name, setup);
+    const displayName = existing?.profile?.name || initialData.profile.name || profile.name;
+    handleAuthSuccess({
+      email: profile.email,
+      name: displayName,
+      workspaceKey,
+      initialData,
+      isCloud: true,
+      google: true,
+      picture: profile.picture,
+      cloudMeta: fromCloud ? { hash: hashData(fromCloud), modified: cloud.modifiedTime } : { hash: '', modified: '' },
+      returning: Boolean(existing),
+    });
+  };
+
   if (!currentUser) {
+    if (legacyAuth) {
+      return (
+        <div>
+          <AuthPortalScreen lang={lang} onToggleLang={toggleLanguageQuick} t={t} onAuthenticateSuccess={handleAuthSuccess} />
+          <button
+            type="button"
+            onClick={() => setLegacyAuth(false)}
+            className="fixed top-3 left-3 z-20 px-3 py-2 rounded-xl bg-life-surface border border-life-border/60 text-xs font-semibold text-life-soft"
+          >
+            ← {lang === 'id' ? 'Kembali' : 'Back'}
+          </button>
+        </div>
+      );
+    }
     return (
-      <AuthPortalScreen
+      <OnboardingFlow
         lang={lang}
         onToggleLang={toggleLanguageQuick}
-        t={t}
-        onAuthenticateSuccess={({ email, name, workspaceKey, initialData, isCloud }) => {
-          setCurrentUser({ email, name, workspaceKey, isCloud });
-          setData(initialData);
-          navigateTab('dashboard');
-          notify(lang === 'id' ? `Selamat datang, ${name}` : `Welcome back, ${name}`);
-        }}
+        tr={makeTr(lang)}
+        onGoogle={handleOnboardGoogle}
+        onLegacy={() => setLegacyAuth(true)}
       />
     );
   }
@@ -10512,7 +10627,7 @@ function LifeOsWorkspace() {
             onImportJson={handleImportJson}
             onResetEmpty={handleResetEmpty}
             onRestoreDemo={handleRestoreDemo}
-            onLogout={() => setCurrentUser(null)}
+            onLogout={handleLogout}
             onAddCategory={handleAddCustomCategory}
             onDeleteCategory={handleDeleteCustomCategory}
             onRenameCategory={handleRenameCustomCategory}
@@ -10856,9 +10971,19 @@ function LifeOsWorkspace() {
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {cloudNeedsAuth && (
+              <button
+                type="button"
+                onClick={() => cloudPush(true)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#D9A441]/15 border border-[#D9A441]/50 text-[11px] font-semibold text-life-text"
+              >
+                <Cloud className="w-3.5 h-3.5 text-[#D9A441]" />
+                {makeTr(lang)('sync_reconnect')}
+              </button>
+            )}
             <span className="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-life-surface border border-life-border/40 text-[11px] text-life-muted">
-              <Cloud className="w-3.5 h-3.5 text-[#87B082]" />
-              {syncStatus === 'syncing' ? t('cloud_syncing') : t('cloud_synced')}
+              <Cloud className={`w-3.5 h-3.5 ${isGoogle && syncStatus !== 'synced' ? 'text-[#D9A441]' : 'text-[#87B082]'}`} />
+              {makeTr(lang)(!isGoogle ? 'sync_local' : syncStatus === 'syncing' ? 'sync_syncing' : syncStatus === 'offline' ? 'sync_offline' : syncStatus === 'auth' ? 'sync_auth' : 'sync_google')}
             </span>
 
             <button
@@ -11030,10 +11155,7 @@ function LifeOsWorkspace() {
         onImportJson={handleImportJson}
         onResetEmpty={handleResetEmpty}
         onRestoreDemo={handleRestoreDemo}
-        onLogout={() => {
-          setSettingsOpen(false);
-          setCurrentUser(null);
-        }}
+        onLogout={handleLogout}
       />
 
       <SearchModal
@@ -11065,6 +11187,7 @@ function LifeOsWorkspace() {
           cfg={lockCfg}
           userName={currentUser.name}
           verifyPassword={verifyAccountPassword}
+          viaGoogle={Boolean(currentUser.google)}
           onUnlock={() => {
             setLockCfg(loadLock());
             setLocked(false);
